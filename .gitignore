@@ -1,0 +1,16 @@
+out/
+**/Debug/
+**/Release/
+**/__pycache__/
+*.pyc
+*.exe
+*.o
+*.d
+*.su
+*.elf
+*.bin
+*.map
+*.SAV
+.ai/
+.settings/
+**/.settings/
