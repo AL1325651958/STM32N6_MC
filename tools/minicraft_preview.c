@@ -15,7 +15,7 @@ int main(int argc,char **argv)
   if(!w.blocks||!save||!view||!fb) return 1;
   MC_Generate(&w,0x20261020);
   char path[1024];
-  const char *variants[]={"preview","night","inventory","mining","chest","furnace","creative","geometry","farming","combat"};
+  const char *variants[]={"preview","night","inventory","mining","chest","furnace","creative","geometry","farming","combat","ruins"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -55,6 +55,12 @@ int main(int argc,char **argv)
       w.mobs[1]=(MC_Mob){12.5f,2.01f,14.0f,0,0,0,8,1,1,0};
       MC_Give(&w,MC_SWORD,1);w.mob_target=0;w.notice="TAP SCREEN TO ATTACK  ANIMAL DROPS RAW MEAT";
     }
+    if(k==10){
+      MC_Generate(&w,0x20261020);
+      int cx=(int)w.chest_map[0][0]-1,h=(int)w.chest_map[0][1]-3,cz=(int)w.chest_map[0][2]-2;
+      w.x=cx+.5f;w.y=h+2.01f;w.z=cz-5.5f;w.yaw=0;w.pitch=-.08f;w.time=90;
+      w.notice="STONE RUIN  TORCHES  SUPPLY CHEST";
+    }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];
     MC_UIDraw(fb,&w,MC_GRASS,0,0,"NEW WORLD  SD READY",1,0,0);
@@ -69,6 +75,6 @@ int main(int argc,char **argv)
   FILE *f=fopen(path,"wb");if(!f)return 1;
   if(fwrite(save,1,MC_SAVE_SIZE,f)!=MC_SAVE_SIZE)return 1;
   fclose(f);
-  printf("Ten interface/geometry previews and %u-byte example save generated at %s\n",(unsigned)MC_SAVE_SIZE,argv[1]);
+  printf("Eleven interface/gameplay previews and %u-byte example save generated at %s\n",(unsigned)MC_SAVE_SIZE,argv[1]);
   free(fb);free(view);free(save);free(w.blocks);return 0;
 }

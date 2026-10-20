@@ -25,6 +25,65 @@ static float noise(int x, int z, unsigned scale, uint32_t seed)
 static int height(int x, int z, uint32_t seed)
 { return 10 + (int)(noise(x,z,24,seed)*18 + noise(x,z,8,seed+1)*7); }
 
+/* Small deterministic ruins give exploration a readable destination without
+   adding another world data structure.  They are generated only for a new
+   world; the chest coordinates and loot use the existing v4 container fields. */
+static int ruin_site(int cx,int cz,uint32_t seed,int *base)
+{
+  int h=height(cx,cz,seed);
+  if(h<17 || h>32 || (abs(cx-64)<18 && abs(cz-64)<18))return 0;
+  for(int dz=-3;dz<=3;dz++)for(int dx=-3;dx<=3;dx++) {
+    int nh=height(cx+dx,cz+dz,seed);
+    if(nh<17 || abs(nh-h)>1)return 0;
+  }
+  *base=h;return 1;
+}
+static int place_ruin(MC_World *w,int cx,int cz,uint32_t seed,int chest_slot)
+{
+  int h;if(!ruin_site(cx,cz,seed,&h))return 0;
+  /* Clear a small footprint and level its floor so the structure is walkable. */
+  for(int dz=-3;dz<=3;dz++)for(int dx=-3;dx<=3;dx++) {
+    int x=cx+dx,z=cz+dz,nh=height(x,z,seed);
+    for(int y=nh+1;y<=h+6;y++)MC_Set(w,x,y,z,MC_AIR);
+    for(int y=nh+1;y<=h;y++)MC_Set(w,x,y,z,MC_BRICK);
+    MC_Set(w,x,h+1,z,MC_BRICK);
+  }
+  /* Three-block walls with a front doorway and a broken roof edge. */
+  for(int y=h+2;y<=h+4;y++)for(int d=-3;d<=3;d++) {
+    /* Leave the centre of the front wall open at every height.  The old
+       bottom-only brick made the doorway catch the player's feet. */
+    if(d)MC_Set(w,cx+d,y,cz-3,MC_BRICK);
+    MC_Set(w,cx+d,y,cz+3,MC_BRICK);
+    MC_Set(w,cx-3,y,cz+d,MC_BRICK);MC_Set(w,cx+3,y,cz+d,MC_BRICK);
+  }
+  for(int d=-3;d<=3;d+=2)MC_Set(w,cx+d,h+5,cz,MC_BRICK);
+  MC_Set(w,cx-2,h+3,cz-2,MC_TORCH);MC_Set(w,cx+2,h+3,cz-2,MC_TORCH);
+  MC_Set(w,cx,h+2,cz+1,MC_CHEST);
+  if(chest_slot>=0 && chest_slot<MC_CHESTS) {
+    w->chest_map[chest_slot][0]=(uint16_t)(cx+1);
+    w->chest_map[chest_slot][1]=(uint16_t)(h+3);
+    w->chest_map[chest_slot][2]=(uint16_t)(cz+2);
+    w->chest_blocks[chest_slot][0]=(MC_Stack){MC_TORCH,8,0};
+    w->chest_blocks[chest_slot][1]=(MC_Stack){MC_COAL,4,0};
+    w->chest_blocks[chest_slot][2]=(MC_Stack){MC_APPLE,2,0};
+    w->chest_blocks[chest_slot][3]=(MC_Stack){MC_STONE_PICK,1,(uint16_t)MC_ToolLife(MC_STONE_PICK)};
+  }
+  return 1;
+}
+static void generate_ruins(MC_World *w,uint32_t seed)
+{
+  int count=0;
+  int placed_x[2]={0,0},placed_z[2]={0,0};
+  /* A hash gate keeps the structures distributed across seeds. */
+  for(int pass=0;pass<2 && count<2;pass++)
+    for(int z=16;z<112 && count<2;z+=8)for(int x=16;x<112 && count<2;x+=8) {
+      if(pass==0 && (hash((uint32_t)x,(uint32_t)z,seed+0x51f2u)&7u)!=0u)continue;
+      int duplicate=0;for(int i=0;i<count;i++)if(placed_x[i]==x&&placed_z[i]==z)duplicate=1;
+      if(duplicate)continue;
+      if(place_ruin(w,x,z,seed,count)) { placed_x[count]=x;placed_z[count]=z;count++; }
+    }
+}
+
 uint8_t MC_Get(const MC_World *w, int x, int y, int z)
 {
   if (x < 0 || x >= MC_MAP_X || z < 0 || z >= MC_MAP_Z || y < 0) return MC_BEDROCK;
@@ -195,6 +254,7 @@ void MC_Generate(MC_World *w, uint32_t seed)
     if(score>best){best=score;w->x=x+.5f;w->y=y+1.01f;w->z=z+.5f;}
   }
   MC_NewPlayer(w,0);
+  generate_ruins(w,seed);
 }
 void MC_Step(MC_World *w, float f, float s, float dt, int jump)
 {

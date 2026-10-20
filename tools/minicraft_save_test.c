@@ -18,7 +18,27 @@ static void invalid(MC_World *w,uint8_t *p,uint8_t *copy,unsigned offset,unsigne
 int main(int argc,char **argv) {
  MC_World a={.blocks=calloc(1,MC_MAP_BYTES)},b={.blocks=calloc(1,MC_MAP_BYTES)};
  uint8_t *save=calloc(1,MC_SAVE_SIZE),*copy=malloc(MC_SAVE_SIZE);assert(a.blocks&&b.blocks&&save&&copy);
- MC_Generate(&a,77);a.x=12.5f;a.y=22;a.z=19.5f;a.yaw=2.1f;a.pitch=-.4f;
+ MC_Generate(&a,77);
+ uint16_t ruin_coords[2][3];
+ for(unsigned c=0;c<2;c++) {
+   memcpy(ruin_coords[c],a.chest_map[c],sizeof(ruin_coords[c]));
+   assert(ruin_coords[c][0]&&ruin_coords[c][1]&&ruin_coords[c][2]);
+   int cx=ruin_coords[c][0]-1,h=ruin_coords[c][1]-3,cz=ruin_coords[c][2]-2;
+   assert(MC_Get(&a,cx,h+2,cz-3)==MC_AIR);
+   assert(MC_Get(&a,cx,h+3,cz-3)==MC_AIR);
+   assert(MC_Get(&a,cx,h+4,cz-3)==MC_AIR);
+   assert(MC_Get(&a,cx,h+2,cz+1)==MC_CHEST);
+   assert(a.chest_blocks[c][0].item==MC_TORCH&&a.chest_blocks[c][0].count==8);
+   assert(a.chest_blocks[c][1].item==MC_COAL&&a.chest_blocks[c][1].count==4);
+   assert(a.chest_blocks[c][2].item==MC_APPLE&&a.chest_blocks[c][2].count==2);
+   assert(a.chest_blocks[c][3].item==MC_STONE_PICK&&a.chest_blocks[c][3].count==1);
+ }
+ roundtrip(&a,&b,save);
+ assert(!memcmp(a.chest_map,b.chest_map,sizeof(a.chest_map)));
+ assert(!memcmp(a.chest_blocks,b.chest_blocks,sizeof(a.chest_blocks)));
+ MC_Generate(&b,77);
+ assert(!memcmp(a.chest_map,b.chest_map,sizeof(a.chest_map)));
+ a.x=12.5f;a.y=22;a.z=19.5f;a.yaw=2.1f;a.pitch=-.4f;
  assert(MC_Give(&a,MC_IRON,99));assert(MC_Give(&a,MC_STONE_PICK,1));a.slots[2].wear=71;a.equipped=MC_STONE_PICK;
  a.slot=3;a.health=13;a.air=7;a.hunger=7;a.time=599.75f;a.reserve[MC_WOOD]=999;
  a.reserve[MC_WOOD_PICK]=2;a.reserve_wear[0]=17;
@@ -64,7 +84,8 @@ int main(int argc,char **argv) {
  MC_SaveEncode(&a,8,save);put32(save+4,1);put32(save+48,0);put32(save+52,0);put32(save+60,MC_Crc32(save,60));
  assert(MC_SaveDecode(&b,save,MC_SAVE_V1_SIZE));assert(b.creative&&b.health==20&&!memcmp(a.blocks,b.blocks,MC_MAP_BYTES));
  /* v2 preserves aggregate counts (including overflow), old hotbar and tool wear. */
- MC_Generate(&a,78);MC_SaveEncode(&a,9,save);put32(save+4,2);uint8_t *m=save+MC_SAVE_V1_SIZE;memset(m,0,MC_SAVE_META);
+ MC_Generate(&a,78);for(unsigned i=0;i<MC_MAP_BYTES;i++)if(a.blocks[i]>=18)a.blocks[i]=MC_STONE;
+ MC_SaveEncode(&a,9,save);put32(save+4,2);uint8_t *m=save+MC_SAVE_V1_SIZE;memset(m,0,MC_SAVE_META);
  for(unsigned id=1;id<25;id++)if(id!=MC_BEDROCK&&id!=MC_WATER)put16(m+id*2,id>=MC_WOOD_PICK&&id<=MC_IRON_PICK?2:999);
  const uint8_t bar[8]={MC_WOOD,MC_DIRT,MC_COBBLE,MC_PLANKS,MC_TABLE,MC_TORCH,MC_GLASS,MC_STONE_PICK};memcpy(m+50,bar,8);
  m[58]=7;m[60]=17;m[61]=8;m[62]=MC_STONE_PICK;put16(m+64,39);put16(m+66,71);put16(m+68,120);putfloat(m+72,399.5f);crc(save,MC_SAVE_V2_META);
