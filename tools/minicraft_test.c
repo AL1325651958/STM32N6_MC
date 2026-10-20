@@ -47,7 +47,7 @@ int main(void)
   /* Small props use their visible dimensions for picking and player collision. */
   flat(&w);MC_Set(&w,10,3,13,MC_TORCH);w.yaw=0;w.pitch=0;
   MC_Hit small;
-  w.y=2.25f;assert(!MC_Pick(&w,400,240,&small)); /* Above the 13/16 flame. */
+  w.y=2.40f;assert(!MC_Pick(&w,400,240,&small)); /* Above the corrected 14/16 flame. */
   assert(MC_BodyClear(&w,10.5f,2.01f,13.5f)); /* Fire and stem remain passable. */
   w.y=1.88f;assert(MC_Pick(&w,400,240,&small));
   assert(small.block==MC_TORCH&&small.nz==-1&&fabsf(small.distance-2.9375f)<.001f);
@@ -59,15 +59,16 @@ int main(void)
   w.z=15;w.yaw=3.14159265f;MC_Set(&w,10,3,14,MC_AIR);
   assert(MC_Pick(&w,400,240,&small)&&small.nz==1&&fabsf(small.distance-1.4375f)<.001f);
   w.x=10.5f;w.z=13.5f;w.y=2.38f;w.pitch=-1.5707963f;
-  assert(MC_Pick(&w,400,240,&small)&&small.ny==1&&fabsf(small.distance-.1875f)<.001f);
+  assert(MC_Pick(&w,400,240,&small)&&small.ny==1&&fabsf(small.distance-.125f)<.001f);
   /* Starting within either part must exit the union, never its hidden seam. */
   w.y=3.5f-1.62f;w.pitch=1.5707963f;
-  assert(MC_Pick(&w,400,240,&small)&&small.ny==1&&fabsf(small.distance-.3125f)<.001f);
+  assert(MC_Pick(&w,400,240,&small)&&small.ny==1&&fabsf(small.distance-.375f)<.001f);
   w.y=3.75f-1.62f;w.pitch=-1.5707963f;
   assert(MC_Pick(&w,400,240,&small)&&small.ny==-1&&fabsf(small.distance-.75f)<.001f);
   w.x=10.45f;w.z=10.5f;w.y=3.65f-1.62f;w.pitch=0;w.yaw=0;
   assert(MC_Pick(&w,400,240,&small)&&small.block==MC_TORCH&&fabsf(small.distance-2.875f)<.001f);
-  w.x=10.39f;w.y=3.7f-1.62f;assert(!MC_Pick(&w,400,240,&small)); /* Stepped flame narrows above its base. */
+  w.x=10.39f;w.y=3.8f-1.62f;assert(!MC_Pick(&w,400,240,&small)); /* Stepped flame narrows above its base. */
+  w.x=10.5f;w.y=3.85f-1.62f;assert(MC_Pick(&w,400,240,&small)); /* The corrected cap reaches 14/16. */
   flat(&w);MC_Set(&w,10,3,13,MC_SAPLING);w.y=1.88f;
   assert(MC_Pick(&w,400,240,&small)&&small.block==MC_SAPLING);
   w.x=10.2f;w.y=1.48f;assert(!MC_Pick(&w,400,240,&small)); /* Beside thin stem. */

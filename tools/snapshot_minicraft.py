@@ -103,8 +103,8 @@ def main():
         "source_file_count": len(sources),
         "source_bytes": sum((ROOT / p).stat().st_size for p in sources),
         "source_hashes_verified": True,
-        "geometry": "Torch stem 2/16 wide × 10/16 high; stepped flame widths 4/16, 3/16, 2/16 reaching 13/16 total height; chest 14/16; bed 9/16; sapling crossed planes.",
-        "geometry_revision": 2,
+        "geometry": "Torch stem 2/16 wide × 10/16 high; stepped flame widths 4/16, 3/16, 2/16 reaching 14/16 total height; chest 14/16; bed 9/16; sapling crossed planes.",
+        "geometry_revision": 3,
         "hardware": "Not flashed in this task. User-reported ~15 FPS refers to an earlier version; v4 performance, touch, and SD migration need board verification.",
         "artifacts": {},
     }
