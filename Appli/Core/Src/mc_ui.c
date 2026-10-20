@@ -2,6 +2,7 @@
 #include "mc_icons.h"
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
 /* Original 5x7 bitmap alphabet, drawn at LCD resolution for legible controls. */
 static const uint8_t font[][5]={
@@ -146,6 +147,75 @@ static void held_item(uint16_t *fb,const MC_World *w)
   rect(fb,ix-3,iy-3,iw+6,ih+6,0x2104);
   icon_rect(fb,ix,iy,iw,ih,id);
 }
+/* A compact top-down locator keeps the nearby terrain and the player's base
+   readable without adding another touch control.  The map is deliberately
+   derived from the current world so it costs no save bytes and never goes
+   stale after building or mining. */
+static uint16_t map_color(uint8_t b)
+{
+  switch(b) {
+    case MC_WATER:return 0x3d9f;
+    case MC_GRASS:return 0x56a5;
+    case MC_DIRT:return 0x8b07;
+    case MC_SAND:return 0xd66f;
+    case MC_STONE:
+    case MC_COBBLE:
+    case MC_BRICK:
+    case MC_SLAB:
+    case MC_SLAB_TOP:
+    case MC_STAIR:
+    case MC_STAIR_EAST:
+    case MC_STAIR_SOUTH:
+    case MC_STAIR_WEST:return 0x8410;
+    case MC_WOOD:
+    case MC_PLANKS:
+    case MC_TABLE:
+    case MC_FENCE:return 0xa365;
+    case MC_LEAVES:return 0x3b85;
+    case MC_GLASS:return 0x9f7f;
+    case MC_TORCH:return 0xfaa0;
+    case MC_FARMLAND:return 0x6a64;
+    case MC_WHEAT_CROP:return 0x5d87;
+    case MC_WHEAT_MATURE:return 0xf6a0;
+    default:return 0x2104;
+  }
+}
+static uint8_t map_surface(const MC_World *w,int x,int z)
+{
+  if(x<0||z<0||x>=MC_MAP_X||z>=MC_MAP_Z)return MC_AIR;
+  for(int y=MC_MAP_Y-1;y>0;y--) {
+    uint8_t b=MC_Get(w,x,y,z);
+    if(b!=MC_AIR)return b;
+  }
+  return MC_AIR;
+}
+static void mini_map(uint16_t *fb,const MC_World *w)
+{
+  const int ox=686,oy=74,ow=104,oh=126,cx=738,cy=139,cell=3,radius=14;
+  panel(fb,ox,oy,ow,oh);text(fb,698,82,"MAP",0xffe0);
+  rect(fb,ox+7,oy+23,87,87,0x1082);
+  int px=(int)floorf(w->x),pz=(int)floorf(w->z);
+  for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++) {
+    int wx=px+dx,wz=pz+dz;uint16_t c=map_color(map_surface(w,wx,wz));
+    rect(fb,cx+dx*cell-1,cy+dz*cell-1,cell,cell,c);
+  }
+  /* Bed spawn and chest locations are persistent landmarks. */
+  if(w->spawn[0] && abs((int)w->spawn[0]-1-px)<=radius && abs((int)w->spawn[2]-1-pz)<=radius) {
+    int sx=cx+((int)w->spawn[0]-1-px)*cell,sz=cy+((int)w->spawn[2]-1-pz)*cell;
+    rect(fb,sx-3,sz-3,7,2,0xffe0);rect(fb,sx-3,sz+1,7,2,0xffe0);
+    rect(fb,sx-3,sz-1,2,3,0xffe0);rect(fb,sx+2,sz-1,2,3,0xffe0);
+  }
+  for(unsigned i=0;i<MC_CHESTS;i++)if(w->chest_map[i][0]) {
+    int dx=(int)w->chest_map[i][0]-1-px,dz=(int)w->chest_map[i][2]-1-pz;
+    if(abs(dx)<=radius&&abs(dz)<=radius)rect(fb,cx+dx*cell-2,cy+dz*cell-2,5,5,0xffc0);
+  }
+  /* A two-pixel arrow shows facing direction while preserving the center dot. */
+  rect(fb,cx-2,cy-2,5,5,0xffff);
+  int ax=(int)roundf(sinf(w->yaw)*4),az=(int)roundf(cosf(w->yaw)*4);
+  rect(fb,cx+ax-1,cy+az-1,3,3,0xf800);
+  small(fb,696,185,"BASE",0xffe0);small(fb,738,185,"YOU",0xffff);
+  rect(fb,686+9,199,7,4,0xffe0);small(fb,696,197,"BED",0xffff);
+}
 static void stack(uint16_t *fb,int x,int y,int width,int height,const MC_Stack *s,int chosen,int infinite)
 {
   char n[16];uint16_t rim=chosen?0xffcb:0x52ab;
@@ -215,6 +285,7 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     if(w->creative)for(unsigned i=0;i<8;i++){MC_Stack s={w->hotbar[i],1,0};stack(fb,430+i*44,390,44,50,&s,i==w->slot,1);}
     else if(w->open_chest>=MC_CHESTS&&w->open_furnace>=MC_FURNACES)small(fb,430,410,"TAP SOURCE THEN DESTINATION TO MOVE",0xffff);
   } else {
+    mini_map(fb,w);
     held_item(fb,w);
     rect(fb,391,239,19,2,0xffff);rect(fb,400,231,2,19,0xffff);
     for(int yy=-78;yy<=78;yy++)for(int xx=-78;xx<=78;xx++){int d=xx*xx+yy*yy;if(d<78*78&&d>74*74)fb[(350+yy)*800+110+xx]=0xc638;}
@@ -241,5 +312,5 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     }
     if(w->attack_flash>0){rect(fb,393,236,15,4,0xffe0);rect(fb,398,231,4,15,0xffe0);}
   }
-  if(w->notice){int y=w->bag?450:74;panel(fb,10,y,780,24);small(fb,20,y+8,w->notice,0xffff);}
+  if(w->notice){int y=w->bag?450:74;panel(fb,10,y,w->bag?780:570,24);small(fb,20,y+8,w->notice,0xffff);}
 }
