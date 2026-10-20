@@ -68,6 +68,9 @@ typedef struct {
   MC_Drop drops[MC_DROPS]; /* Runtime-only entities; absent from v4 saves. */
   uint32_t mob_rng;
   float mob_clock, spawn_clock, attack_cooldown, attack_flash;
+  /* Runtime-only bounded scheduler for nearby falling sand. */
+  float gravity_clock;
+  uint16_t gravity_cursor;
   uint8_t mob_target;
   const char *notice;
 } MC_World;

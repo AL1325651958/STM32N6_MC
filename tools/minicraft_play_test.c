@@ -20,6 +20,12 @@ int main(void) {
  MC_HoldMove(&h,105,104,1500);assert(MC_HoldReady(&h,1500));MC_HoldMove(&h,125,104,1510);assert(!MC_HoldReady(&h,1600));assert(MC_HoldReady(&h,1960));
  MC_HoldStart(&h,0,0,0xffffff00u);assert(MC_HoldReady(&h,0x100));assert(MC_UIRole(620,310)==MC_TOUCH_LOOK);
  MC_World w={.blocks=malloc(MC_MAP_BYTES)};assert(w.blocks);scene(&w);
+ /* Nearby sand falls on a bounded scheduler, while supported sand stays put. */
+ MC_Set(&w,4,5,4,MC_SAND);tick(&w,2);
+ assert(MC_Get(&w,4,5,4)==MC_AIR&&MC_Get(&w,4,4,4)==MC_SAND);
+ MC_Set(&w,5,5,5,MC_SAND);MC_Set(&w,5,4,5,MC_STONE);tick(&w,40);
+ assert(MC_Get(&w,5,5,5)==MC_SAND);
+ scene(&w);
  /* Deferred legacy tools retain wear when a full inventory gains space. */
  full(&w);w.reserve[MC_WOOD_PICK]=1;w.reserve_wear[0]=17;tick(&w,1);assert(w.reserve[MC_WOOD_PICK]==1);
  w.slots[9]=(MC_Stack){0};tick(&w,1);assert(!w.reserve[MC_WOOD_PICK]&&w.slots[9].item==MC_WOOD_PICK&&w.slots[9].wear==17);scene(&w);

@@ -106,6 +106,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   w->sneak=0;
   memset(w->mobs,0,sizeof(w->mobs));memset(w->drops,0,sizeof(w->drops));w->mob_rng=w->seed^0x9e3779b9u;if(!w->mob_rng)w->mob_rng=1;
   w->mob_target=255;w->mob_clock=w->spawn_clock=w->attack_cooldown=w->attack_flash=0;
+  w->gravity_clock=0;w->gravity_cursor=0;
   memset(w->mob_fed,0,sizeof(w->mob_fed));memset(w->mob_fed_age,0,sizeof(w->mob_fed_age));w->breed_cooldown=0;
   MC_SyncInventory(w);
   w->notice=legacy?"OLD WORLD  CREATIVE MODE":"HOLD BLOCK TO MINE  BAG TO CRAFT";
@@ -327,9 +328,33 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   }
 }
 static void clear_empty(MC_Stack *s){if(!s->count)memset(s,0,sizeof(*s));}
+/* Move a bounded number of sand cells near the player.  The cursor and clock
+   are runtime-only, so v4 saves remain byte-for-byte compatible.  Restricting
+   both the horizontal radius and vertical window keeps worst-case work small
+   on the 15 FPS target while still making placed sand fall promptly. */
+static void falling_sand(MC_World *w,float dt)
+{
+  w->gravity_clock+=dt;
+  if(w->gravity_clock<.2f)return;
+  w->gravity_clock=fmodf(w->gravity_clock,.2f);
+  int bx=(int)floorf(w->x)-6,bz=(int)floorf(w->z)-6;
+  int y0=(int)floorf(w->y)-4,y1=(int)floorf(w->y)+8;
+  if(y0<2)y0=2;
+  if(y1>=MC_MAP_Y)y1=MC_MAP_Y-1;
+  /* 12 cells per update: a full 13x13 ring is revisited about every 2.8 s. */
+  for(unsigned n=0;n<12;n++) {
+    unsigned cell=w->gravity_cursor++%169u;
+    int x=bx+(int)(cell%13u),z=bz+(int)(cell/13u);
+    for(int y=y1;y>=y0;y--) {
+      if(MC_Get(w,x,y,z)!=MC_SAND || MC_Get(w,x,y-1,z)!=MC_AIR)continue;
+      MC_Set(w,x,y,z,MC_AIR);MC_Set(w,x,y-1,z,MC_SAND);break;
+    }
+  }
+}
 void MC_SystemsTick(MC_World *w,float dt) {
   if(!(dt>0))return;
   dt=fminf(dt,.1f);
+  falling_sand(w,dt);
   for(unsigned i=0;i<MC_DROPS;i++) {
     MC_Drop *d=&w->drops[i];if(!d->count)continue;
     d->age+=dt;d->spin+=dt*3.2f;
