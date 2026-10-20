@@ -288,6 +288,14 @@ void MC_MobsTick(MC_World *w,float dt)
   if(!(dt>0)||w->bag)return;
   dt=fminf(dt,.1f);w->attack_cooldown=fmaxf(0,w->attack_cooldown-dt);w->attack_flash=fmaxf(0,w->attack_flash-dt);w->breed_cooldown=fmaxf(0,w->breed_cooldown-dt);
   if(w->creative){memset(w->mobs,0,sizeof(w->mobs));w->mob_target=255;w->spawn_clock=w->mob_clock=0;return;}
+  /* Hostile mobs belong to the night cycle.  Clear them at dawn so a safe
+     daytime loop is possible without growing another persistent entity flag. */
+  int night=sinf(w->time*(6.2831853f/600))<=-.38f;
+  if(!night) for(unsigned i=0;i<MC_MOBS;i++) if(w->mobs[i].health&&!w->mobs[i].type) {
+    memset(&w->mobs[i],0,sizeof(w->mobs[i]));
+    w->mob_fed[i]=0;w->mob_fed_age[i]=0;
+    if(w->mob_target==i)w->mob_target=255;
+  }
   w->spawn_clock+=dt;w->mob_clock+=dt;
   if(w->spawn_clock>=4) {
     w->spawn_clock=0;unsigned r=next_random(w);
@@ -295,7 +303,7 @@ void MC_MobsTick(MC_World *w,float dt)
       float angle=((r>>4)&255)*(6.2831853f/256),radius=9+((r>>12)&7);
       int x=(int)(w->x+cosf(angle)*radius),z=(int)(w->z+sinf(angle)*radius);
       for(int y=(int)w->y+3;y>(int)w->y-5&&y>0;y--)
-        if(sinf(w->time*(6.2831853f/600))>-.38f?MC_PassiveSpawn(w,x,y,z):MC_MobSpawn(w,x,y,z))break;
+        if(night?MC_MobSpawn(w,x,y,z):MC_PassiveSpawn(w,x,y,z))break;
     }
   }
   if(w->mob_clock<.1f)return;

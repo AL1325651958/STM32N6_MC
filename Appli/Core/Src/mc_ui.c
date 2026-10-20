@@ -162,6 +162,15 @@ static void held_item(uint16_t *fb,const MC_World *w)
   rect(fb,ix-3,iy-3,iw+6,ih+6,0x2104);
   icon_rect(fb,ix,iy,iw,ih,id);
 }
+/* This is the one explicit scene action control.  Combat is deliberately
+   absent: a tap on the scene attacks with a held weapon. */
+static const char *scene_action(const MC_World *w)
+{
+  unsigned id=w->hotbar[w->slot];
+  return MC_IsBlock(id)?"PLACE":"USE";
+}
+static const char *world_phase(const MC_World *w)
+{ return sinf(w->time*(6.2831853f/600))<=-.38f?"NIGHT":"DAY"; }
 /* A compact top-down locator keeps the nearby terrain and the player's base
    readable without adding another touch control.  The map is deliberately
    derived from the current world so it costs no save bytes and never goes
@@ -263,6 +272,7 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
   panel(fb,10,8,578,62);
   snprintf(info,sizeof(info),"X %d Y %d Z %d FPS %u MAX %uMS",(int)w->x,(int)w->y,(int)w->z,fps,max_ms);
   text(fb,20,18,info,0xffff);text(fb,20,43,touch_ready?status:"TOUCH NOT FOUND",touch_ready?0xffc0:0xf800);
+  small(fb,500,44,world_phase(w),world_phase(w)[0]=='N'?0xfca0:0xffe0);
   panel(fb,600,8,90,54);text(fb,614,28,w->bag?"CLOSE":"BAG",0xffff);
   panel(fb,700,8,90,54);text(fb,718,28,"SAVE",0xffff);
   if(w->bag) {
@@ -319,8 +329,8 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     for(int yy=-78;yy<=78;yy++)for(int xx=-78;xx<=78;xx++){int d=xx*xx+yy*yy;if(d<78*78&&d>74*74)fb[(350+yy)*800+110+xx]=0xc638;}
     int jx=110+(int)(fmaxf(-1,fminf(1,strafe))*45),jy=350-(int)(fmaxf(-1,fminf(1,move))*45);
     rect(fb,jx-10,jy-10,20,20,0xffe0);text(fb,86,444,"MOVE",0xffff);
-    panel(fb,690,288,100,62);text(fb,710,312,(w->hotbar[w->slot]==MC_APPLE||w->hotbar[w->slot]==MC_RAW_MEAT)?"EAT":w->hotbar[w->slot]==MC_WHEAT?"FEED":"USE",0xffff);
-    panel(fb,690,216,100,62);text(fb,710,228,"SNEAK",w->sneak?0x07e0:0xffff);small(fb,700,258,w->sneak?"EDGE GUARD":"HOLD TO BUILD",0xffe0);
+    panel(fb,690,288,100,62);text(fb,710,312,scene_action(w),0xffff);
+    panel(fb,690,216,100,62);text(fb,710,228,"SNEAK",w->sneak?0x07e0:0xffff);small(fb,700,258,w->sneak?"EDGE GUARD":"HOLD TO SNEAK",0xffe0);
     panel(fb,690,360,100,62);text(fb,716,384,"JUMP",0xffff);
     for(unsigned i=0;i<MC_HOTBAR;i++){MC_Stack s=w->creative?(MC_Stack){w->hotbar[i],1,0}:w->slots[i];stack(fb,240+i*50,424,50,56,&s,i==w->slot,w->creative);}
     panel(fb,640,393,44,56);icon(fb,642,397,w->hotbar[w->slot],40);

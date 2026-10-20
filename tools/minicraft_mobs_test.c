@@ -81,8 +81,16 @@ int main(void)
   w.attack_cooldown=0;assert(MC_Attack(&w,400,400));w.attack_cooldown=0;
   assert(MC_Attack(&w,400,400)&&!w.mobs[0].health&&w.items[MC_RAW_MEAT]==1);
   assert(w.experience==3&&MC_XpLevel(&w)==0);
+  /* Hostiles are a night-only threat and leave when dawn arrives.  The
+     night predicate is sin(time*2pi/600)<=-.38, so 435 is night and 150 is
+     daylight. */
+  w.time=435;w.mobs[0]=(MC_Mob){10.5f,2.01f,13.5f,0,0,0,MC_MOB_HEALTH,1,0,0};
+  MC_MobsTick(&w,.1f);assert(w.mobs[0].health==MC_MOB_HEALTH);
+  w.time=150;w.mobs[0]=(MC_Mob){10.5f,2.01f,13.5f,0,0,0,MC_MOB_HEALTH,1,0,0};
+  MC_MobsTick(&w,.1f);assert(!w.mobs[0].health);
   memset(w.slots,0,sizeof(w.slots));MC_SyncInventory(&w);assert(MC_Give(&w,MC_RAW_MEAT,1));
   w.health=10;assert(MC_Use(&w)&&w.health==14&&w.items[MC_RAW_MEAT]==0);
+  w.time=435; /* Keep the hostile alive while exercising its attack tick. */
   w.mobs[0]=(MC_Mob){10.5f,2.01f,13.5f,0,0,0,MC_MOB_HEALTH,1,0,0};
   w.mobs[0].z=11.8f;unsigned health=w.health;MC_MobsTick(&w,.1f);assert(w.health<health);
   health=w.health;w.bag=1;MC_MobsTick(&w,.1f);assert(w.health==health);
