@@ -100,7 +100,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   w->bag=w->recipe_page=w->change_world=w->bag_page=w->recipe_requires=w->split=0;
   w->selected_slot=0;w->open_chest=w->open_furnace=w->moving_slot=255;
   w->sneak=0;
-  memset(w->mobs,0,sizeof(w->mobs));w->mob_rng=w->seed^0x9e3779b9u;if(!w->mob_rng)w->mob_rng=1;
+  memset(w->mobs,0,sizeof(w->mobs));memset(w->drops,0,sizeof(w->drops));w->mob_rng=w->seed^0x9e3779b9u;if(!w->mob_rng)w->mob_rng=1;
   w->mob_target=255;w->mob_clock=w->spawn_clock=w->attack_cooldown=w->attack_flash=0;
   MC_SyncInventory(w);
   w->notice=legacy?"OLD WORLD  CREATIVE MODE":"HOLD BLOCK TO MINE  BAG TO CRAFT";
@@ -143,6 +143,20 @@ static int chest_at(const MC_World *w,int x,int y,int z) {
 static int furnace_at(const MC_World *w,int x,int y,int z) {
   for(unsigned i=0;i<MC_FURNACES;i++)if(w->furnaces[i].x==x+1 && w->furnaces[i].y==y+1 && w->furnaces[i].z==z+1)return (int)i;
   return -1;
+}
+static int drop_spawn(MC_World *w,unsigned item,unsigned count,float x,float y,float z) {
+  if(!item || item>=MC_ITEM_COUNT || !count)return 0;
+  for(unsigned i=0;i<MC_DROPS && count;i++) {
+    MC_Drop *d=&w->drops[i];
+    if(d->item==item && d->count && fabsf(d->x-x)<.7f && fabsf(d->z-z)<.7f && fabsf(d->y-y)<.9f) {
+      unsigned room=64-d->count,n=count<room?count:room;d->count+=(uint8_t)n;count-=n;
+    }
+  }
+  for(unsigned i=0;i<MC_DROPS && count;i++)if(!w->drops[i].count) {
+    unsigned n=count>64?64:count;
+    w->drops[i]=(MC_Drop){x,y,z,1.6f,0,(float)(i&3)*1.57f,(uint8_t)item,(uint8_t)n};count-=n;
+  }
+  return count==0;
 }
 static int fuel_time(unsigned item){return item==MC_COAL?40:item==MC_WOOD?15:item==MC_PLANKS?10:0;}
 static unsigned smelt(unsigned item){return item==MC_IRON_ORE?MC_IRON:item==MC_SAND?MC_GLASS:item==MC_COBBLE?MC_BRICK:item==MC_WOOD?MC_COAL:0;}
@@ -225,7 +239,12 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   unsigned drop=h.block==MC_GRASS?MC_DIRT:h.block==MC_STONE?MC_COBBLE:h.block==MC_COAL_ORE?MC_COAL:h.block;
   if(h.block==MC_LEAVES){unsigned n=(unsigned)(h.x*7+h.y*3+h.z);drop=n%5==0?MC_APPLE:n%3==0?MC_SAPLING:0;}
   int harvest=(!hard || tier>0) && (h.block!=MC_IRON_ORE || tier>=2);
-  if(!w->creative && harvest && drop && !MC_Give(w,drop,1)){w->notice="BAG FULL";w->mining=0;return;}
+  if(!w->creative && harvest && drop) {
+    /* Preserve the established direct pickup path; overflow becomes a world drop. */
+    if(!MC_Give(w,drop,1) && !drop_spawn(w,drop,1,h.x+.5f,h.y+.55f,h.z+.5f)) {
+      w->notice="BAG FULL";w->mining=0;return;
+    }
+  }
   MC_Set(w,h.x,h.y,h.z,MC_AIR);w->mining=0;w->target_valid=0;
   if(ci>=0)memset(w->chest_map[ci],0,sizeof(w->chest_map[ci]));
   if(fi>=0)memset(&w->furnaces[fi],0,sizeof(MC_Furnace));
@@ -242,6 +261,24 @@ static void clear_empty(MC_Stack *s){if(!s->count)memset(s,0,sizeof(*s));}
 void MC_SystemsTick(MC_World *w,float dt) {
   if(!(dt>0))return;
   dt=fminf(dt,.1f);
+  for(unsigned i=0;i<MC_DROPS;i++) {
+    MC_Drop *d=&w->drops[i];if(!d->count)continue;
+    d->age+=dt;d->spin+=dt*3.2f;
+    if(d->age>300 || !d->item || d->item>=MC_ITEM_COUNT){memset(d,0,sizeof(*d));continue;}
+    d->vy-=18*dt;d->y+=d->vy*dt;
+    int bx=(int)floorf(d->x),by=(int)floorf(d->y-.12f),bz=(int)floorf(d->z);
+    if(MC_IsSolid(MC_Get(w,bx,by,bz)) && d->y<by+1.12f){d->y=by+1.12f;d->vy=0;}
+    float dx=d->x-w->x,dy=d->y-(w->y+.65f),dz=d->z-w->z;
+    if(dx*dx+dy*dy+dz*dz<1.35f*1.35f && MC_Give(w,d->item,d->count)) {
+      w->notice=MC_ItemName(d->item);memset(d,0,sizeof(*d));continue;
+    }
+  }
+  /* Merge nearby stacks with a fixed O(16^2) budget. */
+  for(unsigned i=0;i<MC_DROPS;i++)if(w->drops[i].count)for(unsigned j=i+1;j<MC_DROPS;j++)
+    if(w->drops[j].count && w->drops[i].item==w->drops[j].item && fabsf(w->drops[i].x-w->drops[j].x)<.55f && fabsf(w->drops[i].z-w->drops[j].z)<.55f) {
+      unsigned room=64-w->drops[i].count,n=w->drops[j].count<room?w->drops[j].count:room;
+      w->drops[i].count+=(uint8_t)n;w->drops[j].count-=(uint8_t)n;if(!w->drops[j].count)memset(&w->drops[j],0,sizeof(MC_Drop));
+    }
   for(unsigned i=1;i<25;i++)if(w->reserve[i] && i!=MC_BEDROCK && i!=MC_WATER) {
     unsigned n=w->reserve[i]>64?64:w->reserve[i],room=capacity(w->slots,MC_SLOTS,i);
     if(n>room)n=room;

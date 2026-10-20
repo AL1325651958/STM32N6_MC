@@ -41,7 +41,11 @@ int main(void) {
  /* Finite stacks, atomic give/craft, full-bag mining protection. */
  scene(&w);assert(MC_Give(&w,MC_WOOD,130));assert(w.slots[0].count==64&&w.slots[1].count==64&&w.slots[2].count==2);
  assert(!MC_Give(&w,MC_AIR,1)&&!MC_Give(&w,MC_WATER,1));full(&w);
- assert(!MC_Give(&w,MC_WOOD,1));MC_Set(&w,10,3,13,MC_WOOD);mine(&w,20);assert(MC_Get(&w,10,3,13)==MC_WOOD);
+ assert(!MC_Give(&w,MC_WOOD,1));MC_Set(&w,10,3,13,MC_WOOD);mine(&w,20);
+ assert(MC_Get(&w,10,3,13)==MC_AIR);assert(w.drops[0].item==MC_WOOD&&w.drops[0].count==1);
+ w.slots[0]=(MC_Stack){0};MC_SyncInventory(&w);w.x=w.drops[0].x;w.y=w.drops[0].y-.65f;w.z=w.drops[0].z;tick(&w,2);assert(!w.drops[0].count&&w.items[MC_WOOD]==1);
+ scene(&w);full(&w);w.drops[0]=(MC_Drop){10.5f,2.1f,10.5f,0,0,0,MC_WOOD,2};w.drops[1]=(MC_Drop){10.7f,2.1f,10.5f,0,0,0,MC_WOOD,3};tick(&w,1);
+ assert(w.drops[0].count==5&&!w.drops[1].count);w.drops[0].age=300;tick(&w,1);assert(!w.drops[0].count);
  w.slots[0]=(MC_Stack){MC_WOOD,2,0};MC_SyncInventory(&w);assert(!MC_Craft(&w,0));assert(w.items[MC_WOOD]==2);
  /* Durability follows the individual tool through swaps and chest transfers. */
  scene(&w);assert(MC_Give(&w,MC_WOOD_PICK,2));w.slots[0].wear=1;MC_Set(&w,10,3,13,MC_STONE);mine(&w,25);

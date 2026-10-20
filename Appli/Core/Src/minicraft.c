@@ -390,6 +390,18 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
     mob_rect[i][0]=(int)clamp(floorf(minx),0,width);mob_rect[i][1]=(int)clamp(floorf(miny),0,height);
     mob_rect[i][2]=(int)clamp(ceilf(maxx),0,width);mob_rect[i][3]=(int)clamp(ceilf(maxy),0,height);mob_mask|=1u<<i;
   }
+  int drop_rect[MC_DROPS][4];float drop_depth[MC_DROPS];unsigned drop_mask=0;
+  for(unsigned i=0;i<MC_DROPS;i++)if(w->drops[i].count) {
+    const MC_Drop *d=&w->drops[i];float px=d->x-w->x,py=d->y-w->y-1.62f,pz=d->z-w->z;
+    float depth=px*syaw*cp+py*sp+pz*cyaw*cp;if(depth<=.05f)continue;
+    float sx=width*.5f+focal*(px*cyaw-pz*syaw)/depth;
+    float sy=height*.5f-focal*(-px*sp*syaw+py*cp-pz*sp*cyaw)/depth;
+    float half=fmaxf(1.5f,focal*.12f/depth);
+    if(sx+half<0||sy+half<0||sx-half>=width||sy-half>=height)continue;
+    drop_rect[i][0]=(int)clamp(floorf(sx-half),0,width);drop_rect[i][1]=(int)clamp(floorf(sy-half),0,height);
+    drop_rect[i][2]=(int)clamp(ceilf(sx+half),0,width);drop_rect[i][3]=(int)clamp(ceilf(sy+half),0,height);
+    drop_depth[i]=depth;drop_mask|=1u<<i;
+  }
   /* Bound dynamic light work: collect at most eight nearby torches once per frame. */
   int lights[8][3],nl=0;
   for(int y=(int)w->y-4;y<=(int)w->y+4 && nl<8;y++)
@@ -472,6 +484,13 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
         if(tu==0 || tu==15 || tv==0 || tv==15){r=246;g=237;b=180;}
         if(w->mining>0 && ((tu+tv*3)%((unsigned)(12-w->mining*8))==0)){r/=3;g/=3;b/=3;}
       }
+    }
+    for(unsigned i=0;i<MC_DROPS;i++)if((drop_mask&(1u<<i)) && (int)x>=drop_rect[i][0] && (int)x<=drop_rect[i][2] && (int)y>=drop_rect[i][1] && (int)y<=drop_rect[i][3] &&
+        (!world_hit || drop_depth[i]<h.distance)) {
+      uint16_t c=MC_ItemColor(w->drops[i].item);r=((c>>11)&31)*255/31;g=((c>>5)&63)*255/63;b=(c&31)*255/31;
+      int edge=(int)x==drop_rect[i][0] || (int)y==drop_rect[i][1] || (int)x==drop_rect[i][2] || (int)y==drop_rect[i][3];
+      if(edge){r=r*2/3;g=g*2/3;b=b*2/3;}
+      break;
     }
     unsigned candidates=0;
     for(unsigned i=0;i<MC_MOBS;i++)if((mob_mask&(1u<<i)) && (int)x>=mob_rect[i][0] && (int)x<=mob_rect[i][2] && (int)y>=mob_rect[i][1] && (int)y<=mob_rect[i][3])candidates|=1u<<i;

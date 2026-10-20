@@ -24,11 +24,13 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
 #define MC_CHESTS 6
 #define MC_MOBS 8
 #define MC_MOB_HEALTH 12
+#define MC_DROPS 16
 typedef struct { uint8_t item,count; uint16_t wear; } MC_Stack;
 typedef struct { uint16_t x,y,z; MC_Stack input,fuel,output; float burn,progress; } MC_Furnace;
 typedef struct { uint16_t x,y,z; float age; } MC_Grower;
 typedef struct { int x,y,z,nx,ny,nz; float distance; uint8_t block; } MC_Hit;
 typedef struct { float x,y,z,vy,attack,hurt; uint8_t health,on_ground; } MC_Mob;
+typedef struct { float x,y,z,vy,age,spin; uint8_t item,count; } MC_Drop;
 
 typedef struct {
   uint8_t *blocks;
@@ -52,6 +54,7 @@ typedef struct {
   uint16_t chest_map[MC_CHESTS][3];
   uint8_t target_valid, bag_page;
   MC_Mob mobs[MC_MOBS];
+  MC_Drop drops[MC_DROPS]; /* Runtime-only entities; absent from v4 saves. */
   uint32_t mob_rng;
   float mob_clock, spawn_clock, attack_cooldown, attack_flash;
   uint8_t mob_target;
