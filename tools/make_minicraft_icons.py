@@ -12,6 +12,7 @@ NAMES = ['AIR', 'GRASS', 'DIRT', 'STONE', 'SAND', 'LOG', 'LEAVES',
          'COAL ORE', 'IRON ORE', 'GLASS', 'BRICKS', 'TORCH', 'STICKS', 'COAL',
          'IRON', 'WOOD PICK', 'STONE PICK', 'IRON PICK', 'APPLE', 'AXE',
          'SHOVEL', 'SWORD', 'CHEST', 'BED', 'SAPLING', 'DOOR', 'DOOR OPEN']
+NAMES += ['STONE SLAB', 'SLAB TOP']
 BASE = {1:(112,165,55), 2:(139,96,61), 3:(141,145,151), 4:(224,208,150),
         5:(144,100,53), 6:(62,135,49), 7:(67,69,77), 8:(55,135,207),
         9:(133,139,146), 10:(191,145,83), 11:(169,116,59), 12:(115,121,128),
@@ -211,6 +212,13 @@ def sprite(item):
             d.polygon([(3,3),(6,2),(8,3),(4,5),(4,13),(3,12)], fill='#a8733a')
             d.line([(4,6),(4,12)], fill='#d29a4c', width=1)
             d.point((6,6), fill='#f0c568')
+    elif item in (33, 34):
+        # The top state is an internal map shape but shares the held-item icon.
+        d.polygon([(2,8),(8,4),(14,8),(8,12)], fill=edge)
+        d.polygon([(3,8),(8,5),(13,8),(8,10)], fill='#aeb4b9')
+        d.polygon([(3,8),(8,10),(8,14),(3,11)], fill='#747b83')
+        d.polygon([(8,10),(13,8),(13,11),(8,14)], fill='#5d636b')
+        d.line([(4,8),(8,6),(12,8)], fill='#e0e4e4')
     return im
 
 

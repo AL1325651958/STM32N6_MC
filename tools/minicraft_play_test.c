@@ -89,15 +89,19 @@ int main(void) {
  /* Touch layout: all 18 recipes reachable, real slot moves, split and mode. */
  scene(&w);w.bag=1;assert(MC_Give(&w,MC_WOOD,10));MC_UIBagTap(&w,30,115);MC_UIBagTap(&w,78,183);assert(w.slots[9].count==10&&!w.slots[0].count);
  MC_UIBagTap(&w,200,420);assert(w.split);MC_UIBagTap(&w,78,183);MC_UIBagTap(&w,30,115);assert(w.slots[0].count==5&&w.slots[9].count==5);
- for(unsigned i=1;i<=5;i++){MC_UIBagTap(&w,450,85);assert(w.recipe_page==i%5);}assert(MC_RecipeCount()==18);
+ for(unsigned i=1;i<=5;i++){MC_UIBagTap(&w,450,85);assert(w.recipe_page==i%5);}assert(MC_RecipeCount()==19);
  assert(MC_RecipeResult(0)==MC_PLANKS&&MC_RecipeIngredient(0,0)==MC_WOOD&&MC_RecipeIngredientCount(0,0)==1);
  assert(MC_RecipeIngredient(0,1)==0&&MC_UIRole(720,240)==MC_TOUCH_SNEAK&&MC_UIRole(720,300)==MC_TOUCH_PLACE);
  MC_UIBagTap(&w,40,420);assert(w.creative);MC_UIBagTap(&w,750,415);assert(w.slot==7);
- MC_UIBagTap(&w,24+5*48+5,108+3*68+5);assert(w.hotbar[7]==MC_SAPLING);
+ MC_UIBagTap(&w,24+3*48+5,108+3*68+5);assert(w.hotbar[7]==MC_SAPLING);
  MC_UIBagTap(&w,40,420);assert(!w.creative&&w.items[MC_WOOD]==10);MC_UIBagTap(&w,320,420);assert(w.change_world);
  MC_UIBagTap(&w,620,30);assert(!w.bag&&w.open_chest==255&&w.open_furnace==255&&w.moving_slot==255);
  /* Canary catches UI writes beyond framebuffer on every menu. */
  uint16_t *fb=calloc(800*480+64,sizeof(*fb));assert(fb);for(int k=0;k<64;k++)fb[800*480+k]=0xa55a;
+ memset(fb,0,800*480*sizeof(*fb));w.bag=0;w.creative=0;w.slot=0;w.slots[0]=(MC_Stack){MC_SWORD,1,0};MC_SyncInventory(&w);
+ MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);unsigned held_pixels=0;
+ for(int yy=270;yy<400;yy++)for(int xx=570;xx<685;xx++)if(fb[yy*800+xx])held_pixels++;
+ assert(held_pixels>100);
  for(int k=0;k<6;k++){w.bag=k>0;MC_SetMode(&w,k==5);w.open_chest=k==2?0:255;w.open_furnace=k==3?0:255;MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);}
  for(int k=0;k<64;k++)assert(fb[800*480+k]==0xa55a);
  free(fb);free(w.blocks);puts("minicraft slots / crafting / containers / furnace / growth / survival / UI: OK");return 0;

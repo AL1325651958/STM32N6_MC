@@ -68,6 +68,8 @@ static void bounds(uint8_t b,float lo[3],float hi[3])
   else if(b==MC_SAPLING){lo[0]=lo[2]=2/16.f;hi[0]=hi[2]=14/16.f;hi[1]=13/16.f;}
   else if(b==MC_DOOR){lo[2]=6/16.f;hi[2]=10/16.f;}
   else if(b==MC_DOOR_OPEN){lo[0]=6/16.f;hi[0]=10/16.f;}
+  else if(b==MC_SLAB){hi[1]=.5f;}
+  else if(b==MC_SLAB_TOP){lo[1]=.5f;}
 }
 static int body_intersects(uint8_t b,int bx,int by,int bz,float x,float y,float z)
 {
@@ -97,9 +99,8 @@ static int has_floor(const MC_World *w,float x,float z)
     {
       float px=x+ix*inset,pz=z+iz*inset;int bx=(int)floorf(px),by=(int)floorf(y),bz=(int)floorf(pz);
       uint8_t b=MC_Get(w,bx,by,bz);
-      if(!MC_IsSolid(b))continue;
-      if(b!=MC_BED && b!=MC_CHEST)return 1;
       float lo[3],hi[3];bounds(b,lo,hi);
+      if(!MC_IsSolid(b))continue;
       if(px>=bx+lo[0] && px<=bx+hi[0] && pz>=bz+lo[2] && pz<=bz+hi[2] && y>=by+lo[1] && y<by+hi[1])return 1;
     }
   return 0;
@@ -203,7 +204,7 @@ void MC_Step(MC_World *w, float f, float s, float dt, int jump)
 
 typedef MC_Hit Hit;
 static int shaped(uint8_t b)
-{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST || b==MC_DOOR || b==MC_DOOR_OPEN;}
+{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST || b==MC_DOOR || b==MC_DOOR_OPEN || b==MC_SLAB || b==MC_SLAB_TOP;}
 
 /* Intersect only special objects; ordinary cubes retain the cheap DDA path. */
 static int box_hit(const float lo[3],const float hi[3],const float p[3],const float d[3],
@@ -471,6 +472,11 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
           r=153;g=101;b=48;
           if((tu%4)==0 || tv==0 || tv==15){r=105;g=65;b=32;}
           if(tv>6 && tv<10 && ((h.block==MC_DOOR && tu>10) || (h.block==MC_DOOR_OPEN && tu<5))){r=220;g=177;b=67;}
+          break;
+        case MC_SLAB:
+        case MC_SLAB_TOP:
+          r=139;g=143;b=149;
+          if((tu+((tv/5)&1)*4)%7==0 || tv%5==0){r=94;g=99;b=106;}
           break;
         default:break;
       }

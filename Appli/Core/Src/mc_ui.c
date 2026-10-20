@@ -39,7 +39,6 @@ int MC_UIRole(unsigned x,unsigned y)
   if(x>=700 && y<66)return MC_TOUCH_SAVE;
   if(x>=600 && x<690 && y<66)return MC_TOUCH_BAG;
   if(x>=690 && y>=288 && y<350)return MC_TOUCH_PLACE;
-  if(x>=690 && y>=144 && y<206)return MC_TOUCH_ATTACK;
   if(x>=690 && y>=216 && y<278)return MC_TOUCH_SNEAK;
   if(x>=690 && y>=360 && y<422)return MC_TOUCH_JUMP;
   if(x>=240 && x<640 && y>=424)return MC_TOUCH_SELECT;
@@ -57,6 +56,7 @@ static void small(uint16_t *fb,int x,int y,const char *s,uint16_t c)
     if(*s=='-')rect(fb,x,y+3,4,1,c);
   }
 }
+static unsigned catalog_item(unsigned index);
 void MC_UIBagTap(MC_World *w,unsigned x,unsigned y)
 {
   if(y<66){if(x>=600&&x<690)MC_CloseBag(w);return;}
@@ -69,7 +69,7 @@ void MC_UIBagTap(MC_World *w,unsigned x,unsigned y)
   if(w->creative && x>=430 && x<782 && y>=390 && y<440) {w->slot=(uint8_t)((x-430)/44);return;}
   if(x>=24 && x<408 && y>=108 && y<380) {
     unsigned i=(x-24)/48+((y-108)/68)*8;
-    if(w->creative)MC_SelectItem(w,i+1);
+    if(w->creative)MC_SelectItem(w,catalog_item(i));
     else MC_TransferSlot(w,i,w->split);
     return;
   }
@@ -82,17 +82,64 @@ void MC_UIBagTap(MC_World *w,unsigned x,unsigned y)
     else if(x>=430&&x<782&&y>=108&&y<380)MC_Craft(w,w->recipe_page*4+(y-108)/68);
   }
 }
-static void icon(uint16_t *fb,int x,int y,unsigned id,int size)
+static void icon_rect(uint16_t *fb,int x,int y,int width,int height,unsigned id)
 {
   if(!id||id>=MC_ITEM_COUNT)return;
   const MC_Icon *sprite=&mc_icons[id];
-  for(int py=0;py<size;py++)for(int px=0;px<size;px++) {
-    unsigned sx=(unsigned)px*MC_ICON_EDGE/(unsigned)size;
-    unsigned sy=(unsigned)py*MC_ICON_EDGE/(unsigned)size;
+  if(width<=0||height<=0)return;
+  for(int py=0;py<height;py++)for(int px=0;px<width;px++) {
+    unsigned sx=(unsigned)px*MC_ICON_EDGE/(unsigned)width;
+    unsigned sy=(unsigned)py*MC_ICON_EDGE/(unsigned)height;
     unsigned p=sy*MC_ICON_EDGE+sx;
     unsigned index=(sprite->pixels[p>>1]>>(p&1?0:4))&15;
     if(index)rect(fb,x+px,y+py,1,1,sprite->colors[index]);
   }
+}
+static void icon(uint16_t *fb,int x,int y,unsigned id,int size)
+{ icon_rect(fb,x,y,size,size,id); }
+static unsigned catalog_item(unsigned index)
+{
+  unsigned seen=0;
+  for(unsigned id=1;id<MC_ITEM_COUNT;id++) {
+    if(id==MC_WATER || id==MC_BEDROCK || id==MC_SLAB_TOP)continue;
+    if(seen++==index)return id;
+  }
+  return 0;
+}
+/* First-person item view: keep the hand below the item so every selected
+   hotbar object reads as something the player is carrying, including blocks. */
+static void held_item(uint16_t *fb,const MC_World *w)
+{
+  unsigned id=w->hotbar[w->slot];
+  if(!id || id>=MC_ITEM_COUNT)return;
+  int swing=w->attack_flash>0?(int)(sinf(w->attack_flash*34.0f)*18.0f):0;
+  /* Handheld geometry follows the silhouette instead of scaling every icon
+     to the same square.  This keeps torches and saplings slender while
+     swords and tools remain readable at the 800x480 HUD resolution. */
+  int iw=70,ih=70,ix=590+swing,iy=293;
+  switch(id) {
+    case MC_TORCH: iw=34;ih=66;ix=630+swing;iy=274;break;
+    case MC_SAPLING: iw=46;ih=66;ix=616+swing;iy=276;break;
+    case MC_STICK: iw=30;ih=72;ix=632+swing;iy=270;break;
+    case MC_APPLE: iw=48;ih=48;ix=626+swing;iy=294;break;
+    case MC_SWORD: iw=50;ih=94;ix=618+swing;iy=255;break;
+    case MC_AXE:
+    case MC_SHOVEL: iw=76;ih=80;ix=596+swing;iy=276;break;
+    case MC_WOOD_PICK:
+    case MC_STONE_PICK:
+    case MC_IRON_PICK: iw=82;ih=78;ix=592+swing;iy=278;break;
+    case MC_CHEST: iw=78;ih=62;ix=592+swing;iy=286;break;
+    case MC_BED: iw=82;ih=54;ix=588+swing;iy=294;break;
+    case MC_DOOR:
+    case MC_DOOR_OPEN: iw=54;ih=82;ix=614+swing;iy=274;break;
+    default: break;
+  }
+  /* Dark outline and a warm skin-tone cuff give the icon a readable grip. */
+  rect(fb,642+swing,360,42,58,0x4208);
+  rect(fb,646+swing,357,34,61,0xd4a6);
+  rect(fb,650+swing,352,27,20,0xe6bd);
+  rect(fb,ix-3,iy-3,iw+6,ih+6,0x2104);
+  icon_rect(fb,ix,iy,iw,ih,id);
 }
 static void stack(uint16_t *fb,int x,int y,int width,int height,const MC_Stack *s,int chosen,int infinite)
 {
@@ -126,7 +173,7 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     else if(w->open_furnace<MC_FURNACES)text(fb,430,84,"FURNACE",0xffe0);
     else {snprintf(info,sizeof(info),"CRAFT %u-%u  NEXT",w->recipe_page+1,(MC_RecipeCount()+3)/4);text(fb,430,84,info,0xffe0);}
     for(unsigned i=0;i<MC_SLOTS;i++) {
-      MC_Stack s=w->creative?(MC_Stack){i+1<MC_ITEM_COUNT?i+1:0,1,0}:w->slots[i];
+      MC_Stack s=w->creative?(MC_Stack){catalog_item(i),1,0}:w->slots[i];
       if(s.item==MC_WATER||s.item==MC_BEDROCK)s=(MC_Stack){0};
       stack(fb,24+(i%8)*48,108+(i/8)*68,48,68,&s,!w->creative&&(i==w->selected_slot||i==w->moving_slot),w->creative);
       if(!w->creative && i<8) {snprintf(info,sizeof(info),"%u",i+1);small(fb,26+i*48,110,info,0xffe0);}
@@ -163,15 +210,16 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     if(w->creative)for(unsigned i=0;i<8;i++){MC_Stack s={w->hotbar[i],1,0};stack(fb,430+i*44,390,44,50,&s,i==w->slot,1);}
     else if(w->open_chest>=MC_CHESTS&&w->open_furnace>=MC_FURNACES)small(fb,430,410,"TAP SOURCE THEN DESTINATION TO MOVE",0xffff);
   } else {
+    held_item(fb,w);
     rect(fb,391,239,19,2,0xffff);rect(fb,400,231,2,19,0xffff);
     for(int yy=-78;yy<=78;yy++)for(int xx=-78;xx<=78;xx++){int d=xx*xx+yy*yy;if(d<78*78&&d>74*74)fb[(350+yy)*800+110+xx]=0xc638;}
     int jx=110+(int)(fmaxf(-1,fminf(1,strafe))*45),jy=350-(int)(fmaxf(-1,fminf(1,move))*45);
     rect(fb,jx-10,jy-10,20,20,0xffe0);text(fb,86,444,"MOVE",0xffff);
     panel(fb,690,288,100,62);text(fb,710,312,w->hotbar[w->slot]==MC_APPLE?"EAT":"USE",0xffff);
-    panel(fb,690,144,100,62);text(fb,710,168,"ATTACK",w->attack_cooldown>0?0x7bef:0xffff);
     panel(fb,690,216,100,62);text(fb,710,228,"SNEAK",w->sneak?0x07e0:0xffff);small(fb,700,258,w->sneak?"EDGE GUARD":"HOLD TO BUILD",0xffe0);
     panel(fb,690,360,100,62);text(fb,716,384,"JUMP",0xffff);
     for(unsigned i=0;i<MC_HOTBAR;i++){MC_Stack s=w->creative?(MC_Stack){w->hotbar[i],1,0}:w->slots[i];stack(fb,240+i*50,424,50,56,&s,i==w->slot,w->creative);}
+    panel(fb,640,393,44,56);icon(fb,642,397,w->hotbar[w->slot],40);
     panel(fb,240,393,400,25);text(fb,249,399,MC_ItemName(w->hotbar[w->slot]),0xffff);
     if(w->mining>0){rect(fb,300,274,200,8,0x2104);rect(fb,302,276,(int)(196*fminf(1,w->mining)),4,0xffe0);}
     for(unsigned i=0;i<10;i++){int x=246+(int)i*22;rect(fb,x,369,16,12,i*2<w->health?0xe924:0x4208);if(i*2+1>=w->health)rect(fb,x+8,369,8,12,0x4208);}

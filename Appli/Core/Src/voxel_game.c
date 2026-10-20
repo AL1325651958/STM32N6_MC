@@ -129,6 +129,9 @@ static void update_contacts(const GT911_StateTypeDef *touch,uint32_t now,unsigne
         world.slot=(p->x-240)/50;*selected=world.hotbar[world.slot];
         if(MC_ToolIndex(*selected)>=0)MC_SelectItem(&world,*selected);
       }
+      /* Tools attack on the initial scene tap; mining still begins after a long press. */
+      if(c->role==MC_TOUCH_LOOK && MC_ToolIndex(world.hotbar[world.slot])>=0)
+        if(MC_Attack(&world,p->x,p->y)) dirty=1;
     }
     if(c->role==MC_TOUCH_LOOK && !world.bag) {
       MC_HoldMove(&c->hold,p->x,p->y,now);
@@ -159,10 +162,6 @@ void VoxelGame_Run(void)
       if(c->role==MC_TOUCH_MOVE) { f=(350.0f-c->y)/65;s=(c->x-110.0f)/65; }
       else if(c->role==MC_TOUCH_JUMP) jump=1;
       else if(c->role==MC_TOUCH_SNEAK) sneak=1;
-      else if(c->role==MC_TOUCH_ATTACK && now-c->action>=100) {
-        if(MC_Attack(&world,400,240))dirty=1;
-        c->action=now;
-      }
       else if(c->role==MC_TOUCH_LOOK && MC_HoldReady(&c->hold,now)) {
         holding=1;mine_x=c->x;mine_y=c->y;
       }

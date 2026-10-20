@@ -142,6 +142,25 @@ int main(void)
   assert(w.x<13.24f&&w.z<12.24f&&w.y>1.99f);
   w.on_ground=1;MC_Step(&w,1,0,.1f,1);assert(w.y>2.3f&&w.z>12.24f);
   flat(&w);w.sneak=1;MC_Step(&w,1,0,.1f,0);assert(w.z>10.63f&&w.z<10.66f);w.sneak=0;
+  /* Stone slabs occupy one half of a cell, support the player at their
+     actual surface, and keep the top/bottom state in the map byte. */
+  flat(&w);MC_NewPlayer(&w,0);w.x=10.5f;w.y=2.01f;w.z=10.5f;w.yaw=0;w.pitch=0;w.on_ground=1;
+  MC_Set(&w,10,3,13,MC_SLAB);MC_Hit slab;
+  assert(MC_Pick(&w,400,240,&slab)==0); /* The horizontal eye ray is above a lower slab. */
+  w.pitch=-.2f;assert(MC_Pick(&w,400,240,&slab)&&slab.block==MC_SLAB);
+  w.pitch=0;MC_Set(&w,10,3,13,MC_SLAB_TOP);
+  assert(MC_Pick(&w,400,240,&slab)&&slab.block==MC_SLAB_TOP);
+  w.pitch=-.2f;w.x=10.5f;w.z=13.5f;w.y=4.2f;w.on_ground=0;
+  for(int i=0;i<100;i++)MC_Step(&w,0,0,.016f,0);
+  assert(fabsf(w.y-4.0f)<.02f&&w.on_ground); /* Upper slab surface is y+1.0. */
+  flat(&w);MC_NewPlayer(&w,0);w.x=10.5f;w.y=2.01f;w.z=10.5f;w.yaw=0;w.pitch=-.2f;w.on_ground=1;
+  MC_Set(&w,10,3,13,MC_STONE);assert(MC_Give(&w,MC_SLAB,1));w.slot=0;MC_SyncInventory(&w);
+  assert(MC_Place(&w)&&MC_Get(&w,10,3,12)==MC_SLAB);
+  MC_Set(&w,10,3,12,MC_SLAB_TOP);w.pitch=0;assert(MC_Pick(&w,400,240,&slab)&&slab.block==MC_SLAB_TOP);
+  assert(MC_Give(&w,MC_STONE_PICK,1));w.slot=0;MC_SyncInventory(&w);
+  w.target_valid=1;w.target=slab;w.mining=0;
+  for(int i=0;i<20;i++)MC_PlayTick(&w,.1f,1,400,240);
+  assert(MC_Get(&w,10,3,12)==MC_AIR&&w.items[MC_SLAB]==1);
   flat(&w);w.x=.3f;w.yaw=-1.5707963f;
   for(int i=0;i<10;i++) MC_Step(&w,1,0,.1f,0);
   assert(w.x>=.28f);
