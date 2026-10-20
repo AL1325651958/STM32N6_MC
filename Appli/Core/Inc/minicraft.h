@@ -24,19 +24,23 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
        /* Redstone uses paired OFF/ON map states.  Keep these IDs appended so
           v1-v4 saves retain their original item numbering. */
        MC_DUST, MC_DUST_ON, MC_LAMP, MC_LAMP_ON,
-       MC_LEVER, MC_LEVER_ON, MC_BUTTON, MC_BUTTON_ON, MC_ITEM_COUNT };
+       MC_LEVER, MC_LEVER_ON, MC_BUTTON, MC_BUTTON_ON,
+       /* Ranged combat IDs are appended so all existing saves keep their
+          original item numbering. */
+       MC_BOW, MC_ARROW, MC_ITEM_COUNT };
 #define MC_HOTBAR 8
 #define MC_SLOTS 32
 #define MC_CHEST_SLOTS 24
 #define MC_FURNACES 6
 #define MC_GROWERS 16
-#define MC_TOOLS 6
+#define MC_TOOLS 7
 #define MC_CHESTS 6
 #define MC_MOBS 8
 #define MC_MOB_HEALTH 12
 #define MC_DROPS 16
 #define MC_REDSTONE_SOURCES 32
 #define MC_REDSTONE_BUTTONS 8
+#define MC_PROJECTILES 8
 typedef struct { uint8_t item,count; uint16_t wear; } MC_Stack;
 typedef struct { uint16_t x,y,z; MC_Stack input,fuel,output; float burn,progress; } MC_Furnace;
 typedef struct { uint16_t x,y,z; float age; } MC_Grower;
@@ -45,6 +49,7 @@ typedef struct { int x,y,z,nx,ny,nz; float distance; uint8_t block; } MC_Hit;
    heading is persisted in the unused tail of each fixed 32-byte v4 mob slot. */
 typedef struct { float x,y,z,vy,attack,hurt; uint8_t health,on_ground,type; float heading; } MC_Mob;
 typedef struct { float x,y,z,vy,age,spin; uint8_t item,count; } MC_Drop;
+typedef struct { float x,y,z,vx,vy,vz,age; uint8_t active; } MC_Projectile;
 
 typedef struct {
   uint8_t *blocks;
@@ -72,8 +77,9 @@ typedef struct {
   uint8_t mob_fed[MC_MOBS];
   float mob_fed_age[MC_MOBS], breed_cooldown;
   MC_Drop drops[MC_DROPS]; /* Runtime-only entities; absent from v4 saves. */
+  MC_Projectile projectiles[MC_PROJECTILES]; /* Runtime-only arrows. */
   uint32_t mob_rng;
-  float mob_clock, spawn_clock, attack_cooldown, attack_flash;
+  float mob_clock, spawn_clock, attack_cooldown, attack_flash, shoot_cooldown;
   /* Runtime-only bounded scheduler for nearby falling sand. */
   float gravity_clock;
   uint16_t gravity_cursor;
@@ -102,6 +108,7 @@ int MC_BodyClear(const MC_World *w,float x,float y,float z);
 int MC_PickMob(const MC_World *w,float x,float y,float reach,float *distance);
 int MC_MobRay(const MC_World *w,float dx,float dy,float dz,float reach,unsigned mask,int *index,float *distance,int *axis,int *sign);
 int MC_Attack(MC_World *w,float x,float y);
+int MC_Shoot(MC_World *w,float x,float y);
 int MC_MobFeed(MC_World *w,float x,float y);
 void MC_MobsTick(MC_World *w,float dt);
 int MC_MobSpawn(MC_World *w,int x,int y,int z);
@@ -124,6 +131,7 @@ unsigned MC_ToolLife(unsigned item);
 int MC_MoveStack(MC_Stack *from,MC_Stack *to,int split);
 int MC_ContainerTap(MC_World *w,unsigned slot);
 void MC_SystemsTick(MC_World *w,float dt);
+void MC_ProjectilesTick(MC_World *w,float dt);
 void MC_RedstoneRefresh(MC_World *w);
 int MC_OpenTarget(MC_World *w);
 int MC_TransferSlot(MC_World *w,unsigned slot,int shift);

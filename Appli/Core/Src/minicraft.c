@@ -512,6 +512,31 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
     drop_rect[i][2]=(int)clamp(ceilf(sx+half),0,width);drop_rect[i][3]=(int)clamp(ceilf(sy+half),0,height);
     drop_depth[i]=depth;drop_mask|=1u<<i;
   }
+  /* Project bounded arrow entities once.  The arrow is a short screen-space
+     segment, so the pixel loop only checks a tiny rectangle per active slot. */
+  int projectile_rect[MC_PROJECTILES][4];
+  float projectile_depth[MC_PROJECTILES],projectile_ax[MC_PROJECTILES],projectile_ay[MC_PROJECTILES];
+  float projectile_bx[MC_PROJECTILES],projectile_by[MC_PROJECTILES];
+  unsigned projectile_mask=0;
+  for(unsigned i=0;i<MC_PROJECTILES;i++)if(w->projectiles[i].active) {
+    const MC_Projectile *p=&w->projectiles[i];
+    float cx=p->x-w->x,cy=p->y-w->y-1.62f,cz=p->z-w->z;
+    float tx=p->x-p->vx*.075f-w->x,ty=p->y-p->vy*.075f-w->y-1.62f,tz=p->z-p->vz*.075f-w->z;
+    float depth=cx*syaw*cp+cy*sp+cz*cyaw*cp;
+    float tail_depth=tx*syaw*cp+ty*sp+tz*cyaw*cp;
+    if(depth<=.05f && tail_depth<=.05f)continue;
+    if(depth<=.05f)depth=tail_depth;
+    float sx=width*.5f+focal*(cx*cyaw-cz*syaw)/fmaxf(depth,.05f);
+    float sy=height*.5f-focal*(-cx*sp*syaw+cy*cp-cz*sp*cyaw)/fmaxf(depth,.05f);
+    float ex=width*.5f+focal*(tx*cyaw-tz*syaw)/fmaxf(tail_depth,.05f);
+    float ey=height*.5f-focal*(-tx*sp*syaw+ty*cp-tz*sp*cyaw)/fmaxf(tail_depth,.05f);
+    float pad=fmaxf(1.5f,focal*.035f/fmaxf(depth,.05f));
+    float minx=fminf(sx,ex)-pad,maxx=fmaxf(sx,ex)+pad,miny=fminf(sy,ey)-pad,maxy=fmaxf(sy,ey)+pad;
+    if(maxx<0||maxy<0||minx>=width||miny>=height)continue;
+    projectile_rect[i][0]=(int)clamp(floorf(minx),0,width);projectile_rect[i][1]=(int)clamp(floorf(miny),0,height);
+    projectile_rect[i][2]=(int)clamp(ceilf(maxx),0,width);projectile_rect[i][3]=(int)clamp(ceilf(maxy),0,height);
+    projectile_depth[i]=depth;projectile_ax[i]=sx;projectile_ay[i]=sy;projectile_bx[i]=ex;projectile_by[i]=ey;projectile_mask|=1u<<i;
+  }
   /* Bound dynamic light work: collect at most eight nearby torches once per frame. */
   int lights[8][3],nl=0;
   for(int y=(int)w->y-4;y<=(int)w->y+4 && nl<8;y++)
@@ -642,6 +667,18 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
       int edge=(int)x==drop_rect[i][0] || (int)y==drop_rect[i][1] || (int)x==drop_rect[i][2] || (int)y==drop_rect[i][3];
       if(edge){r=r*2/3;g=g*2/3;b=b*2/3;}
       break;
+    }
+    for(unsigned i=0;i<MC_PROJECTILES;i++)if((projectile_mask&(1u<<i)) && (int)x>=projectile_rect[i][0] && (int)x<=projectile_rect[i][2] && (int)y>=projectile_rect[i][1] && (int)y<=projectile_rect[i][3] &&
+        (!world_hit || projectile_depth[i]<h.distance)) {
+      float ax=projectile_ax[i],ay=projectile_ay[i],bx=projectile_bx[i],by=projectile_by[i];
+      float vx=bx-ax,vy=by-ay,den=vx*vx+vy*vy,t=den>1e-6f?((((float)x+.5f-ax)*vx+((float)y+.5f-ay)*vy)/den):0;
+      if(t<0)t=0;else if(t>1)t=1;
+      float qx=ax+vx*t,qy=ay+vy*t,ddx=(float)x+.5f-qx,ddy=(float)y+.5f-qy;
+      if(ddx*ddx+ddy*ddy<2.1f) {
+        int head=t<.36f;
+        r=head?245:216;g=head?242:204;b=head?190:137;
+        break;
+      }
     }
     unsigned candidates=0;
     for(unsigned i=0;i<MC_MOBS;i++)if((mob_mask&(1u<<i)) && (int)x>=mob_rect[i][0] && (int)x<=mob_rect[i][2] && (int)y>=mob_rect[i][1] && (int)y<=mob_rect[i][3])candidates|=1u<<i;

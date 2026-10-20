@@ -129,11 +129,12 @@ static void update_contacts(const GT911_StateTypeDef *touch,uint32_t now,unsigne
         world.slot=(p->x-240)/50;*selected=world.hotbar[world.slot];
         if(MC_ToolIndex(*selected)>=0)MC_SelectItem(&world,*selected);
       }
-      /* A scene tap feeds a pointed animal with wheat or attacks with a tool;
-         mining still begins only after a long press. */
+      /* A scene tap feeds a pointed animal, fires a bow, or attacks with a
+         held tool. Mining still begins only after a long press. */
       if(c->role==MC_TOUCH_LOOK) {
-        if(MC_MobFeed(&world,p->x,p->y) ||
-           (MC_ToolIndex(world.hotbar[world.slot])>=0 && MC_Attack(&world,p->x,p->y)))dirty=1;
+        if(MC_MobFeed(&world,p->x,p->y))dirty=1;
+        else if(world.hotbar[world.slot]==MC_BOW ? MC_Shoot(&world,p->x,p->y) :
+                (MC_ToolIndex(world.hotbar[world.slot])>=0 && MC_Attack(&world,p->x,p->y)))dirty=1;
       }
     }
     if(c->role==MC_TOUCH_LOOK && !world.bag) {

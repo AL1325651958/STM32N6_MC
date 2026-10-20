@@ -120,6 +120,89 @@ int MC_Attack(MC_World *w,float x,float y)
   return 1;
 }
 
+static void camera_ray(const MC_World *w,float sx,float sy,float *dx,float *dy,float *dz)
+{
+  float u=(sx-400)/576,v=(240-sy)/576,sp=sinf(w->pitch),cp=cosf(w->pitch),syaw=sinf(w->yaw),cyaw=cosf(w->yaw);
+  *dx=syaw*cp+u*cyaw-v*sp*syaw;*dy=sp+v*cp;*dz=cyaw*cp-u*syaw-v*sp*cyaw;
+  float inv=1/sqrtf((*dx)*(*dx)+(*dy)*(*dy)+(*dz)*(*dz));*dx*=inv;*dy*=inv;*dz*=inv;
+}
+
+static void consume_arrow(MC_World *w)
+{
+  if(w->creative)return;
+  for(unsigned i=0;i<MC_SLOTS;i++)if(w->slots[i].item==MC_ARROW && w->slots[i].count) {
+    if(!--w->slots[i].count)memset(&w->slots[i],0,sizeof(MC_Stack));
+    MC_SyncInventory(w);return;
+  }
+}
+
+int MC_Shoot(MC_World *w,float x,float y)
+{
+  if(w->bag || w->hotbar[w->slot]!=MC_BOW || w->shoot_cooldown>0)return 0;
+  if(!w->creative && (!w->slots[w->slot].count || w->slots[w->slot].item!=MC_BOW))return 0;
+  if(!w->creative && !w->items[MC_ARROW]){w->notice="NEED ARROWS";return 0;}
+  int slot=-1;for(unsigned i=0;i<MC_PROJECTILES;i++)if(!w->projectiles[i].active){slot=(int)i;break;}
+  if(slot<0){w->notice="TOO MANY ARROWS";return 0;}
+  float dx,dy,dz;camera_ray(w,x,y,&dx,&dy,&dz);
+  MC_Projectile *p=&w->projectiles[slot];
+  p->x=w->x+dx*.55f;p->y=w->y+1.62f+dy*.55f;p->z=w->z+dz*.55f;
+  p->vx=dx*18;p->vy=dy*18;p->vz=dz*18;p->age=0;p->active=1;
+  if(!w->creative) {
+    consume_arrow(w);MC_Stack *bow=&w->slots[w->slot];
+    if(bow->wear && !--bow->wear){memset(bow,0,sizeof(*bow));w->equipped=0;w->notice="BOW BROKE";}
+    MC_SyncInventory(w);
+  }
+  w->shoot_cooldown=.42f;w->attack_flash=.18f;w->notice="ARROW FIRED";return 1;
+}
+
+static float segment_distance2(float ax,float ay,float az,float bx,float by,float bz,float px,float py,float pz)
+{
+  float vx=bx-ax,vy=by-ay,vz=bz-az,wx=px-ax,wy=py-ay,wz=pz-az;
+  float vv=vx*vx+vy*vy+vz*vz,t=vv>1e-8f?(wx*vx+wy*vy+wz*vz)/vv:0;
+  if(t<0)t=0;else if(t>1)t=1;
+  float dx=ax+vx*t-px,dy=ay+vy*t-py,dz=az+vz*t-pz;return dx*dx+dy*dy+dz*dz;
+}
+
+static void arrow_kill_mob(MC_World *w,MC_Mob *m)
+{
+  unsigned type=m->type;float x=m->x,y=m->y,z=m->z;
+  memset(m,0,sizeof(*m));w->mob_target=255;
+  if(type && !MC_Give(w,MC_RAW_MEAT,1))MC_DropSpawn(w,MC_RAW_MEAT,1,x,y+.45f,z);
+  w->notice=type?"ANIMAL DOWN  RAW MEAT":"NIGHT STALKER DOWN";
+}
+
+void MC_ProjectilesTick(MC_World *w,float dt)
+{
+  if(!(dt>0)||w->bag)return;
+  dt=fminf(dt,.1f);w->shoot_cooldown=fmaxf(0,w->shoot_cooldown-dt);
+  for(unsigned i=0;i<MC_PROJECTILES;i++) {
+    MC_Projectile *p=&w->projectiles[i];if(!p->active)continue;
+    p->age+=dt;if(p->age>8){memset(p,0,sizeof(*p));continue;}
+    unsigned steps=(unsigned)ceilf(dt/.02f);if(!steps)steps=1;float h=dt/steps;
+    int gone=0;
+    for(unsigned step=0;step<steps && !gone;step++) {
+      float ox=p->x,oy=p->y,oz=p->z;p->vy-=8*h;
+      float nx=ox+p->vx*h,ny=oy+p->vy*h,nz=oz+p->vz*h;
+      /* Sample the segment so an arrow cannot tunnel through a one-cell wall. */
+      unsigned samples=(unsigned)ceilf(sqrtf((nx-ox)*(nx-ox)+(ny-oy)*(ny-oy)+(nz-oz)*(nz-oz))/.12f);if(samples<1)samples=1;
+      for(unsigned s=1;s<=samples;s++) {
+        float t=(float)s/samples,qx=ox+(nx-ox)*t,qy=oy+(ny-oy)*t,qz=oz+(nz-oz)*t;
+        if(MC_IsSolid(MC_Get(w,(int)floorf(qx),(int)floorf(qy),(int)floorf(qz)))){gone=1;w->notice="ARROW HIT BLOCK";break;}
+        for(unsigned m=0;m<MC_MOBS;m++)if(w->mobs[m].health) {
+          const MC_Mob *mob=&w->mobs[m];float radius=mob->type?.55f:.45f;
+          if(segment_distance2(ox,oy,oz,qx,qy,qz,mob->x,mob->y+.72f,mob->z)<=radius*radius) {
+            MC_Mob *hit=&w->mobs[m];hit->health=hit->health>5?(uint8_t)(hit->health-5):0;hit->hurt=.35f;
+            if(!hit->health)arrow_kill_mob(w,hit);else w->notice=hit->type?"ANIMAL HIT":"NIGHT STALKER HIT";
+            gone=1;break;
+          }
+        }
+      }
+      if(!gone){p->x=nx;p->y=ny;p->z=nz;}
+    }
+    if(gone)memset(p,0,sizeof(*p));
+  }
+}
+
 static void consume_selected_wheat(MC_World *w)
 {
   if(w->creative)return;

@@ -112,6 +112,24 @@ int main(void) {
  w.hunger=1;for(int i=0;i<320;i++)MC_PlayTick(&w,.1f,0,400,240);assert(w.hunger==0&&w.health<20);
  MC_Set(&w,10,3,10,MC_WATER);for(int i=0;i<140;i++)MC_PlayTick(&w,.1f,0,400,240);assert(w.health<17);
  MC_Set(&w,10,3,10,MC_AIR);MC_PlayTick(&w,.1f,0,400,240);assert(w.air==10);w.health=2;w.fall_speed=18;w.hurt_timer=0;MC_PlayTick(&w,.1f,0,400,240);assert(w.health==20&&w.items[MC_APPLE]==1);
+ /* Bow combat: a tap fires, consumes one arrow, damages a mob, and stops at
+    the bounded projectile pool. A block hit removes the arrow as well. */
+ scene(&w);assert(MC_Give(&w,MC_BOW,1)&&MC_Give(&w,MC_ARROW,5));select_item(&w,MC_BOW);
+ MC_Set(&w,10,3,13,MC_STONE);w.shoot_cooldown=0;assert(MC_Shoot(&w,400,240));
+ assert(w.items[MC_ARROW]==4&&w.slots[w.slot].item==MC_BOW&&w.slots[w.slot].wear<MC_ToolLife(MC_BOW));
+ for(int i=0;i<8;i++)MC_ProjectilesTick(&w,.1f);
+ for(unsigned i=0;i<MC_PROJECTILES;i++)assert(!w.projectiles[i].active);
+ scene(&w);assert(MC_Give(&w,MC_BOW,1)&&MC_Give(&w,MC_ARROW,2));select_item(&w,MC_BOW);
+ w.mobs[0]=(MC_Mob){10.5f,2.01f,14.0f,0,0,0,MC_MOB_HEALTH,1,0,0};w.shoot_cooldown=0;assert(MC_Shoot(&w,400,384));
+ for(int i=0;i<20 && w.mobs[0].health==MC_MOB_HEALTH;i++)MC_ProjectilesTick(&w,.1f);
+ assert(w.mobs[0].health<MC_MOB_HEALTH);
+ scene(&w);assert(MC_Give(&w,MC_BOW,1)&&MC_Give(&w,MC_ARROW,3));select_item(&w,MC_BOW);
+ w.shoot_cooldown=0;MC_PlayTick(&w,.1f,1,400,240);assert(w.items[MC_ARROW]==2);
+ for(int i=0;i<5;i++){MC_ProjectilesTick(&w,.1f);MC_PlayTick(&w,.1f,1,400,240);}
+ assert(w.items[MC_ARROW]==1); /* A held bow repeats without a mob target. */
+ scene(&w);assert(MC_Give(&w,MC_BOW,1)&&MC_Give(&w,MC_ARROW,MC_PROJECTILES+1));select_item(&w,MC_BOW);w.shoot_cooldown=0;
+ for(unsigned i=0;i<MC_PROJECTILES;i++)w.projectiles[i].active=1;
+ assert(!MC_Shoot(&w,400,240));
  /* Redstone: bounded propagation, lamp lighting, and a half-second button pulse. */
  scene(&w);MC_Set(&w,10,3,10,MC_LEVER_ON);MC_Set(&w,11,3,10,MC_DUST);MC_Set(&w,12,3,10,MC_DUST);MC_Set(&w,13,3,10,MC_LAMP);
  MC_RedstoneRefresh(&w);assert(MC_Get(&w,11,3,10)==MC_DUST_ON&&MC_Get(&w,12,3,10)==MC_DUST_ON&&MC_Get(&w,13,3,10)==MC_LAMP_ON);
@@ -120,10 +138,10 @@ int main(void) {
  MC_Set(&w,11,3,11,MC_DUST);MC_Set(&w,12,3,11,MC_LAMP);MC_RedstoneRefresh(&w);assert(MC_Get(&w,11,3,11)==MC_DUST_ON&&MC_Get(&w,12,3,11)==MC_LAMP_ON);
  for(int i=0;i<6;i++) { MC_SystemsTick(&w,.1f); }
  assert(MC_Get(&w,10,3,11)==MC_BUTTON);
- /* Touch layout: all 18 recipes reachable, real slot moves, split and mode. */
+ /* Touch layout: all 27 recipes reachable, real slot moves, split and mode. */
  scene(&w);w.bag=1;assert(MC_Give(&w,MC_WOOD,10));MC_UIBagTap(&w,30,115);MC_UIBagTap(&w,78,183);assert(w.slots[9].count==10&&!w.slots[0].count);
  MC_UIBagTap(&w,200,420);assert(w.split);MC_UIBagTap(&w,78,183);MC_UIBagTap(&w,30,115);assert(w.slots[0].count==5&&w.slots[9].count==5);
- for(unsigned i=1;i<=6;i++){MC_UIBagTap(&w,450,85);assert(w.recipe_page==i%7);}assert(MC_RecipeCount()==25);
+ for(unsigned i=1;i<=6;i++){MC_UIBagTap(&w,450,85);assert(w.recipe_page==i%7);}assert(MC_RecipeCount()==27);
  assert(MC_RecipeResult(0)==MC_PLANKS&&MC_RecipeIngredient(0,0)==MC_WOOD&&MC_RecipeIngredientCount(0,0)==1);
  /* The former attack button area is now scene input; weapon taps are handled
     by voxel_game.c so the right side only keeps the essential controls. */

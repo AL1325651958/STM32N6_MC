@@ -127,6 +127,8 @@ static void held_item(uint16_t *fb,const MC_World *w)
     case MC_APPLE: iw=48;ih=48;ix=626+swing;iy=294;break;
     case MC_RAW_MEAT: iw=48;ih=44;ix=626+swing;iy=296;break;
     case MC_SWORD: iw=50;ih=94;ix=618+swing;iy=255;break;
+    case MC_BOW: iw=82;ih=84;ix=588+swing;iy=270;break;
+    case MC_ARROW: iw=26;ih=76;ix=638+swing;iy=270;break;
     case MC_AXE:
     case MC_SHOVEL: iw=76;ih=80;ix=596+swing;iy=276;break;
     case MC_WOOD_PICK:

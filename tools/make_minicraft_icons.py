@@ -16,6 +16,7 @@ NAMES += ['STONE SLAB', 'SLAB TOP', 'FARMLAND', 'WHEAT CROP', 'WHEAT MATURE', 'W
 NAMES += ['FENCE', 'STONE STAIRS', 'STONE STAIRS EAST', 'STONE STAIRS SOUTH', 'STONE STAIRS WEST']
 NAMES += ['RAW MEAT']
 NAMES += ['REDSTONE DUST', 'REDSTONE DUST ON', 'REDSTONE LAMP', 'REDSTONE LAMP ON', 'LEVER', 'LEVER ON', 'BUTTON', 'BUTTON ON']
+NAMES += ['BOW', 'ARROW']
 BASE = {1:(112,165,55), 2:(139,96,61), 3:(141,145,151), 4:(224,208,150),
         5:(144,100,53), 6:(62,135,49), 7:(67,69,77), 8:(55,135,207),
         9:(133,139,146), 10:(191,145,83), 11:(169,116,59), 12:(115,121,128),
@@ -212,6 +213,20 @@ def sprite(item):
     elif item in (52,53):
         d.rectangle((2,5,13,12), fill=edge);d.rectangle((4,6,11,10), fill='#d69a55' if item==53 else '#a9773e')
         d.rectangle((5,7,10,9), fill='#f3c26a' if item==53 else '#c08b4d')
+    elif item == 54:
+        # Bow: a curved wooden limb, taut string, and a small grip.
+        d.arc((1,1,14,15), 72, 288, fill=edge, width=4)
+        d.arc((2,2,13,14), 72, 288, fill='#b9783e', width=2)
+        d.line([(8,3),(8,13)], fill='#ead8a5', width=1)
+        d.rectangle((6,7,10,10), fill='#77482d')
+        d.line([(7,7),(9,10)], fill='#c18a4c', width=1)
+    elif item == 55:
+        # Arrow: iron head, wooden shaft, and two contrasting fletchings.
+        d.line([(3,13),(13,3)], fill=edge, width=3)
+        d.line([(3,13),(12,4)], fill='#d0a064', width=1)
+        d.polygon([(12,1),(15,3),(12,6),(11,4)], fill=edge)
+        d.polygon([(12,2),(14,3),(12,5)], fill='#dce5e7')
+        d.polygon([(3,13),(1,10),(5,11),(5,14)], fill='#6c9c62')
     elif item == 29:
         d.polygon([(1,8),(9,3),(15,6),(15,11),(7,15),(1,12)], fill=edge)
         d.polygon([(2,8),(9,4),(14,6),(7,11)], fill='#e3544b')
