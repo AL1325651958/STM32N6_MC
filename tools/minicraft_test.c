@@ -65,9 +65,9 @@ int main(void)
   assert(MC_Pick(&w,400,240,&small)&&small.ny==1&&fabsf(small.distance-.3125f)<.001f);
   w.y=3.75f-1.62f;w.pitch=-1.5707963f;
   assert(MC_Pick(&w,400,240,&small)&&small.ny==-1&&fabsf(small.distance-.75f)<.001f);
-  w.x=10.39f;w.z=10.5f;w.y=3.7f-1.62f;w.pitch=0;w.yaw=0;
+  w.x=10.45f;w.z=10.5f;w.y=3.65f-1.62f;w.pitch=0;w.yaw=0;
   assert(MC_Pick(&w,400,240,&small)&&small.block==MC_TORCH&&fabsf(small.distance-2.875f)<.001f);
-  w.y=3.5f-1.62f;assert(!MC_Pick(&w,400,240,&small)); /* Flame width is not stem width. */
+  w.x=10.39f;w.y=3.7f-1.62f;assert(!MC_Pick(&w,400,240,&small)); /* Stepped flame narrows above its base. */
   flat(&w);MC_Set(&w,10,3,13,MC_SAPLING);w.y=1.88f;
   assert(MC_Pick(&w,400,240,&small)&&small.block==MC_SAPLING);
   w.x=10.2f;w.y=1.48f;assert(!MC_Pick(&w,400,240,&small)); /* Beside thin stem. */

@@ -34,11 +34,33 @@ void MC_Set(MC_World *w, int x, int y, int z, uint8_t b)
 { if (inside(x,y,z) && y > 0 && (b==MC_AIR || MC_IsBlock(b))) w->blocks[index_of(x,y,z)] = b; }
 int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_TORCH && block != MC_SAPLING; }
 
+typedef struct { float lo[3], hi[3]; } MC_Part;
+
+/* Cell-local parts.  The same data drives bounds, picking and rendering. */
+static const MC_Part torch_parts[] = {
+  {{7/16.f, 0/16.f, 7/16.f}, {9/16.f, 10/16.f, 9/16.f}},
+  {{6/16.f, 9/16.f, 6/16.f}, {10/16.f, 11/16.f, 10/16.f}},
+  {{13/32.f, 10/16.f, 13/32.f}, {19/32.f, 12/16.f, 19/32.f}},
+  {{7/16.f, 12/16.f, 7/16.f}, {9/16.f, 13/16.f, 9/16.f}}
+};
+
+static unsigned parts_for(uint8_t b, const MC_Part **parts)
+{
+  if(b==MC_TORCH) { *parts=torch_parts; return sizeof(torch_parts)/sizeof(torch_parts[0]); }
+  *parts=0; return 0;
+}
+
 /* Cell-local bounds, shared by ray selection, rendering and solid collision. */
 static void bounds(uint8_t b,float lo[3],float hi[3])
 {
   lo[0]=lo[1]=lo[2]=0;hi[0]=hi[1]=hi[2]=1;
-  if(b==MC_TORCH){lo[0]=lo[2]=6/16.f;hi[0]=hi[2]=10/16.f;hi[1]=13/16.f;}
+  if(b==MC_TORCH) {
+    const MC_Part *parts; unsigned count=parts_for(b,&parts);
+    lo[0]=lo[1]=lo[2]=1; hi[0]=hi[1]=hi[2]=0;
+    for(unsigned i=0;i<count;i++) for(unsigned a=0;a<3;a++) {
+      lo[a]=fminf(lo[a],parts[i].lo[a]); hi[a]=fmaxf(hi[a],parts[i].hi[a]);
+    }
+  }
   else if(b==MC_CHEST){lo[0]=lo[2]=1/16.f;hi[0]=hi[2]=15/16.f;hi[1]=14/16.f;}
   else if(b==MC_BED)hi[1]=9/16.f;
   else if(b==MC_SAPLING){lo[0]=lo[2]=2/16.f;hi[0]=hi[2]=14/16.f;hi[1]=13/16.f;}
@@ -201,17 +223,16 @@ static int shape_hit(uint8_t b,const float p[3],const float d[3],float start,flo
                      float *distance,int *nx,int *ny,int *nz)
 {
   if(b==MC_TORCH) {
-    const float lo[2][3]={{7/16.f,0,7/16.f},{6/16.f,9/16.f,6/16.f}};
-    const float hi[2][3]={{9/16.f,10/16.f,9/16.f},{10/16.f,13/16.f,10/16.f}};
-    float enter[2],leave[2];int en[2][3],ex[2][3],valid[2]={0,0};
-    for(int part=0;part<2;part++) {
+    const MC_Part *parts; unsigned count=parts_for(b,&parts);
+    float enter[4],leave[4];int en[4][2],ex[4][2],valid[4]={0,0,0,0};
+    for(unsigned part=0;part<count;part++) {
       float a=-1e30f,z=1e30f;int na=0,fa=0,ns=0,fs=0,intersects=1;
       for(int axis=0;axis<3;axis++) {
         if(fabsf(d[axis])<1e-7f) {
-          if(p[axis]<lo[part][axis]||p[axis]>hi[part][axis])intersects=0;
+          if(p[axis]<parts[part].lo[axis]||p[axis]>parts[part].hi[axis])intersects=0;
           continue;
         }
-        float u=(lo[part][axis]-p[axis])/d[axis],v=(hi[part][axis]-p[axis])/d[axis];
+        float u=(parts[part].lo[axis]-p[axis])/d[axis],v=(parts[part].hi[axis]-p[axis])/d[axis];
         int sign=d[axis]>0?-1:1;
         if(u>v){float t=u;u=v;v=t;}
         if(u>a){a=u;na=axis;ns=sign;}
@@ -222,17 +243,29 @@ static int shape_hit(uint8_t b,const float p[3],const float d[3],float start,flo
       valid[part]=1;enter[part]=a;leave[part]=z;
       en[part][0]=na;en[part][1]=ns;ex[part][0]=fa;ex[part][1]=fs;
     }
-    if(!valid[0]&&!valid[1])return 0;
-    int first=valid[0]&&(!valid[1]||enter[0]<=enter[1])?0:1;
-    int second=1-first;float a=enter[first],z=leave[first];
-    int faraxis=ex[first][0],farsign=ex[first][1];
-    if(valid[second]&&enter[second]<=z+1e-6f&&leave[second]>z) {
-      z=leave[second];faraxis=ex[second][0];farsign=ex[second][1];
+    float best=end+1; int best_axis=0,best_sign=0;
+    for(unsigned first=0;first<count;first++) if(valid[first]) {
+      /* Merge overlapping parts so a ray starting in the stem never hits an
+         invisible seam where the stem and flame overlap. */
+      float a=enter[first],z=leave[first];
+      int axis=en[first][0],sign=en[first][1];
+      int exit_axis=ex[first][0],exit_sign=ex[first][1];
+      int expanded;
+      do {
+        expanded=0;
+        for(unsigned second=0;second<count;second++) if(second!=first&&valid[second] &&
+            enter[second]<=z+1e-6f && leave[second]>=a-1e-6f) {
+          if(enter[second]<a-1e-6f) { a=enter[second]; axis=en[second][0]; sign=en[second][1]; expanded=1; }
+          if(leave[second]>z+1e-6f) { z=leave[second]; exit_axis=ex[second][0]; exit_sign=ex[second][1]; expanded=1; }
+        }
+      } while(expanded);
+      float t; int hit_axis,hit_sign;
+      if(a>=start-.00001f) { t=a; hit_axis=axis; hit_sign=sign; }
+      else { t=z; hit_axis=exit_axis; hit_sign=exit_sign; }
+      if(t>=start-.00001f && t<=end && t<best) { best=t;best_axis=hit_axis;best_sign=hit_sign; }
     }
-    int axis,sign;float t;
-    if(a>=start-.00001f){t=a;axis=en[first][0];sign=en[first][1];}
-    else {t=z;axis=faraxis;sign=farsign;}
-    if(t<start-.00001f||t>end)return 0;
+    if(best>end)return 0;
+    int axis=best_axis,sign=best_sign;float t=best;
     *distance=t;*nx=axis==0?sign:0;*ny=axis==1?sign:0;*nz=axis==2?sign:0;
     return 1;
   }

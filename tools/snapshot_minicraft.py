@@ -16,7 +16,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/minicraft"
-ARCHIVE_ROOT = ROOT / "out/verified-v4"
+ARCHIVE_ROOT = ROOT / "out/verified-v5"
 
 
 def digest(data):
@@ -58,7 +58,7 @@ def main():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archive_root = ARCHIVE_ROOT / stamp
     archive_root.mkdir(parents=True, exist_ok=False)
-    source_zip = archive_root / "MiniCraft-v4-source.zip"
+    source_zip = archive_root / "MiniCraft-v5-source.zip"
     source_hashes = {}
     with zipfile.ZipFile(source_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for rel in sources:
@@ -103,7 +103,8 @@ def main():
         "source_file_count": len(sources),
         "source_bytes": sum((ROOT / p).stat().st_size for p in sources),
         "source_hashes_verified": True,
-        "geometry": "Torch stem 2/16 wide × 10/16 high, flame up to 4/16 wide and 13/16 total height; chest 14/16; bed 9/16; sapling crossed planes.",
+        "geometry": "Torch stem 2/16 wide × 10/16 high; stepped flame widths 4/16, 3/16, 2/16 reaching 13/16 total height; chest 14/16; bed 9/16; sapling crossed planes.",
+        "geometry_revision": 2,
         "hardware": "Not flashed in this task. User-reported ~15 FPS refers to an earlier version; v4 performance, touch, and SD migration need board verification.",
         "artifacts": {},
     }
