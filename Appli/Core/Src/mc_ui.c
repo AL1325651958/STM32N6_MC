@@ -325,6 +325,15 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     for(unsigned i=0;i<MC_HOTBAR;i++){MC_Stack s=w->creative?(MC_Stack){w->hotbar[i],1,0}:w->slots[i];stack(fb,240+i*50,424,50,56,&s,i==w->slot,w->creative);}
     panel(fb,640,393,44,56);icon(fb,642,397,w->hotbar[w->slot],40);
     panel(fb,240,393,400,25);text(fb,249,399,MC_ItemName(w->hotbar[w->slot]),0xffff);
+    /* Compact XP bar fits between the survival meters and the item label. */
+    {
+      unsigned next=MC_XpToNext(w),progress=MC_XpProgress(w);
+      char xp[24];snprintf(xp,sizeof(xp),"LVL %u",(unsigned)MC_XpLevel(w));
+      small(fb,240,378,xp,w->level_flash>0?0xffe0:0xffc0);
+      rect(fb,282,378,350,6,0x2104);
+      if(next)rect(fb,283,379,(int)(348u*(progress>next?next:progress)/next),4,w->level_flash>0?0xffe0:0x07e0);
+      if(w->level_flash>0)small(fb,500,378,"LEVEL UP",0xffe0);
+    }
     if(w->mining>0){rect(fb,300,274,200,8,0x2104);rect(fb,302,276,(int)(196*fminf(1,w->mining)),4,0xffe0);}
     for(unsigned i=0;i<10;i++){int x=246+(int)i*22;rect(fb,x,369,16,12,i*2<w->health?0xe924:0x4208);if(i*2+1>=w->health)rect(fb,x+8,369,8,12,0x4208);}
     small(fb,492,347,"FOOD",0xffc0);

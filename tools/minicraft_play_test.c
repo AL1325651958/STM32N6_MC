@@ -32,7 +32,7 @@ int main(void) {
  /* End-to-end bootstrap from a tree to a stone pick. */
  MC_Set(&w,10,3,13,MC_WOOD);MC_Hit hit;assert(MC_Pick(&w,400,240,&hit)&&hit.z==13);
  MC_PlayTick(&w,.1f,1,400,240);assert(w.mining>0);MC_PlayTick(&w,.1f,0,400,240);assert(w.mining==0);
- mine(&w,20);assert(MC_Get(&w,10,3,13)==MC_AIR&&w.items[MC_WOOD]==1);
+ mine(&w,20);assert(MC_Get(&w,10,3,13)==MC_AIR&&w.items[MC_WOOD]==1&&w.experience>=1);
  assert(MC_Craft(&w,0)&&w.items[MC_PLANKS]==4);assert(!MC_Craft(&w,3));
  assert(MC_Craft(&w,1)&&w.items[MC_STICK]==4);assert(MC_Give(&w,MC_WOOD,3));
  for(int i=0;i<3;i++){assert(MC_Craft(&w,0));}

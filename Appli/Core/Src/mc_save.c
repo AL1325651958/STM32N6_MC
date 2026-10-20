@@ -2,7 +2,7 @@
 #include <math.h>
 #include <string.h>
 /* Versioned metadata offsets are fixed, independent of C struct padding. */
-enum { M_SLOTS=80,M_BAR=208,M_CHESTS=216,M_COORD=792,M_FURNACES=828,M_GROWERS=984,M_MOBS=1144,M_MOB_STATE=1400,M_ARMOR=1420 };
+enum { M_SLOTS=80,M_BAR=208,M_CHESTS=216,M_COORD=792,M_FURNACES=828,M_GROWERS=984,M_MOBS=1144,M_MOB_STATE=1400,M_ARMOR=1420,M_XP=1436 };
 _Static_assert(M_SLOTS+MC_SLOTS*4==M_BAR,"slot layout");
 _Static_assert(M_BAR+MC_HOTBAR==M_CHESTS,"bar layout");
 _Static_assert(M_CHESTS+MC_CHESTS*MC_CHEST_SLOTS*4==M_COORD,"chest layout");
@@ -11,6 +11,7 @@ _Static_assert(M_FURNACES+MC_FURNACES*26==M_GROWERS,"furnace layout");
 _Static_assert(M_GROWERS+MC_GROWERS*10==M_MOBS,"grower layout");
 _Static_assert(M_MOBS+MC_MOBS*32==M_MOB_STATE,"mob layout");
 _Static_assert(M_ARMOR+MC_ARMOR_SLOTS*4<=MC_SAVE_META,"metadata overflow");
+_Static_assert(M_XP+6<=MC_SAVE_META,"experience metadata overflow");
 static uint32_t get32(const uint8_t*p){return(uint32_t)p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24;}
 static void put32(uint8_t*p,uint32_t v){for(int i=0;i<4;i++)p[i]=(uint8_t)(v>>(i*8));}
 static uint16_t get16(const uint8_t*p){return(uint16_t)(p[0]|(uint16_t)p[1]<<8);}
@@ -56,6 +57,7 @@ void MC_SaveEncode(const MC_World*w,uint32_t generation,uint8_t*p){
   put32(m+M_MOB_STATE,w->mob_rng);putfloat(m+M_MOB_STATE+4,w->mob_clock);putfloat(m+M_MOB_STATE+8,w->spawn_clock);
   putfloat(m+M_MOB_STATE+12,w->attack_cooldown);putfloat(m+M_MOB_STATE+16,w->attack_flash);
   for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)swrite(m+M_ARMOR+i*4,&w->armor[i]);
+  put32(m+M_XP,w->experience>MC_XpForLevel(MC_MAX_LEVEL)?MC_XpForLevel(MC_MAX_LEVEL):w->experience);m[M_XP+4]=(uint8_t)MC_XpLevel(w);m[M_XP+5]=1;
   put32(p+48,MC_Crc32(m,MC_SAVE_META));put32(p+52,MC_SAVE_META);put32(p+56,MC_Crc32(p+MC_SAVE_HEADER,MC_MAP_BYTES));put32(p+60,MC_Crc32(p,60));
 }
 static uint8_t saved_block(const uint8_t*p,const uint8_t*q){return p[MC_SAVE_HEADER+((get16(q+2)-1)*MC_MAP_Z+get16(q+4)-1)*MC_MAP_X+get16(q)-1];}
@@ -109,7 +111,11 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
           const uint8_t*q=m+M_ARMOR+i*4;
           if(!svalid(q)||(q[1]&&MC_ArmorIndex(q[0])!=(int)i))return 0;
         }
-        if(m[7]>1 || (m[7] && m[6]>20))return 0;
+        if(m[7]>1 || (m[7] && m[6]>20) || m[M_XP+5]>1)return 0;
+        if(m[M_XP+5]) {
+          unsigned xp=get32(m+M_XP),level=m[M_XP+4];
+          if(xp>MC_XpForLevel(MC_MAX_LEVEL)||level>MC_MAX_LEVEL||level!=MC_XpLevel(&(MC_World){.experience=xp}))return 0;
+        }
         for(unsigned i=0;i<MC_MOBS;i++) {
           const uint8_t*q=m+M_MOBS+i*32;float x=getfloat(q),y=getfloat(q+4),z=getfloat(q+8),vy=getfloat(q+12);
           if(q[24]>MC_MOB_HEALTH||q[25]>1||q[26]>1||!range(getfloat(q+16),0,1.5f)||!range(getfloat(q+20),0,1)||!range(getfloat(q+28),-3.15f,3.15f)||
@@ -168,6 +174,7 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
       w->mob_rng=get32(m+M_MOB_STATE);w->mob_clock=getfloat(m+M_MOB_STATE+4);w->spawn_clock=getfloat(m+M_MOB_STATE+8);
       w->attack_cooldown=getfloat(m+M_MOB_STATE+12);w->attack_flash=getfloat(m+M_MOB_STATE+16);
       for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)sread(&w->armor[i],m+M_ARMOR+i*4);
+      if(m[M_XP+5]) { w->experience=get32(m+M_XP);w->level=(uint8_t)MC_XpLevel(w); }
     }
     w->notice="WORLD AND INVENTORY LOADED";
   }

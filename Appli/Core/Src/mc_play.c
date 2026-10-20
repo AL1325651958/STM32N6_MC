@@ -87,6 +87,46 @@ unsigned MC_ArmorPoints(const MC_World *w) {
   unsigned total=0;for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)if(w->armor[i].count)total+=points[i];
   return total;
 }
+unsigned MC_XpForLevel(unsigned level) {
+  if(level>MC_MAX_LEVEL)level=MC_MAX_LEVEL;
+  return 5u*level*level+10u*level;
+}
+unsigned MC_XpLevel(const MC_World *w) {
+  unsigned xp=w?w->experience:0,level=0;
+  unsigned cap=MC_XpForLevel(MC_MAX_LEVEL);
+  if(xp>cap)xp=cap;
+  while(level<MC_MAX_LEVEL && xp>=MC_XpForLevel(level+1))level++;
+  return level;
+}
+unsigned MC_XpProgress(const MC_World *w) {
+  unsigned level=MC_XpLevel(w),base=MC_XpForLevel(level);
+  return w&&w->experience>base?w->experience-base:0;
+}
+unsigned MC_XpToNext(const MC_World *w) {
+  unsigned level=MC_XpLevel(w);
+  return level>=MC_MAX_LEVEL?0:MC_XpForLevel(level+1)-MC_XpForLevel(level);
+}
+unsigned MC_AddExperience(MC_World *w,unsigned amount) {
+  if(!w||w->creative||!amount)return 0;
+  unsigned old=w->experience,old_level=MC_XpLevel(w),cap=MC_XpForLevel(MC_MAX_LEVEL);
+  if(old>=cap)return 0;
+  if(amount>cap-old)amount=cap-old;
+  w->experience=old+amount;
+  unsigned new_level=MC_XpLevel(w);
+  w->level=(uint8_t)new_level;
+  if(new_level>old_level) {
+    w->level_flash=.9f;
+    w->notice="LEVEL UP";
+  }
+  return amount;
+}
+unsigned MC_AttackDamage(const MC_World *w,unsigned weapon) {
+  unsigned damage=weapon==MC_SWORD?6:weapon==MC_AXE?5:weapon==MC_IRON_PICK?4:MC_ToolIndex(weapon)>=0?3:1;
+  unsigned level=MC_XpLevel(w);
+  if(level>=5)damage++;
+  if(level>=15)damage++;
+  return damage;
+}
 static unsigned capacity(const MC_Stack *slots,unsigned len,unsigned id) {
   unsigned room=0,limit=(MC_ToolIndex(id)>=0||MC_ArmorIndex(id)>=0)?1:64;
   for(unsigned i=0;i<len;i++) {
@@ -186,6 +226,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   const uint8_t bar[8]={MC_WOOD,MC_DIRT,MC_COBBLE,MC_PLANKS,MC_TABLE,MC_TORCH,MC_GLASS,MC_BOW};
   memcpy(w->creative_bar,bar,8);w->slot=0;w->creative=(uint8_t)legacy;
   w->health=20;w->air=10;w->hunger=20;w->equipped=0;w->time=90;
+  w->experience=0;w->level=0;w->level_flash=0;
   w->hunger_clock=w->starvation_clock=0;
   w->fall_speed=w->breath=w->hurt_timer=0;w->target_valid=0;w->mining=0;
   w->bag=w->recipe_page=w->change_world=w->bag_page=w->recipe_requires=w->split=0;
@@ -228,6 +269,7 @@ int MC_Craft(MC_World *w,unsigned r) {
   }
   if(MC_ToolIndex(c.out)>=0){w->equipped=c.out;for(unsigned i=0;i<MC_HOTBAR;i++)if(w->slots[i].item==c.out){w->slot=i;break;}}
   else MC_SelectItem(w,c.out);
+  MC_AddExperience(w,1);
   w->notice="CRAFTED  CHECK INVENTORY";return 1;
 }
 static int chest_at(const MC_World *w,int x,int y,int z) {
@@ -332,6 +374,7 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   if(!(dt>0)||w->bag)return;
   dt=fminf(dt,.1f);w->time=fmodf(w->time+dt,600);
   w->hurt_timer=fmaxf(0,w->hurt_timer-dt);
+  w->level_flash=fmaxf(0,w->level_flash-dt);
   if(!w->creative) {
     w->hunger_clock+=dt;
     while(w->hunger_clock>=30) {
@@ -413,6 +456,9 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
     if(!MC_Give(w,drop,1) && !MC_DropSpawn(w,drop,1,h.x+.5f,h.y+.55f,h.z+.5f)) {
       w->notice="BAG FULL";w->mining=0;return;
     }
+    if(h.block==MC_COAL_ORE)MC_AddExperience(w,2);
+    else if(h.block==MC_IRON_ORE)MC_AddExperience(w,3);
+    else if(h.block==MC_WOOD || h.block==MC_STONE || h.block==MC_COBBLE)MC_AddExperience(w,1);
   }
   if(!w->creative && h.block==MC_GRASS && ((unsigned)(h.x*13+h.z*7)%7u==0u)) {
     if(!MC_Give(w,MC_WHEAT_SEEDS,1))MC_DropSpawn(w,MC_WHEAT_SEEDS,1,h.x+.5f,h.y+.55f,h.z+.5f);
@@ -514,7 +560,7 @@ void MC_SystemsTick(MC_World *w,float dt) {
       float elapsed=fminf(dt,f->burn);f->burn=fmaxf(0,f->burn-dt);
       if(ready) {
         f->progress+=elapsed;
-        if(f->progress>=4.99999f){f->output.item=(uint8_t)out;f->output.count++;f->input.count--;clear_empty(&f->input);f->progress=fmaxf(0,f->progress-5);}
+        if(f->progress>=4.99999f){f->output.item=(uint8_t)out;f->output.count++;f->input.count--;clear_empty(&f->input);f->progress=fmaxf(0,f->progress-5);MC_AddExperience(w,1);}
       } else f->progress=0;
     }
     if(!f->input.count)f->progress=0;

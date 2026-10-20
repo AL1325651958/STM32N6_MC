@@ -46,6 +46,9 @@ int main(void)
   assert(MC_Attack(&w,400,240));assert(w.mobs[0].health==MC_MOB_HEALTH-1&&w.attack_cooldown>0);
   assert(!MC_Attack(&w,400,240));w.attack_cooldown=0;
   assert(MC_Give(&w,MC_SWORD,1));assert(MC_Attack(&w,400,240));assert(w.mobs[0].health==MC_MOB_HEALTH-7);
+  w.experience=MC_XpForLevel(5);w.level=5;w.attack_cooldown=0;
+  w.mobs[0].health=MC_MOB_HEALTH;assert(MC_Attack(&w,400,240));assert(w.mobs[0].health==MC_MOB_HEALTH-7);
+  w.experience=0;w.level=0;
   MC_Set(&w,10,3,12,MC_STONE);w.attack_cooldown=0;assert(MC_PickMob(&w,400,240,4,&d)<0);
   assert(!MC_Attack(&w,400,240));MC_Set(&w,10,3,12,MC_AIR);
   /* Wheat attracts passive animals and two fed animals produce one child.
@@ -77,6 +80,7 @@ int main(void)
   w.mobs[0]=(MC_Mob){10.5f,2.01f,13.5f,0,0,0,8,1,1,0};
   w.attack_cooldown=0;assert(MC_Attack(&w,400,400));w.attack_cooldown=0;
   assert(MC_Attack(&w,400,400)&&!w.mobs[0].health&&w.items[MC_RAW_MEAT]==1);
+  assert(w.experience==3&&MC_XpLevel(&w)==0);
   memset(w.slots,0,sizeof(w.slots));MC_SyncInventory(&w);assert(MC_Give(&w,MC_RAW_MEAT,1));
   w.health=10;assert(MC_Use(&w)&&w.health==14&&w.items[MC_RAW_MEAT]==0);
   w.mobs[0]=(MC_Mob){10.5f,2.01f,13.5f,0,0,0,MC_MOB_HEALTH,1,0,0};

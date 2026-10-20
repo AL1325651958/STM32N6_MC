@@ -43,6 +43,7 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
 #define MC_REDSTONE_BUTTONS 8
 #define MC_PROJECTILES 8
 #define MC_ARMOR_SLOTS 4
+#define MC_MAX_LEVEL 30
 typedef struct { uint8_t item,count; uint16_t wear; } MC_Stack;
 typedef struct { uint16_t x,y,z; MC_Stack input,fuel,output; float burn,progress; } MC_Furnace;
 typedef struct { uint16_t x,y,z; float age; } MC_Grower;
@@ -60,7 +61,9 @@ typedef struct {
   uint8_t on_ground, sneak; /* sneak is a transient held input, never serialized */
   uint16_t items[MC_ITEM_COUNT], durability[MC_TOOLS];
   MC_Stack armor[MC_ARMOR_SLOTS];
-  uint8_t hotbar[MC_HOTBAR], creative_bar[MC_HOTBAR], slot, creative, health, air, equipped, hunger;
+  uint8_t hotbar[MC_HOTBAR], creative_bar[MC_HOTBAR], slot, creative, health, air, equipped, hunger, level;
+  uint32_t experience;
+  float level_flash;
   float time, fall_speed, breath, hurt_timer, hunger_clock, starvation_clock;
   MC_Hit target;
   float mining;
@@ -134,6 +137,12 @@ unsigned MC_ToolLife(unsigned item);
 int MC_ArmorIndex(unsigned item);
 unsigned MC_ArmorLife(unsigned item);
 unsigned MC_ArmorPoints(const MC_World *w);
+unsigned MC_XpForLevel(unsigned level);
+unsigned MC_XpLevel(const MC_World *w);
+unsigned MC_XpProgress(const MC_World *w);
+unsigned MC_XpToNext(const MC_World *w);
+unsigned MC_AddExperience(MC_World *w,unsigned amount);
+unsigned MC_AttackDamage(const MC_World *w,unsigned weapon);
 int MC_EquipArmor(MC_World *w,unsigned inventory_slot);
 int MC_UnequipArmor(MC_World *w,unsigned armor_slot);
 int MC_MoveStack(MC_Stack *from,MC_Stack *to,int split);
