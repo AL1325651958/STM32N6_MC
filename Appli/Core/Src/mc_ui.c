@@ -67,10 +67,19 @@ void MC_UIBagTap(MC_World *w,unsigned x,unsigned y)
     else if(x>=290 && x<404)w->change_world=1;
     return;
   }
+  /* The four bottom-right slots are armor slots in survival inventory.  A
+     direct tap equips an armor item from the bag or removes the worn piece. */
+  if(!w->creative && w->open_chest>=MC_CHESTS && w->open_furnace>=MC_FURNACES &&
+     x>=430 && x<782 && y>=390 && y<440) {
+    unsigned a=(x-430)/88;
+    if(a<MC_ARMOR_SLOTS)MC_UnequipArmor(w,a);
+    return;
+  }
   if(w->creative && x>=430 && x<782 && y>=390 && y<440) {w->slot=(uint8_t)((x-430)/44);return;}
   if(x>=24 && x<408 && y>=108 && y<380) {
     unsigned i=(x-24)/48+((y-108)/68)*8;
     if(w->creative)MC_SelectItem(w,catalog_item(i));
+    else if(MC_ArmorIndex(w->slots[i].item)>=0)MC_EquipArmor(w,i);
     else MC_TransferSlot(w,i,w->split);
     return;
   }
@@ -240,8 +249,9 @@ static void stack(uint16_t *fb,int x,int y,int width,int height,const MC_Stack *
     snprintf(n,sizeof(n),"%u",s->count);const char *label=infinite?"INF":n;
     int length=infinite?3:s->count>=10?2:1;
     if(infinite||s->count>1){int cx=x+width-7-length*6,cy=y+height-19;small(fb,cx+1,cy+1,label,0);small(fb,cx,cy,label,0xffff);}
-    if(s->wear && MC_ToolLife(s->item)) {
-      unsigned life=MC_ToolLife(s->item),wear=s->wear>life?life:s->wear;
+    unsigned life=MC_ToolLife(s->item);if(!life)life=MC_ArmorLife(s->item);
+    if(s->wear && life) {
+      unsigned wear=s->wear>life?life:s->wear;
       rect(fb,x+4,y+height-10,width-11,3,0x4208);
       rect(fb,x+4,y+height-10,(int)((width-11)*wear/life),3,wear*4<life?0xf9a4:wear*2<life?0xffc0:0x07e0);
     }
@@ -297,7 +307,11 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     panel(fb,160,410,120,30);text(fb,166,418,w->split?"HALF ON":"HALF OFF",0xffff);
     panel(fb,290,410,114,30);text(fb,310,418,"WORLD",0xffff);
     if(w->creative)for(unsigned i=0;i<8;i++){MC_Stack s={w->hotbar[i],1,0};stack(fb,430+i*44,390,44,50,&s,i==w->slot,1);}
-    else if(w->open_chest>=MC_CHESTS&&w->open_furnace>=MC_FURNACES)small(fb,430,410,"TAP SOURCE THEN DESTINATION TO MOVE",0xffff);
+    else if(w->open_chest>=MC_CHESTS&&w->open_furnace>=MC_FURNACES) {
+      small(fb,430,386,"ARMOR",0xffe0);
+      for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)stack(fb,430+(int)i*88,394,82,46,&w->armor[i],0,0);
+      char armor[24];snprintf(armor,sizeof(armor),"ARMOR %u PTS",MC_ArmorPoints(w));small(fb,430,444,armor,0xffc0);
+    }
   } else {
     mini_map(fb,w);
     held_item(fb,w);

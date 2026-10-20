@@ -41,6 +41,7 @@ int main(int argc,char **argv) {
  a.x=12.5f;a.y=22;a.z=19.5f;a.yaw=2.1f;a.pitch=-.4f;
  assert(MC_Give(&a,MC_IRON,99));assert(MC_Give(&a,MC_STONE_PICK,1));a.slots[2].wear=71;a.equipped=MC_STONE_PICK;
  a.slot=3;a.health=13;a.air=7;a.hunger=7;a.time=599.75f;a.reserve[MC_WOOD]=999;
+ a.armor[0]=(MC_Stack){MC_IRON_HELMET,1,73};
  a.reserve[MC_WOOD_PICK]=2;a.reserve_wear[0]=17;
  MC_Set(&a,30,40,30,MC_CHEST);a.chest_map[0][0]=31;a.chest_map[0][1]=41;a.chest_map[0][2]=31;
  a.chest_blocks[0][2]=(MC_Stack){MC_AXE,1,17};a.chest_blocks[0][23]=(MC_Stack){MC_PLANKS,64,0};
@@ -52,6 +53,7 @@ int main(int argc,char **argv) {
  roundtrip(&a,&b,save);assert(b.seed==a.seed&&b.x==a.x&&!memcmp(a.blocks,b.blocks,MC_MAP_BYTES));
  assert(MC_Get(&b,40,40,30)==MC_DOOR&&MC_Get(&b,41,40,30)==MC_DOOR_OPEN);
  assert(b.items[MC_IRON]==99&&b.equipped==MC_STONE_PICK&&b.slots[2].wear==71&&b.slot==3&&b.health==13&&b.air==7&&b.hunger==7&&b.time==a.time);
+ assert(b.armor[0].item==MC_IRON_HELMET&&b.armor[0].count==1&&b.armor[0].wear==73);
  assert(!memcmp(a.slots,b.slots,sizeof(a.slots))&&!memcmp(a.chest_blocks,b.chest_blocks,sizeof(a.chest_blocks)));
  assert(!memcmp(a.chest_map,b.chest_map,sizeof(a.chest_map))&&!memcmp(a.spawn,b.spawn,sizeof(a.spawn))&&b.reserve[MC_WOOD]==999);
  assert(b.reserve[MC_WOOD_PICK]==2&&b.reserve_wear[0]==17);
@@ -76,6 +78,7 @@ int main(int argc,char **argv) {
  invalid(&b,save,copy,2,8);invalid(&b,save,copy,5,MC_APPLE);invalid(&b,save,copy,81,65);invalid(&b,save,copy,80,MC_AIR);
  invalid(&b,save,copy,80+2*4+2,251);invalid(&b,save,copy,792,255);invalid(&b,save,copy,828+10,MC_STICK);
  invalid(&b,save,copy,74,61);
+ invalid(&b,save,copy,1420+1,2);invalid(&b,save,copy,1420+2,0);
  invalid(&b,save,copy,1144+24,MC_MOB_HEALTH+1);
  invalid(&b,save,copy,1144+25,2);
  memcpy(save,copy,MC_SAVE_SIZE);putfloat(save+MC_SAVE_V1_SIZE+8,NAN);crc(save,MC_SAVE_META);assert(!MC_SaveValidate(save,MC_SAVE_SIZE));

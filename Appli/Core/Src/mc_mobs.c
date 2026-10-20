@@ -243,6 +243,15 @@ int MC_MobFeed(MC_World *w,float x,float y)
 void MC_Hurt(MC_World *w,unsigned damage)
 {
   if(w->creative||w->hurt_timer>0||!damage)return;
+  unsigned armor=MC_ArmorPoints(w);
+  if(armor) {
+    unsigned reduced=(damage*(10u-armor)+9u)/10u;
+    if(!reduced)reduced=1;
+    damage=reduced;
+    for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)if(w->armor[i].count&&w->armor[i].wear) {
+      if(--w->armor[i].wear==0){memset(&w->armor[i],0,sizeof(MC_Stack));w->notice="ARMOR BROKE";}
+    }
+  }
   w->hurt_timer=1;
   if(damage>=w->health){MC_Respawn(w);w->health=20;w->air=10;w->hunger=20;w->hunger_clock=w->starvation_clock=0;w->notice="RESPAWNED  INVENTORY KEPT";}
   else w->health=(uint8_t)(w->health-damage);

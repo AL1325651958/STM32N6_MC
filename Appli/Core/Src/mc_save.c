@@ -2,7 +2,7 @@
 #include <math.h>
 #include <string.h>
 /* Versioned metadata offsets are fixed, independent of C struct padding. */
-enum { M_SLOTS=80,M_BAR=208,M_CHESTS=216,M_COORD=792,M_FURNACES=828,M_GROWERS=984,M_MOBS=1144,M_MOB_STATE=1400 };
+enum { M_SLOTS=80,M_BAR=208,M_CHESTS=216,M_COORD=792,M_FURNACES=828,M_GROWERS=984,M_MOBS=1144,M_MOB_STATE=1400,M_ARMOR=1420 };
 _Static_assert(M_SLOTS+MC_SLOTS*4==M_BAR,"slot layout");
 _Static_assert(M_BAR+MC_HOTBAR==M_CHESTS,"bar layout");
 _Static_assert(M_CHESTS+MC_CHESTS*MC_CHEST_SLOTS*4==M_COORD,"chest layout");
@@ -10,7 +10,7 @@ _Static_assert(M_COORD+MC_CHESTS*6==M_FURNACES,"coordinate layout");
 _Static_assert(M_FURNACES+MC_FURNACES*26==M_GROWERS,"furnace layout");
 _Static_assert(M_GROWERS+MC_GROWERS*10==M_MOBS,"grower layout");
 _Static_assert(M_MOBS+MC_MOBS*32==M_MOB_STATE,"mob layout");
-_Static_assert(M_MOB_STATE+20<=MC_SAVE_META,"metadata overflow");
+_Static_assert(M_ARMOR+MC_ARMOR_SLOTS*4<=MC_SAVE_META,"metadata overflow");
 static uint32_t get32(const uint8_t*p){return(uint32_t)p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24;}
 static void put32(uint8_t*p,uint32_t v){for(int i=0;i<4;i++)p[i]=(uint8_t)(v>>(i*8));}
 static uint16_t get16(const uint8_t*p){return(uint16_t)(p[0]|(uint16_t)p[1]<<8);}
@@ -23,8 +23,10 @@ static int svalid(const uint8_t*p){
   unsigned id=p[0],n=p[1],wear=get16(p+2);
   if(!n)return id==0&&wear==0;
   if(!id||id>=MC_ITEM_COUNT||(id==MC_FARMLAND||id==MC_WHEAT_CROP||id==MC_WHEAT_MATURE||id==MC_DUST_ON||id==MC_LAMP_ON||id==MC_LEVER_ON||id==MC_BUTTON_ON)||id==MC_WATER||id==MC_BEDROCK||n>64)return 0;
-  int t=MC_ToolIndex(id);
-  return t>=0?(n==1&&wear>0&&wear<=MC_ToolLife(id)):wear==0;
+  int t=MC_ToolIndex(id),a=MC_ArmorIndex(id);
+  if(t>=0)return n==1&&wear>0&&wear<=MC_ToolLife(id);
+  if(a>=0)return n==1&&wear>0&&wear<=MC_ArmorLife(id);
+  return wear==0;
 }
 static int coord(const uint8_t*p){unsigned x=get16(p),y=get16(p+2),z=get16(p+4);return !x?(!y&&!z):(x<=MC_MAP_X&&y>=2&&y<=MC_MAP_Y&&z>=1&&z<=MC_MAP_Z);}
 static int range(float f,float lo,float hi){return isfinite(f)&&f>=lo&&f<=hi;}
@@ -53,6 +55,7 @@ void MC_SaveEncode(const MC_World*w,uint32_t generation,uint8_t*p){
   }
   put32(m+M_MOB_STATE,w->mob_rng);putfloat(m+M_MOB_STATE+4,w->mob_clock);putfloat(m+M_MOB_STATE+8,w->spawn_clock);
   putfloat(m+M_MOB_STATE+12,w->attack_cooldown);putfloat(m+M_MOB_STATE+16,w->attack_flash);
+  for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)swrite(m+M_ARMOR+i*4,&w->armor[i]);
   put32(p+48,MC_Crc32(m,MC_SAVE_META));put32(p+52,MC_SAVE_META);put32(p+56,MC_Crc32(p+MC_SAVE_HEADER,MC_MAP_BYTES));put32(p+60,MC_Crc32(p,60));
 }
 static uint8_t saved_block(const uint8_t*p,const uint8_t*q){return p[MC_SAVE_HEADER+((get16(q+2)-1)*MC_MAP_Z+get16(q+4)-1)*MC_MAP_X+get16(q)-1];}
@@ -102,6 +105,10 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
         if(get16(q))for(unsigned j=0;j<i;j++)if(!memcmp(q,m+M_GROWERS+j*10,6))return 0;
       }
       if(v==4) {
+        for(unsigned i=0;i<MC_ARMOR_SLOTS;i++) {
+          const uint8_t*q=m+M_ARMOR+i*4;
+          if(!svalid(q)||(q[1]&&MC_ArmorIndex(q[0])!=(int)i))return 0;
+        }
         if(m[7]>1 || (m[7] && m[6]>20))return 0;
         for(unsigned i=0;i<MC_MOBS;i++) {
           const uint8_t*q=m+M_MOBS+i*32;float x=getfloat(q),y=getfloat(q+4),z=getfloat(q+8),vy=getfloat(q+12);
@@ -160,6 +167,7 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
       }
       w->mob_rng=get32(m+M_MOB_STATE);w->mob_clock=getfloat(m+M_MOB_STATE+4);w->spawn_clock=getfloat(m+M_MOB_STATE+8);
       w->attack_cooldown=getfloat(m+M_MOB_STATE+12);w->attack_flash=getfloat(m+M_MOB_STATE+16);
+      for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)sread(&w->armor[i],m+M_ARMOR+i*4);
     }
     w->notice="WORLD AND INVENTORY LOADED";
   }

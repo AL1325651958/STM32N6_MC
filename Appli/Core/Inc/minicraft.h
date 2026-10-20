@@ -27,7 +27,8 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
        MC_LEVER, MC_LEVER_ON, MC_BUTTON, MC_BUTTON_ON,
        /* Ranged combat IDs are appended so all existing saves keep their
           original item numbering. */
-       MC_BOW, MC_ARROW, MC_ITEM_COUNT };
+       MC_BOW, MC_ARROW, MC_IRON_HELMET, MC_IRON_CHESTPLATE,
+       MC_IRON_LEGGINGS, MC_IRON_BOOTS, MC_ITEM_COUNT };
 #define MC_HOTBAR 8
 #define MC_SLOTS 32
 #define MC_CHEST_SLOTS 24
@@ -41,6 +42,7 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
 #define MC_REDSTONE_SOURCES 32
 #define MC_REDSTONE_BUTTONS 8
 #define MC_PROJECTILES 8
+#define MC_ARMOR_SLOTS 4
 typedef struct { uint8_t item,count; uint16_t wear; } MC_Stack;
 typedef struct { uint16_t x,y,z; MC_Stack input,fuel,output; float burn,progress; } MC_Furnace;
 typedef struct { uint16_t x,y,z; float age; } MC_Grower;
@@ -57,6 +59,7 @@ typedef struct {
   float x, y, z, yaw, pitch, vy;
   uint8_t on_ground, sneak; /* sneak is a transient held input, never serialized */
   uint16_t items[MC_ITEM_COUNT], durability[MC_TOOLS];
+  MC_Stack armor[MC_ARMOR_SLOTS];
   uint8_t hotbar[MC_HOTBAR], creative_bar[MC_HOTBAR], slot, creative, health, air, equipped, hunger;
   float time, fall_speed, breath, hurt_timer, hunger_clock, starvation_clock;
   MC_Hit target;
@@ -128,6 +131,11 @@ void MC_CloseBag(MC_World *w);
 int MC_IsBlock(unsigned item);
 int MC_ToolIndex(unsigned item);
 unsigned MC_ToolLife(unsigned item);
+int MC_ArmorIndex(unsigned item);
+unsigned MC_ArmorLife(unsigned item);
+unsigned MC_ArmorPoints(const MC_World *w);
+int MC_EquipArmor(MC_World *w,unsigned inventory_slot);
+int MC_UnequipArmor(MC_World *w,unsigned armor_slot);
 int MC_MoveStack(MC_Stack *from,MC_Stack *to,int split);
 int MC_ContainerTap(MC_World *w,unsigned slot);
 void MC_SystemsTick(MC_World *w,float dt);

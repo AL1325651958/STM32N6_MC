@@ -17,6 +17,7 @@ NAMES += ['FENCE', 'STONE STAIRS', 'STONE STAIRS EAST', 'STONE STAIRS SOUTH', 'S
 NAMES += ['RAW MEAT']
 NAMES += ['REDSTONE DUST', 'REDSTONE DUST ON', 'REDSTONE LAMP', 'REDSTONE LAMP ON', 'LEVER', 'LEVER ON', 'BUTTON', 'BUTTON ON']
 NAMES += ['BOW', 'ARROW']
+NAMES += ['IRON HELMET', 'IRON CHESTPLATE', 'IRON LEGGINGS', 'IRON BOOTS']
 BASE = {1:(112,165,55), 2:(139,96,61), 3:(141,145,151), 4:(224,208,150),
         5:(144,100,53), 6:(62,135,49), 7:(67,69,77), 8:(55,135,207),
         9:(133,139,146), 10:(191,145,83), 11:(169,116,59), 12:(115,121,128),
@@ -227,6 +228,26 @@ def sprite(item):
         d.polygon([(12,1),(15,3),(12,6),(11,4)], fill=edge)
         d.polygon([(12,2),(14,3),(12,5)], fill='#dce5e7')
         d.polygon([(3,13),(1,10),(5,11),(5,14)], fill='#6c9c62')
+    elif item in (56, 57, 58, 59):
+        # Iron armor icons share a bright steel palette while keeping each
+        # silhouette distinct in the inventory and armor slots.
+        steel, hi, dark = '#b9c6d0', '#edf7fa', '#566574'
+        if item == 56:  # helmet
+            d.polygon([(2,9),(3,4),(6,1),(11,1),(14,4),(14,10),(11,10),(11,7),(5,7),(5,10)], fill=edge)
+            d.polygon([(4,8),(4,5),(7,3),(10,3),(12,5),(12,8),(10,8),(10,6),(6,6),(6,8)], fill=steel)
+            d.line([(5,4),(10,3),(12,5)], fill=hi, width=1);d.line([(4,9),(13,9)], fill=dark, width=1)
+        elif item == 57:  # chestplate
+            d.polygon([(3,2),(7,1),(8,4),(9,4),(10,1),(14,2),(15,7),(12,9),(12,14),(4,14),(4,9),(1,7)], fill=edge)
+            d.polygon([(4,3),(7,2),(8,6),(9,6),(10,2),(13,3),(14,7),(11,8),(11,13),(5,13),(5,8),(2,7)], fill=steel)
+            d.line([(5,4),(6,11)], fill=hi, width=1);d.line([(11,4),(10,11)], fill=dark, width=1)
+        elif item == 58:  # leggings
+            d.polygon([(3,1),(13,1),(13,7),(11,8),(11,14),(9,15),(8,9),(7,15),(5,14),(5,8),(3,7)], fill=edge)
+            d.polygon([(5,2),(11,2),(11,6),(9,7),(9,13),(8,13),(7,7),(5,6)], fill=steel)
+            d.line([(6,3),(6,7),(7,8)], fill=hi, width=1);d.line([(10,3),(10,7),(9,8)], fill=dark, width=1)
+        else:  # boots
+            d.polygon([(3,1),(8,1),(9,9),(13,11),(14,14),(9,15),(7,12),(5,15),(1,14),(2,10),(4,8)], fill=edge)
+            d.polygon([(4,2),(7,2),(8,10),(11,11),(12,13),(9,13),(7,10),(5,13),(3,13),(4,10)], fill=steel)
+            d.line([(5,3),(6,9)], fill=hi, width=1);d.line([(10,11),(11,13)], fill=dark, width=1)
     elif item == 29:
         d.polygon([(1,8),(9,3),(15,6),(15,11),(7,15),(1,12)], fill=edge)
         d.polygon([(2,8),(9,4),(14,6),(7,11)], fill='#e3544b')
@@ -322,7 +343,7 @@ def main():
               'typedef struct { uint16_t colors[16]; uint8_t pixels[128]; } MC_Icon;',
               'static const MC_Icon mc_icons[MC_ITEM_COUNT] = {']
     atlas = Image.new('RGBA', (16*len(NAMES),16))
-    sheet = Image.new('RGB', (800,4*112), '#121d29');d=ImageDraw.Draw(sheet)
+    sheet = Image.new('RGB', (800,((len(NAMES)+7)//8)*112), '#121d29');d=ImageDraw.Draw(sheet)
     for i,(colors,pixels,im) in enumerate(entries):
         header += ['  { /* %d %s */'%(i,NAMES[i]),
                    '    {'+', '.join('0x%04x'%v for v in colors)+'},',

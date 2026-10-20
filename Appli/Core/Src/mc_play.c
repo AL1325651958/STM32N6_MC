@@ -2,8 +2,8 @@
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
-static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT","REDSTONE DUST","REDSTONE DUST ON","REDSTONE LAMP","REDSTONE LAMP ON","LEVER","LEVER ON","BUTTON","BUTTON ON","BOW","ARROW"};
-static const uint16_t colors[MC_ITEM_COUNT]={0,0x6cc6,0x8b07,0x8410,0xd66f,0x8b45,0x3b85,0x3186,0x3397,0x7390,0xb48a,0x9347,0x630c,0x4208,0xb3ac,0x9f7f,0xb2a8,0xff20,0x9b05,0x2104,0xc638,0xa366,0x94b2,0xdefb,0xe924,0x9b05,0x9b05,0xdefb,0x9347,0x6cc6,0x3b85,0xa365,0x9b05,0x8c71,0x8c71,0x6a64,0x4d8b,0xf6A0,0x7e24,0xdda2,0x8410,0x8410,0x8410,0x8410,0xc9b0,0xf800,0xf800,0x8410,0xffe0,0x9b05,0xffc0,0xb48a,0xffe0,0x8a45,0xe7be};
+static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT","REDSTONE DUST","REDSTONE DUST ON","REDSTONE LAMP","REDSTONE LAMP ON","LEVER","LEVER ON","BUTTON","BUTTON ON","BOW","ARROW","IRON HELMET","IRON CHESTPLATE","IRON LEGGINGS","IRON BOOTS"};
+static const uint16_t colors[MC_ITEM_COUNT]={0,0x6cc6,0x8b07,0x8410,0xd66f,0x8b45,0x3b85,0x3186,0x3397,0x7390,0xb48a,0x9347,0x630c,0x4208,0xb3ac,0x9f7f,0xb2a8,0xff20,0x9b05,0x2104,0xc638,0xa366,0x94b2,0xdefb,0xe924,0x9b05,0x9b05,0xdefb,0x9347,0x6cc6,0x3b85,0xa365,0x9b05,0x8c71,0x8c71,0x6a64,0x4d8b,0xf6A0,0x7e24,0x8410,0x8410,0x8410,0x8410,0xc9b0,0xf800,0xf800,0x8410,0xffe0,0x9b05,0xffc0,0xb48a,0xffe0,0x8a45,0xe7be,0xa514,0xa514,0xa514,0xa514};
 const char *MC_ItemName(unsigned i){return i<MC_ITEM_COUNT?names[i]:"EMPTY";}uint16_t MC_ItemColor(unsigned i){return i<MC_ITEM_COUNT?colors[i]:0;}
 void MC_HoldStart(MC_Hold*h,int x,int y,uint32_t n){*h=(MC_Hold){x,y,x,y,n};}void MC_HoldMove(MC_Hold*h,int x,int y,uint32_t n){int dx=x-h->anchor_x,dy=y-h->anchor_y;h->x=x;h->y=y;if(dx*dx+dy*dy>144){h->anchor_x=x;h->anchor_y=y;h->since=n;}}int MC_HoldReady(const MC_Hold*h,uint32_t n){return(uint32_t)(n-h->since)>=450;}
 int MC_IsBlock(unsigned i) {
@@ -74,8 +74,21 @@ unsigned MC_ToolLife(unsigned i) {
   static const uint16_t life[MC_TOOLS]={60,132,250,90,90,90,160};
   int t=MC_ToolIndex(i);return t<0?0:life[t];
 }
+int MC_ArmorIndex(unsigned item) {
+  if(item>=MC_IRON_HELMET && item<=MC_IRON_BOOTS)return (int)item-(int)MC_IRON_HELMET;
+  return -1;
+}
+unsigned MC_ArmorLife(unsigned item) {
+  static const uint16_t life[MC_ARMOR_SLOTS]={80,120,100,80};
+  int slot=MC_ArmorIndex(item);return slot<0?0:life[slot];
+}
+unsigned MC_ArmorPoints(const MC_World *w) {
+  static const uint8_t points[MC_ARMOR_SLOTS]={1,3,2,1};
+  unsigned total=0;for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)if(w->armor[i].count)total+=points[i];
+  return total;
+}
 static unsigned capacity(const MC_Stack *slots,unsigned len,unsigned id) {
-  unsigned room=0,limit=MC_ToolIndex(id)<0?64:1;
+  unsigned room=0,limit=(MC_ToolIndex(id)>=0||MC_ArmorIndex(id)>=0)?1:64;
   for(unsigned i=0;i<len;i++) {
     if(!slots[i].count)room+=limit;
     else if(slots[i].item==id && limit==64)room+=64-slots[i].count;
@@ -91,7 +104,7 @@ static int add_stack(MC_Stack *slots,unsigned len,MC_Stack src) {
     }
   }
   for(unsigned i=0;i<len && src.count;i++)if(!slots[i].count) {
-    unsigned n=MC_ToolIndex(src.item)>=0?1:src.count>64?64:src.count;
+    unsigned n=(MC_ToolIndex(src.item)>=0||MC_ArmorIndex(src.item)>=0)?1:src.count>64?64:src.count;
     slots[i]=src;slots[i].count=(uint8_t)n;src.count-=n;
   }
   return 1;
@@ -111,8 +124,26 @@ void MC_SyncInventory(MC_World *w) {
 int MC_Give(MC_World *w,unsigned id,unsigned n) {
   if(!id || id>=MC_ITEM_COUNT || id==MC_BEDROCK || id==MC_WATER || map_only(id) || !n || n>255)return 0;
   MC_Stack src={(uint8_t)id,(uint8_t)n,(uint16_t)MC_ToolLife(id)};
+  if(MC_ArmorIndex(id)>=0)src.wear=(uint16_t)MC_ArmorLife(id);
   if(!add_stack(w->slots,MC_SLOTS,src))return 0;
   MC_SyncInventory(w);return 1;
+}
+int MC_EquipArmor(MC_World *w,unsigned inventory_slot) {
+  if(inventory_slot>=MC_SLOTS)return 0;
+  MC_Stack *src=&w->slots[inventory_slot];int slot=MC_ArmorIndex(src->item);
+  if(slot<0||src->count!=1)return 0;
+  MC_Stack old=w->armor[slot];w->armor[slot]=*src;
+  if(old.count)*src=old;else memset(src,0,sizeof(*src));
+  MC_SyncInventory(w);w->notice="ARMOR EQUIPPED";return 1;
+}
+int MC_UnequipArmor(MC_World *w,unsigned armor_slot) {
+  if(armor_slot>=MC_ARMOR_SLOTS||!w->armor[armor_slot].count)return 0;
+  unsigned dst=MC_SLOTS;
+  if(w->selected_slot<MC_SLOTS&&!w->slots[w->selected_slot].count)dst=w->selected_slot;
+  if(dst==MC_SLOTS)for(unsigned i=0;i<MC_SLOTS;i++)if(!w->slots[i].count){dst=i;break;}
+  if(dst==MC_SLOTS){w->notice="BAG FULL  ARMOR STAYS ON";return 0;}
+  w->slots[dst]=w->armor[armor_slot];memset(&w->armor[armor_slot],0,sizeof(MC_Stack));
+  w->selected_slot=(uint8_t)dst;MC_SyncInventory(w);w->notice="ARMOR REMOVED";return 1;
 }
 static void remove_item(MC_World *w,unsigned id,unsigned n) {
   for(unsigned i=0;i<MC_SLOTS && n;i++)if(w->slots[i].item==id) {
@@ -147,6 +178,7 @@ void MC_CloseBag(MC_World *w) {
 }
 void MC_NewPlayer(MC_World *w,int legacy) {
   memset(w->items,0,sizeof(w->items));memset(w->slots,0,sizeof(w->slots));
+  memset(w->armor,0,sizeof(w->armor));
   memset(w->chest_blocks,0,sizeof(w->chest_blocks));memset(w->chest_map,0,sizeof(w->chest_map));
   memset(w->furnaces,0,sizeof(w->furnaces));memset(w->growers,0,sizeof(w->growers));
   memset(w->reserve,0,sizeof(w->reserve));memset(w->spawn,0,sizeof(w->spawn));memset(w->durability,0,sizeof(w->durability));
@@ -174,8 +206,8 @@ void MC_SelectItem(MC_World *w,unsigned item) {
   if(MC_ToolIndex(item)>=0 && (w->creative || w->items[item]))w->equipped=(uint8_t)item;
 }
 typedef struct{uint8_t out,n,a,na,b,nb,station;}R;
-static const R recipes[]={{MC_PLANKS,4,MC_WOOD,1,0,0,0},{MC_STICK,4,MC_PLANKS,2,0,0,0},{MC_TABLE,1,MC_PLANKS,4,0,0,0},{MC_WOOD_PICK,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_STONE_PICK,1,MC_COBBLE,3,MC_STICK,2,MC_TABLE},{MC_FURNACE,1,MC_COBBLE,8,0,0,MC_TABLE},{MC_COAL,1,MC_WOOD,1,MC_PLANKS,1,MC_FURNACE},{MC_TORCH,4,MC_COAL,1,MC_STICK,1,0},{MC_IRON,1,MC_IRON_ORE,1,MC_COAL,1,MC_FURNACE},{MC_IRON_PICK,1,MC_IRON,3,MC_STICK,2,MC_TABLE},{MC_GLASS,4,MC_SAND,4,MC_COAL,1,MC_FURNACE},{MC_BRICK,4,MC_COBBLE,4,MC_COAL,1,MC_FURNACE},{MC_AXE,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_SHOVEL,1,MC_PLANKS,1,MC_STICK,2,MC_TABLE},{MC_SWORD,1,MC_PLANKS,2,MC_STICK,1,MC_TABLE},{MC_CHEST,1,MC_PLANKS,8,0,0,MC_TABLE},{MC_BED,1,MC_PLANKS,3,MC_SAPLING,3,MC_TABLE},{MC_DOOR,1,MC_PLANKS,6,0,0,MC_TABLE},{MC_SLAB,6,MC_COBBLE,3,0,0,MC_TABLE},{MC_FENCE,3,MC_PLANKS,4,MC_STICK,2,MC_TABLE},{MC_STAIR,4,MC_COBBLE,6,0,0,MC_TABLE},{MC_DUST,4,MC_COAL,1,MC_IRON,1,MC_TABLE},{MC_LAMP,1,MC_DUST,4,MC_GLASS,4,MC_TABLE},{MC_LEVER,1,MC_STICK,1,MC_COBBLE,1,MC_TABLE},{MC_BUTTON,1,MC_PLANKS,1,0,0,MC_TABLE},{MC_BOW,1,MC_PLANKS,3,MC_STICK,3,MC_TABLE},{MC_ARROW,4,MC_STICK,1,MC_IRON,1,MC_TABLE}};
-static const char*cost[]={"1 LOG - 4 PLANKS","2 PLANKS - 4 STICKS","4 PLANKS","3 PLANKS 2 STICKS","3 COBBLE 2 STICKS","8 COBBLE","1 LOG 1 PLANK","1 COAL 1 STICK","1 ORE 1 COAL","3 IRON 2 STICKS","4 SAND 1 COAL","4 COBBLE 1 COAL","3 PLANKS 2 STICKS","1 PLANK 2 STICKS","2 PLANKS 1 STICK","8 PLANKS","3 PLANKS 3 SAPLINGS","6 PLANKS","3 COBBLE - 6 STONE SLABS","4 PLANKS 2 STICKS - 3 FENCES","6 COBBLE - 4 STONE STAIRS","1 COAL 1 IRON - 4 DUST","4 DUST 4 GLASS","1 STICK 1 COBBLE","1 PLANK","3 PLANKS 3 STICKS","1 STICK 1 IRON - 4 ARROWS"};
+static const R recipes[]={{MC_PLANKS,4,MC_WOOD,1,0,0,0},{MC_STICK,4,MC_PLANKS,2,0,0,0},{MC_TABLE,1,MC_PLANKS,4,0,0,0},{MC_WOOD_PICK,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_STONE_PICK,1,MC_COBBLE,3,MC_STICK,2,MC_TABLE},{MC_FURNACE,1,MC_COBBLE,8,0,0,MC_TABLE},{MC_COAL,1,MC_WOOD,1,MC_PLANKS,1,MC_FURNACE},{MC_TORCH,4,MC_COAL,1,MC_STICK,1,0},{MC_IRON,1,MC_IRON_ORE,1,MC_COAL,1,MC_FURNACE},{MC_IRON_PICK,1,MC_IRON,3,MC_STICK,2,MC_TABLE},{MC_GLASS,4,MC_SAND,4,MC_COAL,1,MC_FURNACE},{MC_BRICK,4,MC_COBBLE,4,MC_COAL,1,MC_FURNACE},{MC_AXE,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_SHOVEL,1,MC_PLANKS,1,MC_STICK,2,MC_TABLE},{MC_SWORD,1,MC_PLANKS,2,MC_STICK,1,MC_TABLE},{MC_CHEST,1,MC_PLANKS,8,0,0,MC_TABLE},{MC_BED,1,MC_PLANKS,3,MC_SAPLING,3,MC_TABLE},{MC_DOOR,1,MC_PLANKS,6,0,0,MC_TABLE},{MC_SLAB,6,MC_COBBLE,3,0,0,MC_TABLE},{MC_FENCE,3,MC_PLANKS,4,MC_STICK,2,MC_TABLE},{MC_STAIR,4,MC_COBBLE,6,0,0,MC_TABLE},{MC_DUST,4,MC_COAL,1,MC_IRON,1,MC_TABLE},{MC_LAMP,1,MC_DUST,4,MC_GLASS,4,MC_TABLE},{MC_LEVER,1,MC_STICK,1,MC_COBBLE,1,MC_TABLE},{MC_BUTTON,1,MC_PLANKS,1,0,0,MC_TABLE},{MC_BOW,1,MC_PLANKS,3,MC_STICK,3,MC_TABLE},{MC_ARROW,4,MC_STICK,1,MC_IRON,1,MC_TABLE},{MC_IRON_HELMET,1,MC_IRON,5,0,0,MC_TABLE},{MC_IRON_CHESTPLATE,1,MC_IRON,8,0,0,MC_TABLE},{MC_IRON_LEGGINGS,1,MC_IRON,7,0,0,MC_TABLE},{MC_IRON_BOOTS,1,MC_IRON,4,0,0,MC_TABLE}};
+static const char*cost[]={"1 LOG - 4 PLANKS","2 PLANKS - 4 STICKS","4 PLANKS","3 PLANKS 2 STICKS","3 COBBLE 2 STICKS","8 COBBLE","1 LOG 1 PLANK","1 COAL 1 STICK","1 ORE 1 COAL","3 IRON 2 STICKS","4 SAND 1 COAL","4 COBBLE 1 COAL","3 PLANKS 2 STICKS","1 PLANK 2 STICKS","2 PLANKS 1 STICK","8 PLANKS","3 PLANKS 3 SAPLINGS","6 PLANKS","3 COBBLE - 6 STONE SLABS","4 PLANKS 2 STICKS - 3 FENCES","6 COBBLE - 4 STONE STAIRS","1 COAL 1 IRON - 4 DUST","4 DUST 4 GLASS","1 STICK 1 COBBLE","1 PLANK","3 PLANKS 3 STICKS","1 STICK 1 IRON - 4 ARROWS","5 IRON","8 IRON","7 IRON","4 IRON"};
 unsigned MC_RecipeCount(void){return sizeof(recipes)/sizeof(recipes[0]);}const char*MC_RecipeName(unsigned r){return r<MC_RecipeCount()?MC_ItemName(recipes[r].out):"";}const char*MC_RecipeCost(unsigned r){return r<MC_RecipeCount()?cost[r]:"";}
 unsigned MC_RecipeResult(unsigned r){return r<MC_RecipeCount()?recipes[r].out:0;}
 unsigned MC_RecipeIngredient(unsigned r,unsigned p){if(r>=MC_RecipeCount()||p>1)return 0;return p?recipes[r].b:recipes[r].a;}
