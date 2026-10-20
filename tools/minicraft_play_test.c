@@ -62,6 +62,18 @@ int main(void) {
  /* Placement consumes exactly the selected physical stack. */
  scene(&w);assert(MC_Give(&w,MC_DIRT,65));w.slot=1;MC_Set(&w,10,3,13,MC_STONE);assert(MC_Place(&w));
  assert(w.slots[0].count==64&&!w.slots[1].count&&MC_Get(&w,10,3,12)==MC_DIRT);
+ /* Non-cube building parts keep their shape for placement, selection and mining. */
+ scene(&w);assert(MC_IsBlock(MC_FENCE)&&MC_IsBlock(MC_STAIR));
+ assert(MC_Give(&w,MC_FENCE,1));MC_Set(&w,10,3,13,MC_STONE);assert(MC_Place(&w));
+ assert(MC_Get(&w,10,3,12)==MC_FENCE);assert(MC_Pick(&w,400,240,&hit)&&hit.block==MC_FENCE);
+ assert(MC_Give(&w,MC_AXE,1));select_item(&w,MC_AXE);mine(&w,8);assert(MC_Get(&w,10,3,12)==MC_AIR&&w.items[MC_FENCE]==1);
+ MC_Set(&w,10,2,12,MC_FENCE);assert(!MC_BodyClear(&w,10.5f,1,11.6f));MC_Set(&w,10,2,12,MC_AIR);
+ MC_Set(&w,11,2,10,MC_TABLE);assert(MC_Give(&w,MC_PLANKS,4)&&MC_Give(&w,MC_STICK,2));assert(MC_Craft(&w,19)&&w.items[MC_FENCE]>=3);
+ assert(MC_Give(&w,MC_COBBLE,6));assert(MC_Craft(&w,20)&&w.items[MC_STAIR]>=4);
+ scene(&w);assert(MC_Give(&w,MC_STAIR,1));MC_Set(&w,10,3,13,MC_STONE);w.yaw=0;assert(MC_Place(&w));
+ assert(MC_Get(&w,10,3,12)==MC_STAIR_SOUTH);assert(MC_Pick(&w,400,240,&hit)&&hit.block==MC_STAIR_SOUTH);
+ assert(MC_Give(&w,MC_STONE_PICK,1));select_item(&w,MC_STONE_PICK);mine(&w,30);assert(MC_Get(&w,10,3,12)==MC_AIR&&w.items[MC_STAIR]>=1);
+ MC_Set(&w,10,2,12,MC_STAIR_EAST);assert(!MC_BodyClear(&w,10.5f,1,11.6f));
  /* Chest registration, opening and nonempty destruction protection. */
  scene(&w);assert(MC_Give(&w,MC_CHEST,1));MC_Set(&w,10,3,13,MC_STONE);assert(MC_Place(&w));assert(w.chest_map[0][0]==11);
  assert(MC_OpenTarget(&w)&&w.bag&&w.open_chest==0);assert(MC_Give(&w,MC_WOOD,10));w.selected_slot=find(&w,MC_WOOD);
@@ -94,9 +106,12 @@ int main(void) {
  /* Touch layout: all 18 recipes reachable, real slot moves, split and mode. */
  scene(&w);w.bag=1;assert(MC_Give(&w,MC_WOOD,10));MC_UIBagTap(&w,30,115);MC_UIBagTap(&w,78,183);assert(w.slots[9].count==10&&!w.slots[0].count);
  MC_UIBagTap(&w,200,420);assert(w.split);MC_UIBagTap(&w,78,183);MC_UIBagTap(&w,30,115);assert(w.slots[0].count==5&&w.slots[9].count==5);
- for(unsigned i=1;i<=5;i++){MC_UIBagTap(&w,450,85);assert(w.recipe_page==i%5);}assert(MC_RecipeCount()==19);
+ for(unsigned i=1;i<=6;i++){MC_UIBagTap(&w,450,85);assert(w.recipe_page==i%6);}assert(MC_RecipeCount()==21);
  assert(MC_RecipeResult(0)==MC_PLANKS&&MC_RecipeIngredient(0,0)==MC_WOOD&&MC_RecipeIngredientCount(0,0)==1);
- assert(MC_RecipeIngredient(0,1)==0&&MC_UIRole(720,240)==MC_TOUCH_SNEAK&&MC_UIRole(720,300)==MC_TOUCH_PLACE);
+ /* The former attack button area is now scene input; weapon taps are handled
+    by voxel_game.c so the right side only keeps the essential controls. */
+ assert(MC_RecipeIngredient(0,1)==0&&MC_UIRole(720,170)==MC_TOUCH_LOOK&&
+        MC_UIRole(720,240)==MC_TOUCH_SNEAK&&MC_UIRole(720,300)==MC_TOUCH_PLACE);
  MC_UIBagTap(&w,40,420);assert(w.creative);MC_UIBagTap(&w,750,415);assert(w.slot==7);
  MC_UIBagTap(&w,24+3*48+5,108+3*68+5);assert(w.hotbar[7]==MC_SAPLING);
  MC_UIBagTap(&w,40,420);assert(!w.creative&&w.items[MC_WOOD]==10);MC_UIBagTap(&w,320,420);assert(w.change_world);

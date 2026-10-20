@@ -19,7 +19,8 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
        /* Map-only crop states are appended before the two inventory items so
           all existing block and item IDs remain stable for old saves. */
        MC_FARMLAND, MC_WHEAT_CROP, MC_WHEAT_MATURE,
-       MC_WHEAT_SEEDS, MC_WHEAT, MC_ITEM_COUNT };
+       MC_WHEAT_SEEDS, MC_WHEAT, MC_FENCE, MC_STAIR,
+       MC_STAIR_EAST, MC_STAIR_SOUTH, MC_STAIR_WEST, MC_RAW_MEAT, MC_ITEM_COUNT };
 #define MC_HOTBAR 8
 #define MC_SLOTS 32
 #define MC_CHEST_SLOTS 24
@@ -34,7 +35,9 @@ typedef struct { uint8_t item,count; uint16_t wear; } MC_Stack;
 typedef struct { uint16_t x,y,z; MC_Stack input,fuel,output; float burn,progress; } MC_Furnace;
 typedef struct { uint16_t x,y,z; float age; } MC_Grower;
 typedef struct { int x,y,z,nx,ny,nz; float distance; uint8_t block; } MC_Hit;
-typedef struct { float x,y,z,vy,attack,hurt; uint8_t health,on_ground; } MC_Mob;
+/* type 0 is the hostile night stalker; type 1 is a passive daytime animal.
+   heading is persisted in the unused tail of each fixed 32-byte v4 mob slot. */
+typedef struct { float x,y,z,vy,attack,hurt; uint8_t health,on_ground,type; float heading; } MC_Mob;
 typedef struct { float x,y,z,vy,age,spin; uint8_t item,count; } MC_Drop;
 
 typedef struct {
@@ -59,6 +62,9 @@ typedef struct {
   uint16_t chest_map[MC_CHESTS][3];
   uint8_t target_valid, bag_page;
   MC_Mob mobs[MC_MOBS];
+  /* Runtime-only breeding state; v4 mob slots remain exactly 32 bytes. */
+  uint8_t mob_fed[MC_MOBS];
+  float mob_fed_age[MC_MOBS], breed_cooldown;
   MC_Drop drops[MC_DROPS]; /* Runtime-only entities; absent from v4 saves. */
   uint32_t mob_rng;
   float mob_clock, spawn_clock, attack_cooldown, attack_flash;
@@ -82,8 +88,10 @@ int MC_BodyClear(const MC_World *w,float x,float y,float z);
 int MC_PickMob(const MC_World *w,float x,float y,float reach,float *distance);
 int MC_MobRay(const MC_World *w,float dx,float dy,float dz,float reach,unsigned mask,int *index,float *distance,int *axis,int *sign);
 int MC_Attack(MC_World *w,float x,float y);
+int MC_MobFeed(MC_World *w,float x,float y);
 void MC_MobsTick(MC_World *w,float dt);
 int MC_MobSpawn(MC_World *w,int x,int y,int z);
+int MC_PassiveSpawn(MC_World *w,int x,int y,int z);
 int MC_DarkAt(const MC_World *w,int x,int y,int z);
 void MC_Hurt(MC_World *w,unsigned damage);
 void MC_NewPlayer(MC_World *w, int legacy);
@@ -92,6 +100,7 @@ int MC_Place(MC_World *w);
 int MC_Craft(MC_World *w, unsigned recipe);
 int MC_Use(MC_World *w);
 int MC_Give(MC_World *w,unsigned item,unsigned count);
+int MC_DropSpawn(MC_World *w,unsigned item,unsigned count,float x,float y,float z);
 void MC_SyncInventory(MC_World *w);
 void MC_SetMode(MC_World *w,int creative);
 void MC_CloseBag(MC_World *w);

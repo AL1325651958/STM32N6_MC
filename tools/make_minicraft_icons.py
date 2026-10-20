@@ -13,6 +13,8 @@ NAMES = ['AIR', 'GRASS', 'DIRT', 'STONE', 'SAND', 'LOG', 'LEAVES',
          'IRON', 'WOOD PICK', 'STONE PICK', 'IRON PICK', 'APPLE', 'AXE',
          'SHOVEL', 'SWORD', 'CHEST', 'BED', 'SAPLING', 'DOOR', 'DOOR OPEN']
 NAMES += ['STONE SLAB', 'SLAB TOP', 'FARMLAND', 'WHEAT CROP', 'WHEAT MATURE', 'WHEAT SEEDS', 'WHEAT']
+NAMES += ['FENCE', 'STONE STAIRS', 'STONE STAIRS EAST', 'STONE STAIRS SOUTH', 'STONE STAIRS WEST']
+NAMES += ['RAW MEAT']
 BASE = {1:(112,165,55), 2:(139,96,61), 3:(141,145,151), 4:(224,208,150),
         5:(144,100,53), 6:(62,135,49), 7:(67,69,77), 8:(55,135,207),
         9:(133,139,146), 10:(191,145,83), 11:(169,116,59), 12:(115,121,128),
@@ -181,6 +183,13 @@ def sprite(item):
         d.polygon([(3,6),(5,5),(7,6),(9,6),(11,5),(13,7),(12,12),(10,14),(7,13),(5,14),(3,11),(2,8)], fill='#c6383a')
         d.polygon([(3,7),(5,6),(6,7),(5,10),(3,10)], fill='#ff9b76')
         d.line([(12,9),(11,12),(9,13)], fill='#8f2533')
+    elif item == 45:
+        # Raw meat: a compact pink-red cut with a pale fat edge and bone.
+        d.polygon([(1,8),(4,4),(10,3),(15,6),(14,11),(10,14),(4,13),(1,10)], fill=edge)
+        d.polygon([(3,8),(5,5),(10,4),(13,6),(13,10),(9,12),(5,11),(3,10)], fill='#c94e58')
+        d.polygon([(4,7),(7,5),(10,5),(12,7),(10,8),(7,7),(5,9)], fill='#ef8c7f')
+        d.polygon([(10,9),(13,7),(13,10),(10,12)], fill='#a93645')
+        d.ellipse((2,9,5,12), fill='#f1d7bd', outline=edge)
     elif item == 29:
         d.polygon([(1,8),(9,3),(15,6),(15,11),(7,15),(1,12)], fill=edge)
         d.polygon([(2,8),(9,4),(14,6),(7,11)], fill='#e3544b')
@@ -231,6 +240,18 @@ def sprite(item):
         d.polygon([(3,8),(8,10),(8,14),(3,11)], fill='#747b83')
         d.polygon([(8,10),(13,8),(13,11),(8,14)], fill='#5d636b')
         d.line([(4,8),(8,6),(12,8)], fill='#e0e4e4')
+    elif item == 40:
+        d.rectangle((6,1,9,14), fill=edge)
+        d.rectangle((7,2,8,13), fill='#a9773e')
+        d.rectangle((1,5,14,7), fill=edge);d.rectangle((2,5,13,6), fill='#b77d42')
+        d.rectangle((1,10,14,12), fill=edge);d.rectangle((2,10,13,11), fill='#a36c37')
+    elif item in (41,42,43,44):
+        # The orientation variants intentionally reuse the same item silhouette.
+        d.polygon([(1,10),(8,5),(15,9),(8,14)], fill=edge)
+        d.polygon([(2,9),(8,5),(14,9),(8,11)], fill='#b4bac0')
+        d.polygon([(2,9),(8,11),(8,14),(2,11)], fill='#7b838c')
+        d.polygon([(8,11),(14,9),(14,12),(8,14)], fill='#626a73')
+        d.line([(4,9),(8,7),(12,9)], fill='#e7ebeb', width=1)
     return im
 
 

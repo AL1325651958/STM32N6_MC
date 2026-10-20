@@ -49,7 +49,7 @@ void MC_SaveEncode(const MC_World*w,uint32_t generation,uint8_t*p){
   }
   for(unsigned i=0;i<MC_GROWERS;i++){uint8_t*q=m+M_GROWERS+i*10;put16(q,w->growers[i].x);put16(q+2,w->growers[i].y);put16(q+4,w->growers[i].z);putfloat(q+6,w->growers[i].age);}
   for(unsigned i=0;i<MC_MOBS;i++) {
-    uint8_t*q=m+M_MOBS+i*32;const MC_Mob*a=&w->mobs[i];if(!a->health)continue;putfloat(q,a->x);putfloat(q+4,a->y);putfloat(q+8,a->z);putfloat(q+12,a->vy);putfloat(q+16,a->attack);putfloat(q+20,a->hurt);q[24]=a->health;q[25]=a->on_ground;
+    uint8_t*q=m+M_MOBS+i*32;const MC_Mob*a=&w->mobs[i];if(!a->health)continue;putfloat(q,a->x);putfloat(q+4,a->y);putfloat(q+8,a->z);putfloat(q+12,a->vy);putfloat(q+16,a->attack);putfloat(q+20,a->hurt);q[24]=a->health;q[25]=a->on_ground;q[26]=a->type;putfloat(q+28,a->heading);
   }
   put32(m+M_MOB_STATE,w->mob_rng);putfloat(m+M_MOB_STATE+4,w->mob_clock);putfloat(m+M_MOB_STATE+8,w->spawn_clock);
   putfloat(m+M_MOB_STATE+12,w->attack_cooldown);putfloat(m+M_MOB_STATE+16,w->attack_flash);
@@ -104,7 +104,7 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
       if(v==4) {
         for(unsigned i=0;i<MC_MOBS;i++) {
           const uint8_t*q=m+M_MOBS+i*32;float x=getfloat(q),y=getfloat(q+4),z=getfloat(q+8),vy=getfloat(q+12);
-          if(q[24]>MC_MOB_HEALTH||q[25]>1||!range(getfloat(q+16),0,1.5f)||!range(getfloat(q+20),0,1)||
+          if(q[24]>MC_MOB_HEALTH||q[25]>1||q[26]>1||!range(getfloat(q+16),0,1.5f)||!range(getfloat(q+20),0,1)||!range(getfloat(q+28),-3.15f,3.15f)||
              !range(vy,-16,16)||(!q[24] && (x||y||z||vy||getfloat(q+16)||getfloat(q+20)||q[25]))||
              (q[24] && (!range(x,.3f,MC_MAP_X-.3f)||!range(y,1,MC_MAP_Y+2)||!range(z,.3f,MC_MAP_Z-.3f))))return 0;
         }
@@ -155,7 +155,7 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
     for(unsigned i=0;i<MC_GROWERS;i++){const uint8_t*q=m+M_GROWERS+i*10;w->growers[i]=(MC_Grower){get16(q),get16(q+2),get16(q+4),getfloat(q+6)};}
     if(v==4) {
       for(unsigned i=0;i<MC_MOBS;i++) {
-        const uint8_t*q=m+M_MOBS+i*32;w->mobs[i]=(MC_Mob){getfloat(q),getfloat(q+4),getfloat(q+8),getfloat(q+12),getfloat(q+16),getfloat(q+20),q[24],q[25]};
+        const uint8_t*q=m+M_MOBS+i*32;w->mobs[i]=(MC_Mob){getfloat(q),getfloat(q+4),getfloat(q+8),getfloat(q+12),getfloat(q+16),getfloat(q+20),q[24],q[25],q[26],getfloat(q+28)};
       }
       w->mob_rng=get32(m+M_MOB_STATE);w->mob_clock=getfloat(m+M_MOB_STATE+4);w->spawn_clock=getfloat(m+M_MOB_STATE+8);
       w->attack_cooldown=getfloat(m+M_MOB_STATE+12);w->attack_flash=getfloat(m+M_MOB_STATE+16);

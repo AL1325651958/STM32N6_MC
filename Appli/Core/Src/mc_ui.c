@@ -101,7 +101,7 @@ static unsigned catalog_item(unsigned index)
 {
   unsigned seen=0;
   for(unsigned id=1;id<MC_ITEM_COUNT;id++) {
-    if(id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE)continue;
+    if(id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE || (id>=MC_STAIR_EAST && id<=MC_STAIR_WEST))continue;
     if(seen++==index)return id;
   }
   return 0;
@@ -124,6 +124,7 @@ static void held_item(uint16_t *fb,const MC_World *w)
     case MC_WHEAT: iw=42;ih=76;ix=622+swing;iy=266;break;
     case MC_STICK: iw=30;ih=72;ix=632+swing;iy=270;break;
     case MC_APPLE: iw=48;ih=48;ix=626+swing;iy=294;break;
+    case MC_RAW_MEAT: iw=48;ih=44;ix=626+swing;iy=296;break;
     case MC_SWORD: iw=50;ih=94;ix=618+swing;iy=255;break;
     case MC_AXE:
     case MC_SHOVEL: iw=76;ih=80;ix=596+swing;iy=276;break;
@@ -132,6 +133,8 @@ static void held_item(uint16_t *fb,const MC_World *w)
     case MC_IRON_PICK: iw=82;ih=78;ix=592+swing;iy=278;break;
     case MC_CHEST: iw=78;ih=62;ix=592+swing;iy=286;break;
     case MC_BED: iw=82;ih=54;ix=588+swing;iy=294;break;
+    case MC_FENCE: iw=60;ih=76;ix=608+swing;iy=274;break;
+    case MC_STAIR: iw=76;ih=68;ix=600+swing;iy=282;break;
     case MC_DOOR:
     case MC_DOOR_OPEN: iw=54;ih=82;ix=614+swing;iy=274;break;
     default: break;
@@ -217,7 +220,7 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     for(int yy=-78;yy<=78;yy++)for(int xx=-78;xx<=78;xx++){int d=xx*xx+yy*yy;if(d<78*78&&d>74*74)fb[(350+yy)*800+110+xx]=0xc638;}
     int jx=110+(int)(fmaxf(-1,fminf(1,strafe))*45),jy=350-(int)(fmaxf(-1,fminf(1,move))*45);
     rect(fb,jx-10,jy-10,20,20,0xffe0);text(fb,86,444,"MOVE",0xffff);
-    panel(fb,690,288,100,62);text(fb,710,312,w->hotbar[w->slot]==MC_APPLE?"EAT":"USE",0xffff);
+    panel(fb,690,288,100,62);text(fb,710,312,(w->hotbar[w->slot]==MC_APPLE||w->hotbar[w->slot]==MC_RAW_MEAT)?"EAT":w->hotbar[w->slot]==MC_WHEAT?"FEED":"USE",0xffff);
     panel(fb,690,216,100,62);text(fb,710,228,"SNEAK",w->sneak?0x07e0:0xffff);small(fb,700,258,w->sneak?"EDGE GUARD":"HOLD TO BUILD",0xffe0);
     panel(fb,690,360,100,62);text(fb,716,384,"JUMP",0xffff);
     for(unsigned i=0;i<MC_HOTBAR;i++){MC_Stack s=w->creative?(MC_Stack){w->hotbar[i],1,0}:w->slots[i];stack(fb,240+i*50,424,50,56,&s,i==w->slot,w->creative);}

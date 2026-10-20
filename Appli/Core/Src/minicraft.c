@@ -45,10 +45,26 @@ static const MC_Part torch_parts[] = {
   {{13/32.f, 10/16.f, 13/32.f}, {19/32.f, 13/16.f, 19/32.f}},
   {{7/16.f, 12/16.f, 7/16.f}, {9/16.f, 14/16.f, 9/16.f}}
 };
+static const MC_Part fence_parts[] = {
+  {{6/16.f,0,6/16.f},{10/16.f,1.5f,10/16.f}},
+  {{0,6/16.f,6/16.f},{1,10/16.f,10/16.f}},
+  {{6/16.f,6/16.f,0},{10/16.f,10/16.f,1}},
+  {{0,11/16.f,6/16.f},{1,14/16.f,10/16.f}},
+  {{6/16.f,11/16.f,0},{10/16.f,14/16.f,1}}
+};
+/* Stair orientation is the direction in which the step rises. */
+static const MC_Part stair_parts[4][2] = {
+  {{{0,0,0},{1,.5f,1}},{{.5f,.5f,0},{1,1,1}}},
+  {{{0,0,0},{1,.5f,1}},{{0,.5f,0},{.5f,1,1}}},
+  {{{0,0,0},{1,.5f,1}},{{0,.5f,.5f},{1,1,1}}},
+  {{{0,0,0},{1,.5f,1}},{{0,.5f,0},{1,1,.5f}}}
+};
 
 static unsigned parts_for(uint8_t b, const MC_Part **parts)
 {
   if(b==MC_TORCH) { *parts=torch_parts; return sizeof(torch_parts)/sizeof(torch_parts[0]); }
+  if(b==MC_FENCE) { *parts=fence_parts; return sizeof(fence_parts)/sizeof(fence_parts[0]); }
+  if(b>=MC_STAIR && b<=MC_STAIR_WEST) { *parts=stair_parts[b-MC_STAIR]; return 2; }
   *parts=0; return 0;
 }
 
@@ -56,7 +72,7 @@ static unsigned parts_for(uint8_t b, const MC_Part **parts)
 static void bounds(uint8_t b,float lo[3],float hi[3])
 {
   lo[0]=lo[1]=lo[2]=0;hi[0]=hi[1]=hi[2]=1;
-  if(b==MC_TORCH) {
+  if(b==MC_TORCH || b==MC_FENCE || (b>=MC_STAIR && b<=MC_STAIR_WEST)) {
     const MC_Part *parts; unsigned count=parts_for(b,&parts);
     lo[0]=lo[1]=lo[2]=1; hi[0]=hi[1]=hi[2]=0;
     for(unsigned i=0;i<count;i++) for(unsigned a=0;a<3;a++) {
@@ -76,7 +92,13 @@ static void bounds(uint8_t b,float lo[3],float hi[3])
 }
 static int body_intersects(uint8_t b,int bx,int by,int bz,float x,float y,float z)
 {
+  const MC_Part *parts; unsigned count=parts_for(b,&parts);
+  if(count) for(unsigned i=0;i<count;i++) {
+    const float *lo=parts[i].lo,*hi=parts[i].hi;
+    if(x+.28f>bx+lo[0] && x-.28f<bx+hi[0] && y+1.799f>by+lo[1] && y+.001f<by+hi[1] && z+.28f>bz+lo[2] && z-.28f< bz+hi[2]) return 1;
+  }
   float lo[3],hi[3];bounds(b,lo,hi);
+  if(count)return 0;
   return x+.28f>bx+lo[0] && x-.28f<bx+hi[0] &&
     y+1.799f>by+lo[1] && y+.001f<by+hi[1] &&
     z+.28f>bz+lo[2] && z-.28f<bz+hi[2];
@@ -207,7 +229,7 @@ void MC_Step(MC_World *w, float f, float s, float dt, int jump)
 
 typedef MC_Hit Hit;
 static int shaped(uint8_t b)
-{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST || b==MC_DOOR || b==MC_DOOR_OPEN || b==MC_SLAB || b==MC_SLAB_TOP || b==MC_FARMLAND || b==MC_WHEAT_CROP || b==MC_WHEAT_MATURE;}
+{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST || b==MC_DOOR || b==MC_DOOR_OPEN || b==MC_SLAB || b==MC_SLAB_TOP || b==MC_FARMLAND || b==MC_WHEAT_CROP || b==MC_WHEAT_MATURE || b==MC_FENCE || (b>=MC_STAIR && b<=MC_STAIR_WEST);}
 
 /* Intersect only special objects; ordinary cubes retain the cheap DDA path. */
 static int box_hit(const float lo[3],const float hi[3],const float p[3],const float d[3],
@@ -292,6 +314,19 @@ static int shape_hit(uint8_t b,const float p[3],const float d[3],float start,flo
     }
     if(!normal)return 0;
     *distance=best;*nx=normal;*ny=*nz=0;return 1;
+  }
+  {
+    const MC_Part *parts; unsigned count=parts_for(b,&parts);
+    if(count) {
+      float best=end+1; int bx=0,by=0,bz=0;
+      for(unsigned i=0;i<count;i++) {
+        float t; int nx0,ny0,nz0;
+        if(box_hit(parts[i].lo,parts[i].hi,p,d,start,end,&t,&nx0,&ny0,&nz0) && t<best) {
+          best=t;bx=nx0;by=ny0;bz=nz0;
+        }
+      }
+      if(best<=end) {*distance=best;*nx=bx;*ny=by;*nz=bz;return 1;}
+    }
   }
   float lo[3],hi[3];bounds(b,lo,hi);
   return box_hit(lo,hi,p,d,start,end,distance,nx,ny,nz);
@@ -381,11 +416,12 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
   int mob_rect[MC_MOBS][4];unsigned mob_mask=0;
   for(unsigned i=0;i<MC_MOBS;i++)if(w->mobs[i].health) {
     const MC_Mob *m=&w->mobs[i];
+    float halfx=m->type?.50f:.30f, halfz=m->type?.28f:.30f, top=m->type?1.25f:1.80f;
     float minx=width,miny=height,maxx=0,maxy=0;int behind=0,front=0;
     for(int corner=0;corner<8;corner++) {
-      float px=m->x+((corner&1)?.30f:-.30f)-w->x;
-      float py=m->y+((corner&2)?1.8f:0)-w->y-1.62f;
-      float pz=m->z+((corner&4)?.30f:-.30f)-w->z;
+      float px=m->x+((corner&1)?halfx:-halfx)-w->x;
+      float py=m->y+((corner&2)?top:0)-w->y-1.62f;
+      float pz=m->z+((corner&4)?halfz:-halfz)-w->z;
       float depth=px*syaw*cp+py*sp+pz*cyaw*cp;
       if(depth<=.01f){behind=1;continue;}front=1;
       float sx=width*.5f+focal*(px*cyaw-pz*syaw)/depth;
@@ -484,6 +520,20 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
           r=139;g=143;b=149;
           if((tu+((tv/5)&1)*4)%7==0 || tv%5==0){r=94;g=99;b=106;}
           break;
+        case MC_FENCE:
+          r=151;g=103;b=55;
+          if((tu+tv)%5==0){r=108;g=70;b=36;}
+          if(h.ny>0){r=181;g=131;b=70;}
+          break;
+        case MC_STAIR:
+        case MC_STAIR_EAST:
+        case MC_STAIR_SOUTH:
+        case MC_STAIR_WEST:
+          r=139;g=143;b=149;
+          if(h.ny>0){r=171;g=175;b=181;}
+          else if(h.ny<0){r=82;g=87;b=94;}
+          else if((tu+tv)%6==0){r=101;g=106;b=113;}
+          break;
         default:break;
       }
       float ambient=.22f+.78f*daylight;
@@ -521,12 +571,27 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
       if(MC_MobRay(w,dx,dy,dz,world_hit?h.distance:40,candidates,&id,&distance,&axis,&sign)>=0) {
         const MC_Mob *m=&w->mobs[id];float py=w->y+1.62f+dy*distance-m->y;
         float px=w->x+dx*distance-m->x,pz=w->z+dz*distance-m->z;
-        r=48;g=114;b=101;
-        if(py>1.32f){r=104;g=145;b=64;
+        if(m->type) {
+          /* Passive animal: a squat brown body, pink muzzle and four dark
+             legs.  Keep the silhouette deliberately simple for the 160x96
+             ray view, but use a head/eye highlight so it reads as an animal. */
           float face=axis==2?px:pz;
-          if(axis!=1 && py>1.55f && py<1.65f && fabsf(face)>.07f && fabsf(face)<.21f){r=238;g=214;b=120;}
-          if(axis!=1 && py>1.38f && py<1.46f && fabsf(face)<.13f){r=39;g=57;b=32;}
-        }else if(py<.62f){r=63;g=61;b=88;if(fabsf(axis==2?px:pz)<.035f){r=30;g=33;b=45;}}
+          if(py>1.03f){r=206;g=137;b=105;
+            if(axis!=1 && py>1.08f && py<1.18f && fabsf(face)>.07f && fabsf(face)<.22f){r=245;g=224;b=184;}
+            if(axis!=1 && py>1.00f && py<1.08f && fabsf(face)<.12f){r=55;g=37;b=31;}
+          } else if(py>.46f){r=166;g=103;b=57;
+            if(axis!=1 && ((int)(fabsf(face)*80)&7)==0){r=193;g=126;b=68;}
+          } else {r=104;g=68;b=46;
+            if(axis!=1 && fabsf(face)<.035f){r=65;g=48;b=39;}
+          }
+        } else {
+          r=48;g=114;b=101;
+          if(py>1.32f){r=104;g=145;b=64;
+            float face=axis==2?px:pz;
+            if(axis!=1 && py>1.55f && py<1.65f && fabsf(face)>.07f && fabsf(face)<.21f){r=238;g=214;b=120;}
+            if(axis!=1 && py>1.38f && py<1.46f && fabsf(face)<.13f){r=39;g=57;b=32;}
+          }else if(py<.62f){r=63;g=61;b=88;if(fabsf(axis==2?px:pz)<.035f){r=30;g=33;b=45;}}
+        }
         if(m->hurt>0){r=226;g=77;b=62;}
         float shade=(axis==1?1:axis==0?.8f:.68f)*(.55f+.45f*daylight);
         float fog=clamp((distance-18)/22,0,1);fog*=fog;

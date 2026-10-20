@@ -33,8 +33,11 @@ int main(int argc,char **argv)
       MC_Set(&w,10,2,11,MC_TORCH);MC_Set(&w,11,2,11,MC_SAPLING);MC_Set(&w,12,2,11,MC_BED);
       MC_Set(&w,13,2,11,MC_DOOR);MC_Set(&w,14,2,11,MC_DOOR_OPEN);
       MC_Set(&w,15,2,11,MC_SLAB);MC_Set(&w,16,2,11,MC_SLAB_TOP);
+      for(int x=7;x<=10;x++)MC_Set(&w,x,2,13,MC_FENCE);
+      MC_Set(&w,12,2,13,MC_STAIR);MC_Set(&w,13,2,13,MC_STAIR_EAST);
+      MC_Set(&w,14,2,13,MC_STAIR_SOUTH);MC_Set(&w,15,2,13,MC_STAIR_WEST);
       w.x=12.5f;w.y=2;w.z=7.2f;w.yaw=0;w.pitch=-.24f;w.time=90;
-      w.notice="CHEST TORCH SAPLING BED DOOR SLABS";
+      w.notice="CHEST TORCH SAPLING BED DOOR SLABS FENCE STAIRS";
     }
     if(k==8) {
       memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
@@ -48,8 +51,9 @@ int main(int argc,char **argv)
     if(k==9){
       w.time=435;w.x=10.5f;w.y=2.01f;w.z=10.5f;w.yaw=0;w.pitch=0;
       MC_Set(&w,10,1,10,MC_GRASS);MC_Set(&w,10,1,11,MC_GRASS);MC_Set(&w,10,1,12,MC_GRASS);
-      w.mobs[0]=(MC_Mob){10.5f,2.01f,14.5f,0,0,0,MC_MOB_HEALTH,1};
-      MC_Give(&w,MC_SWORD,1);w.mob_target=0;w.notice="NIGHT STALKER  TAP SCREEN TO ATTACK";
+      w.mobs[0]=(MC_Mob){10.5f,2.01f,14.5f,0,0,0,MC_MOB_HEALTH,1,0,0};
+      w.mobs[1]=(MC_Mob){12.5f,2.01f,14.0f,0,0,0,8,1,1,0};
+      MC_Give(&w,MC_SWORD,1);w.mob_target=0;w.notice="TAP SCREEN TO ATTACK  ANIMAL DROPS RAW MEAT";
     }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];
