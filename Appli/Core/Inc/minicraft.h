@@ -15,7 +15,11 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
        MC_COAL_ORE, MC_IRON_ORE, MC_GLASS, MC_BRICK, MC_TORCH, MC_BLOCK_COUNT,
        MC_STICK=MC_BLOCK_COUNT, MC_COAL, MC_IRON, MC_WOOD_PICK, MC_STONE_PICK,
        MC_IRON_PICK, MC_APPLE, MC_AXE, MC_SHOVEL, MC_SWORD, MC_CHEST, MC_BED, MC_SAPLING,
-       MC_DOOR, MC_DOOR_OPEN, MC_SLAB, MC_SLAB_TOP, MC_ITEM_COUNT };
+       MC_DOOR, MC_DOOR_OPEN, MC_SLAB, MC_SLAB_TOP,
+       /* Map-only crop states are appended before the two inventory items so
+          all existing block and item IDs remain stable for old saves. */
+       MC_FARMLAND, MC_WHEAT_CROP, MC_WHEAT_MATURE,
+       MC_WHEAT_SEEDS, MC_WHEAT, MC_ITEM_COUNT };
 #define MC_HOTBAR 8
 #define MC_SLOTS 32
 #define MC_CHEST_SLOTS 24

@@ -2,13 +2,14 @@
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
-static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP"};
-static const uint16_t colors[MC_ITEM_COUNT]={0,0x6cc6,0x8b07,0x8410,0xd66f,0x8b45,0x3b85,0x3186,0x3397,0x7390,0xb48a,0x9347,0x630c,0x4208,0xb3ac,0x9f7f,0xb2a8,0xff20,0x9b05,0x2104,0xc638,0xa366,0x94b2,0xdefb,0xe924,0x9b05,0x9b05,0xdefb,0x9347,0x6cc6,0x3b85,0xa365,0x9b05,0x8c71,0x8c71};
+static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT"};
+static const uint16_t colors[MC_ITEM_COUNT]={0,0x6cc6,0x8b07,0x8410,0xd66f,0x8b45,0x3b85,0x3186,0x3397,0x7390,0xb48a,0x9347,0x630c,0x4208,0xb3ac,0x9f7f,0xb2a8,0xff20,0x9b05,0x2104,0xc638,0xa366,0x94b2,0xdefb,0xe924,0x9b05,0x9b05,0xdefb,0x9347,0x6cc6,0x3b85,0xa365,0x9b05,0x8c71,0x8c71,0x6a64,0x4d8b,0xf6a0,0x7e24,0xdda2};
 const char *MC_ItemName(unsigned i){return i<MC_ITEM_COUNT?names[i]:"EMPTY";}uint16_t MC_ItemColor(unsigned i){return i<MC_ITEM_COUNT?colors[i]:0;}
 void MC_HoldStart(MC_Hold*h,int x,int y,uint32_t n){*h=(MC_Hold){x,y,x,y,n};}void MC_HoldMove(MC_Hold*h,int x,int y,uint32_t n){int dx=x-h->anchor_x,dy=y-h->anchor_y;h->x=x;h->y=y;if(dx*dx+dy*dy>144){h->anchor_x=x;h->anchor_y=y;h->since=n;}}int MC_HoldReady(const MC_Hold*h,uint32_t n){return(uint32_t)(n-h->since)>=450;}
 int MC_IsBlock(unsigned i) {
-  return (i>MC_AIR && i<MC_BLOCK_COUNT) || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP;
+  return (i>MC_AIR && i<MC_BLOCK_COUNT) || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP || i==MC_FARMLAND || i==MC_WHEAT_CROP || i==MC_WHEAT_MATURE;
 }
+static int map_only(unsigned i){return i==MC_FARMLAND||i==MC_WHEAT_CROP||i==MC_WHEAT_MATURE;}
 int MC_ToolIndex(unsigned i) {
   if(i>=MC_WOOD_PICK && i<=MC_IRON_PICK)return (int)i-MC_WOOD_PICK;
   if(i>=MC_AXE && i<=MC_SWORD)return (int)i-MC_AXE+3;
@@ -53,7 +54,7 @@ void MC_SyncInventory(MC_World *w) {
   if(!w->creative && !w->items[w->equipped])w->equipped=0;
 }
 int MC_Give(MC_World *w,unsigned id,unsigned n) {
-  if(!id || id>=MC_ITEM_COUNT || id==MC_BEDROCK || id==MC_WATER || !n || n>255)return 0;
+  if(!id || id>=MC_ITEM_COUNT || id==MC_BEDROCK || id==MC_WATER || map_only(id) || !n || n>255)return 0;
   MC_Stack src={(uint8_t)id,(uint8_t)n,(uint16_t)MC_ToolLife(id)};
   if(!add_stack(w->slots,MC_SLOTS,src))return 0;
   MC_SyncInventory(w);return 1;
@@ -106,7 +107,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   w->notice=legacy?"OLD WORLD  CREATIVE MODE":"HOLD BLOCK TO MINE  BAG TO CRAFT";
 }
 void MC_SelectItem(MC_World *w,unsigned item) {
-  if(!item || item>=MC_ITEM_COUNT || item==MC_BEDROCK || item==MC_WATER || item==MC_SLAB_TOP)return;
+  if(!item || item>=MC_ITEM_COUNT || item==MC_BEDROCK || item==MC_WATER || item==MC_SLAB_TOP || map_only(item))return;
   if(w->creative) {w->creative_bar[w->slot]=(uint8_t)item;MC_SyncInventory(w);}
   else for(unsigned i=0;i<MC_HOTBAR;i++)if(w->slots[i].item==item && w->slots[i].count) {w->slot=(uint8_t)i;break;}
   if(MC_ToolIndex(item)>=0 && (w->creative || w->items[item]))w->equipped=(uint8_t)item;
@@ -167,12 +168,29 @@ int MC_Use(MC_World *w) {
     if(!w->creative){MC_Stack *s=&w->slots[w->slot];if(!--s->count)memset(s,0,sizeof(*s));}
     MC_SyncInventory(w);w->health=(uint8_t)fminf(20,w->health+5);w->notice="ATE APPLE";return 1;
   }
+  if(b==MC_SHOVEL) {
+    MC_Hit h;if(MC_Pick(w,400,240,&h) && (h.block==MC_GRASS||h.block==MC_DIRT) && MC_Get(w,h.x,h.y+1,h.z)==MC_AIR) {
+      MC_Set(w,h.x,h.y,h.z,MC_FARMLAND);
+      if(!w->creative) { MC_Stack *s=&w->slots[w->slot]; if(s->wear && !--s->wear){memset(s,0,sizeof(*s));w->equipped=0;w->notice="SHOVEL BROKE";} MC_SyncInventory(w); }
+      w->notice="TILLED SOIL";return 1;
+    }
+    w->notice="TILL GRASS OR DIRT";return 0;
+  }
+  if(b==MC_WHEAT_SEEDS) {
+    MC_Hit h;if(MC_Pick(w,400,240,&h) && h.block==MC_FARMLAND && MC_Get(w,h.x,h.y+1,h.z)==MC_AIR) {
+      int gi=-1;for(unsigned i=0;i<MC_GROWERS;i++)if(!w->growers[i].x){gi=(int)i;break;}
+      if(gi<0){w->notice="MAX 16 CROPS";return 0;}
+      MC_Set(w,h.x,h.y+1,h.z,MC_WHEAT_CROP);w->growers[gi]=(MC_Grower){h.x+1,h.y+2,h.z+1,0};
+      if(!w->creative){MC_Stack*s=&w->slots[w->slot];if(!--s->count)memset(s,0,sizeof(*s));MC_SyncInventory(w);}w->notice="WHEAT PLANTED";return 1;
+    }
+    w->notice="PLANT ON TILLED SOIL";return 0;
+  }
   if(MC_ToolIndex(b)>=0){MC_SelectItem(w,b);return 0;}
   return MC_Place(w);
 }
 int MC_Place(MC_World *w) {
   unsigned b=w->hotbar[w->slot];
-  if(!MC_IsBlock(b) || b==MC_BEDROCK || b==MC_WATER || b==MC_DOOR_OPEN || b==MC_SLAB_TOP)return 0;
+  if(!MC_IsBlock(b) || map_only(b) || b==MC_BEDROCK || b==MC_WATER || b==MC_DOOR_OPEN || b==MC_SLAB_TOP)return 0;
   if(!w->creative && !w->items[b]){w->notice="NO BLOCKS";return 0;}
   int x,y,z,nx,ny,nz,ci=-1,fi=-1,gi=-1;
   MC_Hit hit;
@@ -245,7 +263,18 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   if(fi>=0 && (w->furnaces[fi].input.count || w->furnaces[fi].fuel.count || w->furnaces[fi].output.count || w->furnaces[fi].burn>0)) {
     w->notice="EMPTY FURNACE AND LET FIRE OUT";w->mining=0;return;
   }
-  unsigned drop=h.block==MC_GRASS?MC_DIRT:h.block==MC_STONE?MC_COBBLE:h.block==MC_COAL_ORE?MC_COAL:h.block;
+  if(h.block==MC_WHEAT_CROP || h.block==MC_WHEAT_MATURE) {
+    w->mining+=dt/.45f;if(w->mining<1)return;
+    if(h.block==MC_WHEAT_CROP){w->notice="WHEAT IS STILL GROWING";w->mining=0;return;}
+    float px=h.x+.5f,py=h.y+.55f,pz=h.z+.5f;
+    if(!MC_Give(w,MC_WHEAT,1) && !drop_spawn(w,MC_WHEAT,1,px,py,pz)){w->notice="BAG FULL";w->mining=0;return;}
+    unsigned seeds=1u+(unsigned)((h.x*17+h.z*31)&1u);
+    if(!MC_Give(w,MC_WHEAT_SEEDS,seeds))drop_spawn(w,MC_WHEAT_SEEDS,seeds,px,py,pz);
+    MC_Set(w,h.x,h.y,h.z,MC_FARMLAND);w->mining=0;w->target_valid=0;
+    for(unsigned i=0;i<MC_GROWERS;i++)if(w->growers[i].x==h.x+1 && w->growers[i].y==h.y+2 && w->growers[i].z==h.z+1)memset(&w->growers[i],0,sizeof(MC_Grower));
+    MC_SyncInventory(w);w->notice="WHEAT HARVESTED";return;
+  }
+  unsigned drop=h.block==MC_GRASS||h.block==MC_FARMLAND?MC_DIRT:h.block==MC_STONE?MC_COBBLE:h.block==MC_COAL_ORE?MC_COAL:h.block;
   if(h.block==MC_DOOR_OPEN)drop=MC_DOOR;
   if(h.block==MC_SLAB_TOP)drop=MC_SLAB;
   if(h.block==MC_LEAVES){unsigned n=(unsigned)(h.x*7+h.y*3+h.z);drop=n%5==0?MC_APPLE:n%3==0?MC_SAPLING:0;}
@@ -255,6 +284,9 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
     if(!MC_Give(w,drop,1) && !drop_spawn(w,drop,1,h.x+.5f,h.y+.55f,h.z+.5f)) {
       w->notice="BAG FULL";w->mining=0;return;
     }
+  }
+  if(!w->creative && h.block==MC_GRASS && ((unsigned)(h.x*13+h.z*7)%7u==0u)) {
+    if(!MC_Give(w,MC_WHEAT_SEEDS,1))drop_spawn(w,MC_WHEAT_SEEDS,1,h.x+.5f,h.y+.55f,h.z+.5f);
   }
   MC_Set(w,h.x,h.y,h.z,MC_AIR);w->mining=0;w->target_valid=0;
   if(ci>=0)memset(w->chest_map[ci],0,sizeof(w->chest_map[ci]));
@@ -323,9 +355,16 @@ void MC_SystemsTick(MC_World *w,float dt) {
   /* Fixed budget: 16 timers, growth clearance checked once when mature. */
   for(unsigned i=0;i<MC_GROWERS;i++) {
     MC_Grower *g=&w->growers[i];if(!g->x)continue;g->age+=dt;
+    int x=g->x-1,y=g->y-1,z=g->z-1;
+    uint8_t current=MC_Get(w,x,y,z);
+    if(current==MC_WHEAT_CROP) {
+      if(g->age<75)continue;
+      if(MC_Get(w,x,y-1,z)!=MC_FARMLAND || MC_Get(w,x,y+1,z)!=MC_AIR){g->age=70;continue;}
+      MC_Set(w,x,y,z,MC_WHEAT_MATURE);memset(g,0,sizeof(*g));continue;
+    }
     if(g->age<120)continue;
-    int x=g->x-1,y=g->y-1,z=g->z-1,space=1;
-    if(MC_Get(w,x,y,z)!=MC_SAPLING){memset(g,0,sizeof(*g));continue;}
+    int space=1;
+    if(current!=MC_SAPLING){memset(g,0,sizeof(*g));continue;}
     if(x<3 || x>=MC_MAP_X-3 || z<3 || z>=MC_MAP_Z-3 || y>MC_MAP_Y-8)space=0;
     for(int dy=1;dy<=5 && space;dy++)for(int dz=-2;dz<=2;dz++)for(int dx=-2;dx<=2;dx++) {
       uint8_t b=MC_Get(w,x+dx,y+dy,z+dz);if(b!=MC_AIR && b!=MC_LEAVES)space=0;

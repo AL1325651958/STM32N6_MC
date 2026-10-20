@@ -101,7 +101,7 @@ static unsigned catalog_item(unsigned index)
 {
   unsigned seen=0;
   for(unsigned id=1;id<MC_ITEM_COUNT;id++) {
-    if(id==MC_WATER || id==MC_BEDROCK || id==MC_SLAB_TOP)continue;
+    if(id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE)continue;
     if(seen++==index)return id;
   }
   return 0;
@@ -120,6 +120,8 @@ static void held_item(uint16_t *fb,const MC_World *w)
   switch(id) {
     case MC_TORCH: iw=34;ih=66;ix=630+swing;iy=274;break;
     case MC_SAPLING: iw=46;ih=66;ix=616+swing;iy=276;break;
+    case MC_WHEAT_SEEDS: iw=42;ih=34;ix=622+swing;iy=304;break;
+    case MC_WHEAT: iw=42;ih=76;ix=622+swing;iy=266;break;
     case MC_STICK: iw=30;ih=72;ix=632+swing;iy=270;break;
     case MC_APPLE: iw=48;ih=48;ix=626+swing;iy=294;break;
     case MC_SWORD: iw=50;ih=94;ix=618+swing;iy=255;break;

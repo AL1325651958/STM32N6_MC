@@ -26,6 +26,7 @@ int main(int argc,char **argv) {
  a.chest_blocks[0][2]=(MC_Stack){MC_AXE,1,17};a.chest_blocks[0][23]=(MC_Stack){MC_PLANKS,64,0};
  MC_Set(&a,31,40,30,MC_FURNACE);a.furnaces[0]=(MC_Furnace){32,41,31,{MC_IRON_ORE,10,0},{MC_COAL,2,0},{MC_IRON,4,0},21.5f,2.5f};
  MC_Set(&a,35,40,30,MC_SAPLING);a.growers[0]=(MC_Grower){36,41,31,78.5f};
+ MC_Set(&a,50,40,30,MC_FARMLAND);MC_Set(&a,50,41,30,MC_WHEAT_CROP);a.growers[1]=(MC_Grower){51,42,31,32.5f};
  MC_Set(&a,36,40,30,MC_BED);a.spawn[0]=37;a.spawn[1]=41;a.spawn[2]=31;
  MC_Set(&a,40,40,30,MC_DOOR);MC_Set(&a,41,40,30,MC_DOOR_OPEN);
  roundtrip(&a,&b,save);assert(b.seed==a.seed&&b.x==a.x&&!memcmp(a.blocks,b.blocks,MC_MAP_BYTES));
@@ -35,6 +36,7 @@ int main(int argc,char **argv) {
  assert(!memcmp(a.chest_map,b.chest_map,sizeof(a.chest_map))&&!memcmp(a.spawn,b.spawn,sizeof(a.spawn))&&b.reserve[MC_WOOD]==999);
  assert(b.reserve[MC_WOOD_PICK]==2&&b.reserve_wear[0]==17);
  assert(b.furnaces[0].progress==2.5f&&b.furnaces[0].burn==21.5f&&b.growers[0].age==78.5f);
+ assert(MC_Get(&b,50,40,30)==MC_FARMLAND&&MC_Get(&b,50,41,30)==MC_WHEAT_CROP&&b.growers[1].age==32.5f);
  /* A v3 file has identical legacy metadata but no entities. */
  memcpy(copy,save,MC_SAVE_SIZE);put32(save+4,3);crc(save,MC_SAVE_V3_META);
  assert(MC_SaveDecode(&b,save,MC_SAVE_V3_SIZE));

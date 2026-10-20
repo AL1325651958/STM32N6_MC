@@ -32,7 +32,7 @@ uint8_t MC_Get(const MC_World *w, int x, int y, int z)
 }
 void MC_Set(MC_World *w, int x, int y, int z, uint8_t b)
 { if (inside(x,y,z) && y > 0 && (b==MC_AIR || MC_IsBlock(b))) w->blocks[index_of(x,y,z)] = b; }
-int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_TORCH && block != MC_SAPLING && block != MC_DOOR_OPEN; }
+int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_TORCH && block != MC_SAPLING && block != MC_DOOR_OPEN && block != MC_WHEAT_CROP && block != MC_WHEAT_MATURE; }
 
 typedef struct { float lo[3], hi[3]; } MC_Part;
 
@@ -66,6 +66,9 @@ static void bounds(uint8_t b,float lo[3],float hi[3])
   else if(b==MC_CHEST){lo[0]=lo[2]=1/16.f;hi[0]=hi[2]=15/16.f;hi[1]=14/16.f;}
   else if(b==MC_BED)hi[1]=9/16.f;
   else if(b==MC_SAPLING){lo[0]=lo[2]=2/16.f;hi[0]=hi[2]=14/16.f;hi[1]=13/16.f;}
+  else if(b==MC_FARMLAND){hi[1]=15/16.f;}
+  else if(b==MC_WHEAT_CROP){lo[0]=lo[2]=4/16.f;hi[0]=hi[2]=12/16.f;hi[1]=11/16.f;}
+  else if(b==MC_WHEAT_MATURE){lo[0]=lo[2]=2/16.f;hi[0]=hi[2]=14/16.f;hi[1]=1.f;}
   else if(b==MC_DOOR){lo[2]=6/16.f;hi[2]=10/16.f;}
   else if(b==MC_DOOR_OPEN){lo[0]=6/16.f;hi[0]=10/16.f;}
   else if(b==MC_SLAB){hi[1]=.5f;}
@@ -204,7 +207,7 @@ void MC_Step(MC_World *w, float f, float s, float dt, int jump)
 
 typedef MC_Hit Hit;
 static int shaped(uint8_t b)
-{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST || b==MC_DOOR || b==MC_DOOR_OPEN || b==MC_SLAB || b==MC_SLAB_TOP;}
+{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST || b==MC_DOOR || b==MC_DOOR_OPEN || b==MC_SLAB || b==MC_SLAB_TOP || b==MC_FARMLAND || b==MC_WHEAT_CROP || b==MC_WHEAT_MATURE;}
 
 /* Intersect only special objects; ordinary cubes retain the cheap DDA path. */
 static int box_hit(const float lo[3],const float hi[3],const float p[3],const float d[3],
@@ -467,6 +470,9 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
           if(!h.ny && tu>6 && tu<10 && tv>5 && tv<10){r=232;g=191;b=74;}break;
         case MC_BED:r=183;g=43;b=40;if(pz-h.z>.75f){r=230;g=221;b=198;}if(!h.ny && tv<5){r=119;g=79;b=40;}break;
         case MC_SAPLING:r=83;g=180;b=49;if(py-h.y<.3f){r=117;g=82;b=43;}break;
+        case MC_FARMLAND:r=102;g=71;b=43;if(h.ny>0){r=116;g=80;b=47;}break;
+        case MC_WHEAT_CROP:r=57;g=151;b=52;n*=2;break;
+        case MC_WHEAT_MATURE:r=197;g=161;b=48;n*=2;if(h.ny<0){r=101;g=83;b=31;}break;
         case MC_DOOR:
         case MC_DOOR_OPEN:
           r=153;g=101;b=48;

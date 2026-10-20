@@ -22,7 +22,7 @@ static void sread(MC_Stack*s,const uint8_t*p){s->item=p[0];s->count=p[1];s->wear
 static int svalid(const uint8_t*p){
   unsigned id=p[0],n=p[1],wear=get16(p+2);
   if(!n)return id==0&&wear==0;
-  if(!id||id>=MC_ITEM_COUNT||id==MC_WATER||id==MC_BEDROCK||n>64)return 0;
+  if(!id||id>=MC_ITEM_COUNT||(id==MC_FARMLAND||id==MC_WHEAT_CROP||id==MC_WHEAT_MATURE)||id==MC_WATER||id==MC_BEDROCK||n>64)return 0;
   int t=MC_ToolIndex(id);
   return t>=0?(n==1&&wear>0&&wear<=MC_ToolLife(id)):wear==0;
 }
@@ -98,7 +98,7 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
       }
       for(unsigned i=0;i<MC_GROWERS;i++){
         const uint8_t*q=m+M_GROWERS+i*10;
-        if(!coord(q)||!range(getfloat(q+6),0,120.1f)||(get16(q)&&saved_block(p,q)!=MC_SAPLING))return 0;
+        if(!coord(q)||!range(getfloat(q+6),0,120.1f)||(get16(q)&&saved_block(p,q)!=MC_SAPLING&&saved_block(p,q)!=MC_WHEAT_CROP))return 0;
         if(get16(q))for(unsigned j=0;j<i;j++)if(!memcmp(q,m+M_GROWERS+j*10,6))return 0;
       }
       if(v==4) {

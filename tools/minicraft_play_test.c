@@ -80,6 +80,11 @@ int main(void) {
  scene(&w);MC_Set(&w,20,2,20,MC_SAPLING);w.growers[0]=(MC_Grower){21,3,21,119.9f};tick(&w,2);assert(MC_Get(&w,20,2,20)==MC_WOOD&&!w.growers[0].x);
  MC_Set(&w,30,2,30,MC_SAPLING);MC_Set(&w,30,4,30,MC_STONE);w.growers[0]=(MC_Grower){31,3,31,119.9f};tick(&w,2);assert(MC_Get(&w,30,2,30)==MC_SAPLING&&w.growers[0].age<111);
  MC_Set(&w,10,2,10,MC_SAPLING);w.growers[1]=(MC_Grower){11,3,11,119.9f};tick(&w,2);assert(MC_Get(&w,10,2,10)==MC_SAPLING);
+ /* Farming: shovel dirt, plant seeds, grow on the low-frequency timer, harvest. */
+ scene(&w);MC_Set(&w,10,3,13,MC_DIRT);assert(MC_Give(&w,MC_SHOVEL,1));select_item(&w,MC_SHOVEL);assert(MC_Use(&w));assert(MC_Get(&w,10,3,13)==MC_FARMLAND);
+ assert(MC_Give(&w,MC_WHEAT_SEEDS,1));select_item(&w,MC_WHEAT_SEEDS);assert(MC_Use(&w));assert(MC_Get(&w,10,4,13)==MC_WHEAT_CROP);
+ tick(&w,751);assert(MC_Get(&w,10,4,13)==MC_WHEAT_MATURE);assert(w.growers[0].x==0);
+ w.pitch=.25f;mine(&w,6);assert(MC_Get(&w,10,4,13)==MC_FARMLAND&&w.items[MC_WHEAT]>=1&&w.items[MC_WHEAT_SEEDS]>=1);
  /* Bed night skip, safe respawn and survival food/oxygen/death. */
  scene(&w);MC_Set(&w,10,3,13,MC_BED);w.pitch=-.15f;w.time=435;assert(MC_Use(&w)&&w.time==90&&w.spawn[2]==14);w.time=150;assert(MC_Use(&w)&&w.time==150);
  MC_Respawn(&w);assert(w.x>9&&w.x<15&&w.z>10&&w.z<16);

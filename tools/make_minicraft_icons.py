@@ -12,7 +12,7 @@ NAMES = ['AIR', 'GRASS', 'DIRT', 'STONE', 'SAND', 'LOG', 'LEAVES',
          'COAL ORE', 'IRON ORE', 'GLASS', 'BRICKS', 'TORCH', 'STICKS', 'COAL',
          'IRON', 'WOOD PICK', 'STONE PICK', 'IRON PICK', 'APPLE', 'AXE',
          'SHOVEL', 'SWORD', 'CHEST', 'BED', 'SAPLING', 'DOOR', 'DOOR OPEN']
-NAMES += ['STONE SLAB', 'SLAB TOP']
+NAMES += ['STONE SLAB', 'SLAB TOP', 'FARMLAND', 'WHEAT CROP', 'WHEAT MATURE', 'WHEAT SEEDS', 'WHEAT']
 BASE = {1:(112,165,55), 2:(139,96,61), 3:(141,145,151), 4:(224,208,150),
         5:(144,100,53), 6:(62,135,49), 7:(67,69,77), 8:(55,135,207),
         9:(133,139,146), 10:(191,145,83), 11:(169,116,59), 12:(115,121,128),
@@ -197,6 +197,18 @@ def sprite(item):
             d.polygon([(x,y+1),(x+2,y),(x+3,y+1),(x+2,y+3),(x,y+2)], fill='#68ac49')
             d.point((x+1,y+1), fill='#afce62')
         d.line([(5,14),(10,14)], fill='#795530')
+    elif item == 38:
+        # Wheat seeds: a small warm seed cluster with a dark outline.
+        for x,y in [(4,11),(7,8),(10,11),(8,5),(11,6)]:
+            d.line([(x-1,y+2),(x+1,y-1)], fill=edge, width=3)
+            d.point((x,y), fill='#e2bd58')
+    elif item == 39:
+        # Wheat: mature golden ears and a green stem.
+        d.line([(7,15),(8,5)], fill='#5c8d38', width=2)
+        d.line([(8,12),(4,8)], fill='#75a441', width=2)
+        d.line([(8,10),(12,6)], fill='#75a441', width=2)
+        for x,y in [(5,7),(4,5),(10,5),(12,4),(7,3),(9,1)]:
+            d.polygon([(x,y+1),(x+2,y),(x+3,y+1),(x+1,y+3)], fill='#e3bd55')
     elif item in (31, 32):
         # A compact wooden door icon; the open variant shows the rotated slab.
         if item == 31:
