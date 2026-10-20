@@ -11,7 +11,7 @@ NAMES = ['AIR', 'GRASS', 'DIRT', 'STONE', 'SAND', 'LOG', 'LEAVES',
          'BEDROCK', 'WATER', 'COBBLE', 'PLANKS', 'WORKBENCH', 'FURNACE',
          'COAL ORE', 'IRON ORE', 'GLASS', 'BRICKS', 'TORCH', 'STICKS', 'COAL',
          'IRON', 'WOOD PICK', 'STONE PICK', 'IRON PICK', 'APPLE', 'AXE',
-         'SHOVEL', 'SWORD', 'CHEST', 'BED', 'SAPLING']
+         'SHOVEL', 'SWORD', 'CHEST', 'BED', 'SAPLING', 'DOOR', 'DOOR OPEN']
 BASE = {1:(112,165,55), 2:(139,96,61), 3:(141,145,151), 4:(224,208,150),
         5:(144,100,53), 6:(62,135,49), 7:(67,69,77), 8:(55,135,207),
         9:(133,139,146), 10:(191,145,83), 11:(169,116,59), 12:(115,121,128),
@@ -196,6 +196,21 @@ def sprite(item):
             d.polygon([(x,y+1),(x+2,y),(x+3,y+1),(x+2,y+3),(x,y+2)], fill='#68ac49')
             d.point((x+1,y+1), fill='#afce62')
         d.line([(5,14),(10,14)], fill='#795530')
+    elif item in (31, 32):
+        # A compact wooden door icon; the open variant shows the rotated slab.
+        if item == 31:
+            d.rectangle((3,1,12,14), fill=edge)
+            d.rectangle((5,2,10,14), fill='#9d6935')
+            d.line((7,3,7,13), fill='#d29a4c', width=1)
+            d.line((9,3,9,13), fill='#704522', width=1)
+            d.rectangle((6,5,9,9), outline='#704522', width=1)
+            d.rectangle((10,8,11,9), fill='#f0c568')
+            d.line((4,1,11,1), fill='#d7a55d', width=1)
+        else:
+            d.polygon([(2,3),(6,1),(9,2),(5,5),(5,14),(2,13)], fill=edge)
+            d.polygon([(3,3),(6,2),(8,3),(4,5),(4,13),(3,12)], fill='#a8733a')
+            d.line([(4,6),(4,12)], fill='#d29a4c', width=1)
+            d.point((6,6), fill='#f0c568')
     return im
 
 

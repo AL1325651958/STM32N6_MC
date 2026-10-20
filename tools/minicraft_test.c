@@ -93,6 +93,19 @@ int main(void)
   w.sneak=1;
   for(int i=0;i<40;i++)MC_Step(&w,1,0,.067f,0);
   assert(w.z<12.25f&&w.y>2.55f);w.sneak=0;
+  /* Doors use a thin closed slab, rotate in place when opened, and remain
+     backward-compatible because the map stores the two block IDs directly. */
+  flat(&w);MC_Set(&w,10,2,13,MC_DOOR);
+  w.x=10.5f;w.y=2.01f;w.z=10.5f;w.yaw=0;w.pitch=-.3f;w.on_ground=1;
+  assert(MC_IsSolid(MC_DOOR)&&!MC_IsSolid(MC_DOOR_OPEN));
+  assert(MC_Raycast(&w,&x,&y,&z,&nx,&ny,&nz,5)&&x==10&&y==2&&z==13);
+  for(int i=0;i<30;i++)MC_Step(&w,1,0,.1f,0);
+  assert(w.z<12.72f);
+  w.z=10.5f;assert(MC_OpenTarget(&w)&&MC_Get(&w,10,2,13)==MC_DOOR_OPEN);
+  assert(MC_Raycast(&w,&x,&y,&z,&nx,&ny,&nz,5)&&z==13);
+  w.z=10.5f;for(int i=0;i<30;i++)MC_Step(&w,1,0,.1f,0);assert(w.z>13.2f);
+  w.z=10.5f;assert(MC_OpenTarget(&w)&&MC_Get(&w,10,2,13)==MC_DOOR);
+  assert(!MC_Edit(&w,1,MC_DOOR_OPEN));
   flat(&w);MC_Set(&w,10,2,10,MC_CHEST);w.y=4;
   for(int i=0;i<80;i++)MC_Step(&w,0,0,.016f,0);
   assert(fabsf(w.y-2.875f)<.01f);

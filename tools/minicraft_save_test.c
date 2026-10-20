@@ -27,7 +27,9 @@ int main(int argc,char **argv) {
  MC_Set(&a,31,40,30,MC_FURNACE);a.furnaces[0]=(MC_Furnace){32,41,31,{MC_IRON_ORE,10,0},{MC_COAL,2,0},{MC_IRON,4,0},21.5f,2.5f};
  MC_Set(&a,35,40,30,MC_SAPLING);a.growers[0]=(MC_Grower){36,41,31,78.5f};
  MC_Set(&a,36,40,30,MC_BED);a.spawn[0]=37;a.spawn[1]=41;a.spawn[2]=31;
+ MC_Set(&a,40,40,30,MC_DOOR);MC_Set(&a,41,40,30,MC_DOOR_OPEN);
  roundtrip(&a,&b,save);assert(b.seed==a.seed&&b.x==a.x&&!memcmp(a.blocks,b.blocks,MC_MAP_BYTES));
+ assert(MC_Get(&b,40,40,30)==MC_DOOR&&MC_Get(&b,41,40,30)==MC_DOOR_OPEN);
  assert(b.items[MC_IRON]==99&&b.equipped==MC_STONE_PICK&&b.slots[2].wear==71&&b.slot==3&&b.health==13&&b.air==7&&b.time==a.time);
  assert(!memcmp(a.slots,b.slots,sizeof(a.slots))&&!memcmp(a.chest_blocks,b.chest_blocks,sizeof(a.chest_blocks)));
  assert(!memcmp(a.chest_map,b.chest_map,sizeof(a.chest_map))&&!memcmp(a.spawn,b.spawn,sizeof(a.spawn))&&b.reserve[MC_WOOD]==999);

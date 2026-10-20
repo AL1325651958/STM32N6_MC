@@ -57,6 +57,8 @@ int main(void) {
  /* Tools do not share pick tiers. */
  scene(&w);assert(MC_Give(&w,MC_SHOVEL,1));MC_Set(&w,10,3,13,MC_IRON_ORE);mine(&w,50);assert(!w.items[MC_IRON_ORE]);
  scene(&w);assert(MC_Give(&w,MC_AXE,1));MC_Set(&w,10,3,13,MC_WOOD);mine(&w,6);assert(w.items[MC_WOOD]==1);
+ scene(&w);assert(MC_Give(&w,MC_AXE,1));w.pitch=-.3f;MC_Set(&w,10,2,13,MC_DOOR);mine(&w,4);
+ assert(MC_Get(&w,10,2,13)==MC_AIR&&w.items[MC_DOOR]==1);
  /* Placement consumes exactly the selected physical stack. */
  scene(&w);assert(MC_Give(&w,MC_DIRT,65));w.slot=1;MC_Set(&w,10,3,13,MC_STONE);assert(MC_Place(&w));
  assert(w.slots[0].count==64&&!w.slots[1].count&&MC_Get(&w,10,3,12)==MC_DIRT);
@@ -84,10 +86,10 @@ int main(void) {
  scene(&w);assert(MC_Give(&w,MC_APPLE,2));w.health=12;assert(MC_Use(&w)&&w.health==17&&w.items[MC_APPLE]==1);
  MC_Set(&w,10,3,10,MC_WATER);for(int i=0;i<140;i++)MC_PlayTick(&w,.1f,0,400,240);assert(w.health<17);
  MC_Set(&w,10,3,10,MC_AIR);MC_PlayTick(&w,.1f,0,400,240);assert(w.air==10);w.health=2;w.fall_speed=18;w.hurt_timer=0;MC_PlayTick(&w,.1f,0,400,240);assert(w.health==20&&w.items[MC_APPLE]==1);
- /* Touch layout: all 17 recipes reachable, real slot moves, split and mode. */
+ /* Touch layout: all 18 recipes reachable, real slot moves, split and mode. */
  scene(&w);w.bag=1;assert(MC_Give(&w,MC_WOOD,10));MC_UIBagTap(&w,30,115);MC_UIBagTap(&w,78,183);assert(w.slots[9].count==10&&!w.slots[0].count);
  MC_UIBagTap(&w,200,420);assert(w.split);MC_UIBagTap(&w,78,183);MC_UIBagTap(&w,30,115);assert(w.slots[0].count==5&&w.slots[9].count==5);
- for(unsigned i=1;i<=5;i++){MC_UIBagTap(&w,450,85);assert(w.recipe_page==i%5);}assert(MC_RecipeCount()==17);
+ for(unsigned i=1;i<=5;i++){MC_UIBagTap(&w,450,85);assert(w.recipe_page==i%5);}assert(MC_RecipeCount()==18);
  assert(MC_RecipeResult(0)==MC_PLANKS&&MC_RecipeIngredient(0,0)==MC_WOOD&&MC_RecipeIngredientCount(0,0)==1);
  assert(MC_RecipeIngredient(0,1)==0&&MC_UIRole(720,240)==MC_TOUCH_SNEAK&&MC_UIRole(720,300)==MC_TOUCH_PLACE);
  MC_UIBagTap(&w,40,420);assert(w.creative);MC_UIBagTap(&w,750,415);assert(w.slot==7);

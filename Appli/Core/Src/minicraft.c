@@ -32,7 +32,7 @@ uint8_t MC_Get(const MC_World *w, int x, int y, int z)
 }
 void MC_Set(MC_World *w, int x, int y, int z, uint8_t b)
 { if (inside(x,y,z) && y > 0 && (b==MC_AIR || MC_IsBlock(b))) w->blocks[index_of(x,y,z)] = b; }
-int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_TORCH && block != MC_SAPLING; }
+int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_TORCH && block != MC_SAPLING && block != MC_DOOR_OPEN; }
 
 typedef struct { float lo[3], hi[3]; } MC_Part;
 
@@ -66,6 +66,8 @@ static void bounds(uint8_t b,float lo[3],float hi[3])
   else if(b==MC_CHEST){lo[0]=lo[2]=1/16.f;hi[0]=hi[2]=15/16.f;hi[1]=14/16.f;}
   else if(b==MC_BED)hi[1]=9/16.f;
   else if(b==MC_SAPLING){lo[0]=lo[2]=2/16.f;hi[0]=hi[2]=14/16.f;hi[1]=13/16.f;}
+  else if(b==MC_DOOR){lo[2]=6/16.f;hi[2]=10/16.f;}
+  else if(b==MC_DOOR_OPEN){lo[0]=6/16.f;hi[0]=10/16.f;}
 }
 static int body_intersects(uint8_t b,int bx,int by,int bz,float x,float y,float z)
 {
@@ -201,7 +203,7 @@ void MC_Step(MC_World *w, float f, float s, float dt, int jump)
 
 typedef MC_Hit Hit;
 static int shaped(uint8_t b)
-{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST;}
+{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST || b==MC_DOOR || b==MC_DOOR_OPEN;}
 
 /* Intersect only special objects; ordinary cubes retain the cheap DDA path. */
 static int box_hit(const float lo[3],const float hi[3],const float p[3],const float d[3],
@@ -347,10 +349,11 @@ int MC_Edit(MC_World *w, int place, uint8_t selected)
   int x,y,z,nx,ny,nz;
   if(!MC_Raycast(w,&x,&y,&z,&nx,&ny,&nz,5)) return 0;
   if(place) {
-    if(!MC_IsBlock(selected) || selected==MC_BEDROCK || selected==MC_WATER || !(nx||ny||nz)) return 0;
+    if(!MC_IsBlock(selected) || selected==MC_BEDROCK || selected==MC_WATER || selected==MC_DOOR_OPEN || !(nx||ny||nz)) return 0;
     x+=nx; y+=ny; z+=nz;
     uint8_t old=MC_Get(w,x,y,z);
     if(!inside(x,y,z) || y==0 || (old!=MC_AIR && old!=MC_WATER)) return 0;
+    if(selected==MC_DOOR && !MC_IsSolid(MC_Get(w,x,y-1,z))) return 0;
     if(MC_IsSolid(selected) && body_intersects(selected,x,y,z,w->x,w->y,w->z)) return 0;
     MC_Set(w,x,y,z,selected);
   } else {
@@ -463,6 +466,12 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
           if(!h.ny && tu>6 && tu<10 && tv>5 && tv<10){r=232;g=191;b=74;}break;
         case MC_BED:r=183;g=43;b=40;if(pz-h.z>.75f){r=230;g=221;b=198;}if(!h.ny && tv<5){r=119;g=79;b=40;}break;
         case MC_SAPLING:r=83;g=180;b=49;if(py-h.y<.3f){r=117;g=82;b=43;}break;
+        case MC_DOOR:
+        case MC_DOOR_OPEN:
+          r=153;g=101;b=48;
+          if((tu%4)==0 || tv==0 || tv==15){r=105;g=65;b=32;}
+          if(tv>6 && tv<10 && ((h.block==MC_DOOR && tu>10) || (h.block==MC_DOOR_OPEN && tu<5))){r=220;g=177;b=67;}
+          break;
         default:break;
       }
       float ambient=.22f+.78f*daylight;

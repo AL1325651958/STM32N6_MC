@@ -31,8 +31,9 @@ int main(int argc,char **argv)
       }
       MC_Set(&w,8,2,11,MC_PLANKS);MC_Set(&w,9,2,11,MC_CHEST);
       MC_Set(&w,10,2,11,MC_TORCH);MC_Set(&w,11,2,11,MC_SAPLING);MC_Set(&w,12,2,11,MC_BED);
-      w.x=10.5f;w.y=2;w.z=7.2f;w.yaw=0;w.pitch=-.24f;w.time=90;
-      w.notice="PLANKS  CHEST  TORCH  SAPLING  BED";
+      MC_Set(&w,13,2,11,MC_DOOR);MC_Set(&w,14,2,11,MC_DOOR_OPEN);
+      w.x=12.5f;w.y=2;w.z=7.2f;w.yaw=0;w.pitch=-.24f;w.time=90;
+      w.notice="CHEST  TORCH  SAPLING  BED  DOOR  OPEN DOOR";
     }
     if(k==8){
       w.time=435;w.x=10.5f;w.y=2.01f;w.z=10.5f;w.yaw=0;w.pitch=0;
