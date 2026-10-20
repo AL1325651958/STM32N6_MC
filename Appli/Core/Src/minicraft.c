@@ -91,7 +91,7 @@ uint8_t MC_Get(const MC_World *w, int x, int y, int z)
 }
 void MC_Set(MC_World *w, int x, int y, int z, uint8_t b)
 { if (inside(x,y,z) && y > 0 && (b==MC_AIR || MC_IsBlock(b))) w->blocks[index_of(x,y,z)] = b; }
-int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_TORCH && block != MC_SAPLING && block != MC_DOOR_OPEN && block != MC_WHEAT_CROP && block != MC_WHEAT_MATURE; }
+int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_TORCH && block != MC_SAPLING && block != MC_DOOR_OPEN && block != MC_WHEAT_CROP && block != MC_WHEAT_MATURE && block != MC_DUST && block != MC_DUST_ON && block != MC_LEVER && block != MC_LEVER_ON && block != MC_BUTTON && block != MC_BUTTON_ON; }
 
 typedef struct { float lo[3], hi[3]; } MC_Part;
 
@@ -111,6 +111,9 @@ static const MC_Part fence_parts[] = {
   {{0,11/16.f,6/16.f},{1,14/16.f,10/16.f}},
   {{6/16.f,11/16.f,0},{10/16.f,14/16.f,1}}
 };
+static const MC_Part dust_parts[] = {{{.08f,0,.08f},{.92f,.07f,.92f}}};
+static const MC_Part lever_parts[] = {{{.25f,0,.25f},{.75f,.10f,.75f}},{{.43f,.08f,.57f},{.57f,.62f,.68f}}};
+static const MC_Part button_parts[] = {{{.25f,.02f,.25f},{.75f,.22f,.75f}}};
 /* Stair orientation is the direction in which the step rises. */
 static const MC_Part stair_parts[4][2] = {
   {{{0,0,0},{1,.5f,1}},{{.5f,.5f,0},{1,1,1}}},
@@ -123,6 +126,9 @@ static unsigned parts_for(uint8_t b, const MC_Part **parts)
 {
   if(b==MC_TORCH) { *parts=torch_parts; return sizeof(torch_parts)/sizeof(torch_parts[0]); }
   if(b==MC_FENCE) { *parts=fence_parts; return sizeof(fence_parts)/sizeof(fence_parts[0]); }
+  if(b==MC_DUST || b==MC_DUST_ON) { *parts=dust_parts; return 1; }
+  if(b==MC_LEVER || b==MC_LEVER_ON) { *parts=lever_parts; return 2; }
+  if(b==MC_BUTTON || b==MC_BUTTON_ON) { *parts=button_parts; return 1; }
   if(b>=MC_STAIR && b<=MC_STAIR_WEST) { *parts=stair_parts[b-MC_STAIR]; return 2; }
   *parts=0; return 0;
 }
@@ -131,7 +137,7 @@ static unsigned parts_for(uint8_t b, const MC_Part **parts)
 static void bounds(uint8_t b,float lo[3],float hi[3])
 {
   lo[0]=lo[1]=lo[2]=0;hi[0]=hi[1]=hi[2]=1;
-  if(b==MC_TORCH || b==MC_FENCE || (b>=MC_STAIR && b<=MC_STAIR_WEST)) {
+  if(b==MC_TORCH || b==MC_FENCE || b==MC_DUST || b==MC_DUST_ON || b==MC_LEVER || b==MC_LEVER_ON || b==MC_BUTTON || b==MC_BUTTON_ON || (b>=MC_STAIR && b<=MC_STAIR_WEST)) {
     const MC_Part *parts; unsigned count=parts_for(b,&parts);
     lo[0]=lo[1]=lo[2]=1; hi[0]=hi[1]=hi[2]=0;
     for(unsigned i=0;i<count;i++) for(unsigned a=0;a<3;a++) {
@@ -289,7 +295,7 @@ void MC_Step(MC_World *w, float f, float s, float dt, int jump)
 
 typedef MC_Hit Hit;
 static int shaped(uint8_t b)
-{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST || b==MC_DOOR || b==MC_DOOR_OPEN || b==MC_SLAB || b==MC_SLAB_TOP || b==MC_FARMLAND || b==MC_WHEAT_CROP || b==MC_WHEAT_MATURE || b==MC_FENCE || (b>=MC_STAIR && b<=MC_STAIR_WEST);}
+{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST || b==MC_DOOR || b==MC_DOOR_OPEN || b==MC_SLAB || b==MC_SLAB_TOP || b==MC_FARMLAND || b==MC_WHEAT_CROP || b==MC_WHEAT_MATURE || b==MC_FENCE || (b>=MC_DUST && b<=MC_BUTTON_ON) || (b>=MC_STAIR && b<=MC_STAIR_WEST);}
 
 /* Intersect only special objects; ordinary cubes retain the cheap DDA path. */
 static int box_hit(const float lo[3],const float hi[3],const float p[3],const float d[3],
@@ -511,7 +517,7 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
   for(int y=(int)w->y-4;y<=(int)w->y+4 && nl<8;y++)
     for(int z=(int)w->z-6;z<=(int)w->z+6 && nl<8;z++)
       for(int x=(int)w->x-6;x<=(int)w->x+6 && nl<8;x++)
-        if(MC_Get(w,x,y,z)==MC_TORCH) {lights[nl][0]=x;lights[nl][1]=y;lights[nl++][2]=z;}
+        if(MC_Get(w,x,y,z)==MC_TORCH || MC_Get(w,x,y,z)==MC_LAMP_ON) {lights[nl][0]=x;lights[nl][1]=y;lights[nl++][2]=z;}
   for(unsigned y=0;y<height;++y) for(unsigned x=0;x<width;++x) {
     float u=(x+.5f-width*.5f)/focal,v=(height*.5f-y-.5f)/focal;
     float dx=syaw*cp+u*cyaw-v*sp*syaw,dy=sp+v*cp,dz=cyaw*cp-u*syaw-v*sp*cyaw;
@@ -562,6 +568,19 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
         case MC_GLASS:r=139;g=206;b=218;n=(tu<2 || tv<2 || tu==tv)?38:-5;break;
         case MC_BRICK:r=161;g=74;b=55;if(tv%4==0 || (tu+((tv/4)&1)*4)%8==0){r=162;g=155;b=139;}break;
         case MC_TORCH:r=123;g=84;b=39;if(py-h.y>=9/16.f){r=255;g=187+(tu&1)*30;b=40;}break;
+        case MC_DUST:
+        case MC_DUST_ON:
+          r=h.block==MC_DUST_ON?235:105;g=h.block==MC_DUST_ON?24:20;b=h.block==MC_DUST_ON?30:25;break;
+        case MC_LAMP:
+          r=93;g=87;b=75;break;
+        case MC_LAMP_ON:
+          r=255;g=204;b=54;break;
+        case MC_LEVER:
+        case MC_LEVER_ON:
+          r=118;g=82;b=45;if(h.block==MC_LEVER_ON){r=218;g=153;b=60;}break;
+        case MC_BUTTON:
+        case MC_BUTTON_ON:
+          r=h.block==MC_BUTTON_ON?214:152;g=h.block==MC_BUTTON_ON?90:96;b=55;break;
         case MC_CHEST:r=157;g=103;b=44;if(tv<2 || tv>13 || tu<2 || tu>13)n=-42;
           if(!h.ny && tu>6 && tu<10 && tv>5 && tv<10){r=232;g=191;b=74;}break;
         case MC_BED:r=183;g=43;b=40;if(pz-h.z>.75f){r=230;g=221;b=198;}if(!h.ny && tv<5){r=119;g=79;b=40;}break;
@@ -605,7 +624,7 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
         glow=fmaxf(glow,clamp(1-(lx*lx+ly*ly+lz*lz)/42,0,1));
       }
       ambient=fmaxf(ambient,glow*.95f);
-      if(h.block==MC_TORCH)ambient=1;
+      if(h.block==MC_TORCH || h.block==MC_LAMP_ON)ambient=1;
       float shade=(h.ny>0?1.0f:h.ny<0?.50f:h.nx?.80f:.68f)*ambient;
       float fog=clamp((h.distance-18)/22,0,1);fog*=fog;
       r=(unsigned)clamp((r+n)*shade*(1-fog)+skyR*fog,0,255);

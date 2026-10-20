@@ -22,7 +22,7 @@ static void sread(MC_Stack*s,const uint8_t*p){s->item=p[0];s->count=p[1];s->wear
 static int svalid(const uint8_t*p){
   unsigned id=p[0],n=p[1],wear=get16(p+2);
   if(!n)return id==0&&wear==0;
-  if(!id||id>=MC_ITEM_COUNT||(id==MC_FARMLAND||id==MC_WHEAT_CROP||id==MC_WHEAT_MATURE)||id==MC_WATER||id==MC_BEDROCK||n>64)return 0;
+  if(!id||id>=MC_ITEM_COUNT||(id==MC_FARMLAND||id==MC_WHEAT_CROP||id==MC_WHEAT_MATURE||id==MC_DUST_ON||id==MC_LAMP_ON||id==MC_LEVER_ON||id==MC_BUTTON_ON)||id==MC_WATER||id==MC_BEDROCK||n>64)return 0;
   int t=MC_ToolIndex(id);
   return t>=0?(n==1&&wear>0&&wear<=MC_ToolLife(id)):wear==0;
 }
@@ -163,5 +163,10 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
     }
     w->notice="WORLD AND INVENTORY LOADED";
   }
-  MC_SyncInventory(w);return 1;
+  MC_SyncInventory(w);
+  /* Redstone propagation is runtime-only.  Lever states persist in the map;
+     button pulses are intentionally cleared on load and the nearby network
+     is rebuilt from its stable sources. */
+  MC_RedstoneRefresh(w);
+  return 1;
 }

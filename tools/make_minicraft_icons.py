@@ -15,6 +15,7 @@ NAMES = ['AIR', 'GRASS', 'DIRT', 'STONE', 'SAND', 'LOG', 'LEAVES',
 NAMES += ['STONE SLAB', 'SLAB TOP', 'FARMLAND', 'WHEAT CROP', 'WHEAT MATURE', 'WHEAT SEEDS', 'WHEAT']
 NAMES += ['FENCE', 'STONE STAIRS', 'STONE STAIRS EAST', 'STONE STAIRS SOUTH', 'STONE STAIRS WEST']
 NAMES += ['RAW MEAT']
+NAMES += ['REDSTONE DUST', 'REDSTONE DUST ON', 'REDSTONE LAMP', 'REDSTONE LAMP ON', 'LEVER', 'LEVER ON', 'BUTTON', 'BUTTON ON']
 BASE = {1:(112,165,55), 2:(139,96,61), 3:(141,145,151), 4:(224,208,150),
         5:(144,100,53), 6:(62,135,49), 7:(67,69,77), 8:(55,135,207),
         9:(133,139,146), 10:(191,145,83), 11:(169,116,59), 12:(115,121,128),
@@ -190,6 +191,27 @@ def sprite(item):
         d.polygon([(4,7),(7,5),(10,5),(12,7),(10,8),(7,7),(5,9)], fill='#ef8c7f')
         d.polygon([(10,9),(13,7),(13,10),(10,12)], fill='#a93645')
         d.ellipse((2,9,5,12), fill='#f1d7bd', outline=edge)
+    elif item in (46,47):
+        # Redstone dust: a small cross of powder, with a brighter powered state.
+        c = '#f12b36' if item == 47 else '#9f1f2b'
+        d.line([(2,8),(13,8)], fill=edge, width=4);d.line([(8,3),(8,13)], fill=edge, width=4)
+        d.line([(2,8),(13,8)], fill=c, width=2);d.line([(8,3),(8,13)], fill=c, width=2)
+        for x,y in [(4,5),(11,11),(5,11),(11,5)]: d.rectangle((x,y,x+1,y+1), fill='#ff7a55' if item==47 else '#ce3540')
+    elif item in (48,49):
+        # Lamp block, with the powered variant glowing warm yellow.
+        fill='#f4c43c' if item==49 else '#6e6257'
+        d.rectangle((1,1,14,14), fill=edge);d.rectangle((3,3,12,12), fill=fill)
+        d.rectangle((5,5,10,10), fill='#fff0a0' if item==49 else '#a79b80')
+        d.line([(3,4),(12,4)], fill='#ffe67a' if item==49 else '#81786a')
+    elif item in (50,51):
+        # Lever and its powered state; the state is an internal map shape but
+        # shares the same silhouette for inventory previews.
+        d.rectangle((2,10,13,13), fill=edge);d.rectangle((3,10,12,11), fill='#9c6b3b')
+        d.line([(8,10),(11 if item==51 else 5,3)], fill=edge, width=4)
+        d.line([(8,10),(11 if item==51 else 5,3)], fill='#e7b55a' if item==51 else '#a9773e', width=2)
+    elif item in (52,53):
+        d.rectangle((2,5,13,12), fill=edge);d.rectangle((4,6,11,10), fill='#d69a55' if item==53 else '#a9773e')
+        d.rectangle((5,7,10,9), fill='#f3c26a' if item==53 else '#c08b4d')
     elif item == 29:
         d.polygon([(1,8),(9,3),(15,6),(15,11),(7,15),(1,12)], fill=edge)
         d.polygon([(2,8),(9,4),(14,6),(7,11)], fill='#e3544b')

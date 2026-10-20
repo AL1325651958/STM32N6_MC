@@ -20,7 +20,11 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
           all existing block and item IDs remain stable for old saves. */
        MC_FARMLAND, MC_WHEAT_CROP, MC_WHEAT_MATURE,
        MC_WHEAT_SEEDS, MC_WHEAT, MC_FENCE, MC_STAIR,
-       MC_STAIR_EAST, MC_STAIR_SOUTH, MC_STAIR_WEST, MC_RAW_MEAT, MC_ITEM_COUNT };
+       MC_STAIR_EAST, MC_STAIR_SOUTH, MC_STAIR_WEST, MC_RAW_MEAT,
+       /* Redstone uses paired OFF/ON map states.  Keep these IDs appended so
+          v1-v4 saves retain their original item numbering. */
+       MC_DUST, MC_DUST_ON, MC_LAMP, MC_LAMP_ON,
+       MC_LEVER, MC_LEVER_ON, MC_BUTTON, MC_BUTTON_ON, MC_ITEM_COUNT };
 #define MC_HOTBAR 8
 #define MC_SLOTS 32
 #define MC_CHEST_SLOTS 24
@@ -31,6 +35,8 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
 #define MC_MOBS 8
 #define MC_MOB_HEALTH 12
 #define MC_DROPS 16
+#define MC_REDSTONE_SOURCES 32
+#define MC_REDSTONE_BUTTONS 8
 typedef struct { uint8_t item,count; uint16_t wear; } MC_Stack;
 typedef struct { uint16_t x,y,z; MC_Stack input,fuel,output; float burn,progress; } MC_Furnace;
 typedef struct { uint16_t x,y,z; float age; } MC_Grower;
@@ -71,6 +77,11 @@ typedef struct {
   /* Runtime-only bounded scheduler for nearby falling sand. */
   float gravity_clock;
   uint16_t gravity_cursor;
+  /* Runtime-only redstone scheduler; map bytes keep lever state, while
+     button timers and the propagation clock are discarded on save/load. */
+  float redstone_clock;
+  uint16_t redstone_button_pos[MC_REDSTONE_BUTTONS][3];
+  float redstone_button_timer[MC_REDSTONE_BUTTONS];
   uint8_t mob_target;
   const char *notice;
 } MC_World;
@@ -113,6 +124,7 @@ unsigned MC_ToolLife(unsigned item);
 int MC_MoveStack(MC_Stack *from,MC_Stack *to,int split);
 int MC_ContainerTap(MC_World *w,unsigned slot);
 void MC_SystemsTick(MC_World *w,float dt);
+void MC_RedstoneRefresh(MC_World *w);
 int MC_OpenTarget(MC_World *w);
 int MC_TransferSlot(MC_World *w,unsigned slot,int shift);
 const char *MC_ItemName(unsigned item);

@@ -102,7 +102,7 @@ static unsigned catalog_item(unsigned index)
 {
   unsigned seen=0;
   for(unsigned id=1;id<MC_ITEM_COUNT;id++) {
-    if(id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE || (id>=MC_STAIR_EAST && id<=MC_STAIR_WEST))continue;
+    if(id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE || id==MC_DUST_ON || id==MC_LAMP_ON || id==MC_LEVER_ON || id==MC_BUTTON_ON || (id>=MC_STAIR_EAST && id<=MC_STAIR_WEST))continue;
     if(seen++==index)return id;
   }
   return 0;
@@ -138,6 +138,10 @@ static void held_item(uint16_t *fb,const MC_World *w)
     case MC_STAIR: iw=76;ih=68;ix=600+swing;iy=282;break;
     case MC_DOOR:
     case MC_DOOR_OPEN: iw=54;ih=82;ix=614+swing;iy=274;break;
+    case MC_DUST: iw=34;ih=18;ix=632+swing;iy=318;break;
+    case MC_LAMP: iw=58;ih=58;ix=606+swing;iy=292;break;
+    case MC_LEVER: iw=34;ih=48;ix=630+swing;iy=296;break;
+    case MC_BUTTON: iw=30;ih=30;ix=632+swing;iy=306;break;
     default: break;
   }
   /* Dark outline and a warm skin-tone cuff give the icon a readable grip. */
@@ -177,6 +181,14 @@ static uint16_t map_color(uint8_t b)
     case MC_FARMLAND:return 0x6a64;
     case MC_WHEAT_CROP:return 0x5d87;
     case MC_WHEAT_MATURE:return 0xf6a0;
+    case MC_DUST:
+    case MC_DUST_ON:return 0xf800;
+    case MC_LAMP:return 0x8410;
+    case MC_LAMP_ON:return 0xffe0;
+    case MC_LEVER:
+    case MC_LEVER_ON:return 0xffc0;
+    case MC_BUTTON:
+    case MC_BUTTON_ON:return 0xb48a;
     default:return 0x2104;
   }
 }

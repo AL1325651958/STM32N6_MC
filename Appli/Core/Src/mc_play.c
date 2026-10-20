@@ -2,14 +2,68 @@
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
-static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT"};
-static const uint16_t colors[MC_ITEM_COUNT]={0,0x6cc6,0x8b07,0x8410,0xd66f,0x8b45,0x3b85,0x3186,0x3397,0x7390,0xb48a,0x9347,0x630c,0x4208,0xb3ac,0x9f7f,0xb2a8,0xff20,0x9b05,0x2104,0xc638,0xa366,0x94b2,0xdefb,0xe924,0x9b05,0x9b05,0xdefb,0x9347,0x6cc6,0x3b85,0xa365,0x9b05,0x8c71,0x8c71,0x6a64,0x4d8b,0xf6A0,0x7e24,0xdda2,0xb48a,0x8410,0x8410,0x8410,0x8410,0xc9b0};
+static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT","REDSTONE DUST","REDSTONE DUST ON","REDSTONE LAMP","REDSTONE LAMP ON","LEVER","LEVER ON","BUTTON","BUTTON ON"};
+static const uint16_t colors[MC_ITEM_COUNT]={0,0x6cc6,0x8b07,0x8410,0xd66f,0x8b45,0x3b85,0x3186,0x3397,0x7390,0xb48a,0x9347,0x630c,0x4208,0xb3ac,0x9f7f,0xb2a8,0xff20,0x9b05,0x2104,0xc638,0xa366,0x94b2,0xdefb,0xe924,0x9b05,0x9b05,0xdefb,0x9347,0x6cc6,0x3b85,0xa365,0x9b05,0x8c71,0x8c71,0x6a64,0x4d8b,0xf6A0,0x7e24,0xdda2,0x8410,0x8410,0x8410,0x8410,0xc9b0,0xf800,0xf800,0x8410,0xffe0,0x9b05,0xffc0,0xb48a,0xffe0};
 const char *MC_ItemName(unsigned i){return i<MC_ITEM_COUNT?names[i]:"EMPTY";}uint16_t MC_ItemColor(unsigned i){return i<MC_ITEM_COUNT?colors[i]:0;}
 void MC_HoldStart(MC_Hold*h,int x,int y,uint32_t n){*h=(MC_Hold){x,y,x,y,n};}void MC_HoldMove(MC_Hold*h,int x,int y,uint32_t n){int dx=x-h->anchor_x,dy=y-h->anchor_y;h->x=x;h->y=y;if(dx*dx+dy*dy>144){h->anchor_x=x;h->anchor_y=y;h->since=n;}}int MC_HoldReady(const MC_Hold*h,uint32_t n){return(uint32_t)(n-h->since)>=450;}
 int MC_IsBlock(unsigned i) {
-  return (i>MC_AIR && i<MC_BLOCK_COUNT) || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP || i==MC_FARMLAND || i==MC_WHEAT_CROP || i==MC_WHEAT_MATURE || (i>=MC_FENCE && i<=MC_STAIR_WEST);
+  return (i>MC_AIR && i<MC_BLOCK_COUNT) || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP || i==MC_FARMLAND || i==MC_WHEAT_CROP || i==MC_WHEAT_MATURE || (i>=MC_FENCE && i<=MC_STAIR_WEST) || (i>=MC_DUST && i<=MC_BUTTON_ON);
 }
-static int map_only(unsigned i){return i==MC_FARMLAND||i==MC_WHEAT_CROP||i==MC_WHEAT_MATURE||(i>=MC_STAIR_EAST&&i<=MC_STAIR_WEST);}
+static int map_only(unsigned i){return i==MC_FARMLAND||i==MC_WHEAT_CROP||i==MC_WHEAT_MATURE||(i>=MC_STAIR_EAST&&i<=MC_STAIR_WEST)||i==MC_DUST_ON||i==MC_LAMP_ON||i==MC_LEVER_ON||i==MC_BUTTON_ON;}
+static uint8_t redstone_off(uint8_t b)
+{
+  if(b==MC_DUST_ON)return MC_DUST;
+  if(b==MC_LAMP_ON)return MC_LAMP;
+  if(b==MC_LEVER_ON)return MC_LEVER;
+  if(b==MC_BUTTON_ON)return MC_BUTTON;
+  return b;
+}
+static int redstone_kind(uint8_t b){return b>=MC_DUST && b<=MC_BUTTON_ON;}
+static int redstone_button_find(const MC_World *w,int x,int y,int z)
+{
+  for(unsigned i=0;i<MC_REDSTONE_BUTTONS;i++)
+    if(w->redstone_button_timer[i]>0 && w->redstone_button_pos[i][0]==(uint16_t)(x+1) &&
+       w->redstone_button_pos[i][1]==(uint16_t)(y+1) && w->redstone_button_pos[i][2]==(uint16_t)(z+1)) return (int)i;
+  return -1;
+}
+static void redstone_button_press(MC_World *w,int x,int y,int z)
+{
+  int i=redstone_button_find(w,x,y,z);
+  if(i<0) for(unsigned n=0;n<MC_REDSTONE_BUTTONS;n++) if(w->redstone_button_timer[n]<=0){i=(int)n;break;}
+  if(i>=0){w->redstone_button_pos[i][0]=(uint16_t)(x+1);w->redstone_button_pos[i][1]=(uint16_t)(y+1);w->redstone_button_pos[i][2]=(uint16_t)(z+1);w->redstone_button_timer[i]=.5f;MC_Set(w,x,y,z,MC_BUTTON_ON);}
+}
+/* Recompute a small redstone neighborhood with a fixed queue budget.  Sources
+   are levers and active buttons; dust carries power horizontally and lamps
+   adjacent to powered dust turn on.  Runtime state is deliberately excluded
+   from saves, so a loaded world can rebuild this network cheaply. */
+void MC_RedstoneRefresh(MC_World *w)
+{
+  int cx=(int)w->x,cy=(int)w->y,cz=(int)w->z;
+  int x0=cx-16,x1=cx+16,y0=cy-8,y1=cy+8,z0=cz-16,z1=cz+16;
+  if(x0<1)x0=1;
+  if(z0<1)z0=1;
+  if(y0<1)y0=1;
+  if(x1>=MC_MAP_X-1)x1=MC_MAP_X-2;
+  if(z1>=MC_MAP_Z-1)z1=MC_MAP_Z-2;
+  if(y1>=MC_MAP_Y)y1=MC_MAP_Y-1;
+  int qx[128],qy[128],qz[128],head=0,tail=0;
+  for(int y=y0;y<=y1;y++)for(int z=z0;z<=z1;z++)for(int x=x0;x<=x1;x++){
+    uint8_t b=MC_Get(w,x,y,z);
+    if(b==MC_DUST_ON||b==MC_LAMP_ON)MC_Set(w,x,y,z,redstone_off(b));
+    else if(b==MC_BUTTON_ON && redstone_button_find(w,x,y,z)<0)MC_Set(w,x,y,z,MC_BUTTON);
+    if((b==MC_LEVER_ON || b==MC_BUTTON_ON) && tail<128){qx[tail]=x;qy[tail]=y;qz[tail++]=z;}
+  }
+  while(head<tail){
+    int x=qx[head],y=qy[head],z=qz[head];head++;
+    for(int dz=-1;dz<=1;dz++)for(int dx=-1;dx<=1;dx++){
+      if((dx&&dz)||(!dx&&!dz))continue;
+      int nx=x+dx,nz=z+dz;uint8_t b=MC_Get(w,nx,y,nz);
+      if(b==MC_DUST){MC_Set(w,nx,y,nz,MC_DUST_ON);if(tail<128){qx[tail]=nx;qy[tail]=y;qz[tail++]=nz;}}
+      else if(b==MC_LAMP)MC_Set(w,nx,y,nz,MC_LAMP_ON);
+      else if(b==MC_BUTTON_ON || b==MC_LEVER_ON){/* a source can feed dust on its other side */}
+    }
+  }
+}
 int MC_ToolIndex(unsigned i) {
   if(i>=MC_WOOD_PICK && i<=MC_IRON_PICK)return (int)i-MC_WOOD_PICK;
   if(i>=MC_AXE && i<=MC_SWORD)return (int)i-MC_AXE+3;
@@ -107,6 +161,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   memset(w->mobs,0,sizeof(w->mobs));memset(w->drops,0,sizeof(w->drops));w->mob_rng=w->seed^0x9e3779b9u;if(!w->mob_rng)w->mob_rng=1;
   w->mob_target=255;w->mob_clock=w->spawn_clock=w->attack_cooldown=w->attack_flash=0;
   w->gravity_clock=0;w->gravity_cursor=0;
+  w->redstone_clock=0;memset(w->redstone_button_pos,0,sizeof(w->redstone_button_pos));memset(w->redstone_button_timer,0,sizeof(w->redstone_button_timer));
   memset(w->mob_fed,0,sizeof(w->mob_fed));memset(w->mob_fed_age,0,sizeof(w->mob_fed_age));w->breed_cooldown=0;
   MC_SyncInventory(w);
   w->notice=legacy?"OLD WORLD  CREATIVE MODE":"HOLD BLOCK TO MINE  BAG TO CRAFT";
@@ -118,8 +173,8 @@ void MC_SelectItem(MC_World *w,unsigned item) {
   if(MC_ToolIndex(item)>=0 && (w->creative || w->items[item]))w->equipped=(uint8_t)item;
 }
 typedef struct{uint8_t out,n,a,na,b,nb,station;}R;
-static const R recipes[]={{MC_PLANKS,4,MC_WOOD,1,0,0,0},{MC_STICK,4,MC_PLANKS,2,0,0,0},{MC_TABLE,1,MC_PLANKS,4,0,0,0},{MC_WOOD_PICK,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_STONE_PICK,1,MC_COBBLE,3,MC_STICK,2,MC_TABLE},{MC_FURNACE,1,MC_COBBLE,8,0,0,MC_TABLE},{MC_COAL,1,MC_WOOD,1,MC_PLANKS,1,MC_FURNACE},{MC_TORCH,4,MC_COAL,1,MC_STICK,1,0},{MC_IRON,1,MC_IRON_ORE,1,MC_COAL,1,MC_FURNACE},{MC_IRON_PICK,1,MC_IRON,3,MC_STICK,2,MC_TABLE},{MC_GLASS,4,MC_SAND,4,MC_COAL,1,MC_FURNACE},{MC_BRICK,4,MC_COBBLE,4,MC_COAL,1,MC_FURNACE},{MC_AXE,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_SHOVEL,1,MC_PLANKS,1,MC_STICK,2,MC_TABLE},{MC_SWORD,1,MC_PLANKS,2,MC_STICK,1,MC_TABLE},{MC_CHEST,1,MC_PLANKS,8,0,0,MC_TABLE},{MC_BED,1,MC_PLANKS,3,MC_SAPLING,3,MC_TABLE},{MC_DOOR,1,MC_PLANKS,6,0,0,MC_TABLE},{MC_SLAB,6,MC_COBBLE,3,0,0,MC_TABLE},{MC_FENCE,3,MC_PLANKS,4,MC_STICK,2,MC_TABLE},{MC_STAIR,4,MC_COBBLE,6,0,0,MC_TABLE}};
-static const char*cost[]={"1 LOG - 4 PLANKS","2 PLANKS - 4 STICKS","4 PLANKS","3 PLANKS 2 STICKS","3 COBBLE 2 STICKS","8 COBBLE","1 LOG 1 PLANK","1 COAL 1 STICK","1 ORE 1 COAL","3 IRON 2 STICKS","4 SAND 1 COAL","4 COBBLE 1 COAL","3 PLANKS 2 STICKS","1 PLANK 2 STICKS","2 PLANKS 1 STICK","8 PLANKS","3 PLANKS 3 SAPLINGS","6 PLANKS","3 COBBLE - 6 STONE SLABS","4 PLANKS 2 STICKS - 3 FENCES","6 COBBLE - 4 STONE STAIRS"};
+static const R recipes[]={{MC_PLANKS,4,MC_WOOD,1,0,0,0},{MC_STICK,4,MC_PLANKS,2,0,0,0},{MC_TABLE,1,MC_PLANKS,4,0,0,0},{MC_WOOD_PICK,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_STONE_PICK,1,MC_COBBLE,3,MC_STICK,2,MC_TABLE},{MC_FURNACE,1,MC_COBBLE,8,0,0,MC_TABLE},{MC_COAL,1,MC_WOOD,1,MC_PLANKS,1,MC_FURNACE},{MC_TORCH,4,MC_COAL,1,MC_STICK,1,0},{MC_IRON,1,MC_IRON_ORE,1,MC_COAL,1,MC_FURNACE},{MC_IRON_PICK,1,MC_IRON,3,MC_STICK,2,MC_TABLE},{MC_GLASS,4,MC_SAND,4,MC_COAL,1,MC_FURNACE},{MC_BRICK,4,MC_COBBLE,4,MC_COAL,1,MC_FURNACE},{MC_AXE,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_SHOVEL,1,MC_PLANKS,1,MC_STICK,2,MC_TABLE},{MC_SWORD,1,MC_PLANKS,2,MC_STICK,1,MC_TABLE},{MC_CHEST,1,MC_PLANKS,8,0,0,MC_TABLE},{MC_BED,1,MC_PLANKS,3,MC_SAPLING,3,MC_TABLE},{MC_DOOR,1,MC_PLANKS,6,0,0,MC_TABLE},{MC_SLAB,6,MC_COBBLE,3,0,0,MC_TABLE},{MC_FENCE,3,MC_PLANKS,4,MC_STICK,2,MC_TABLE},{MC_STAIR,4,MC_COBBLE,6,0,0,MC_TABLE},{MC_DUST,4,MC_COAL,1,MC_IRON,1,MC_TABLE},{MC_LAMP,1,MC_DUST,4,MC_GLASS,4,MC_TABLE},{MC_LEVER,1,MC_STICK,1,MC_COBBLE,1,MC_TABLE},{MC_BUTTON,1,MC_PLANKS,1,0,0,MC_TABLE}};
+static const char*cost[]={"1 LOG - 4 PLANKS","2 PLANKS - 4 STICKS","4 PLANKS","3 PLANKS 2 STICKS","3 COBBLE 2 STICKS","8 COBBLE","1 LOG 1 PLANK","1 COAL 1 STICK","1 ORE 1 COAL","3 IRON 2 STICKS","4 SAND 1 COAL","4 COBBLE 1 COAL","3 PLANKS 2 STICKS","1 PLANK 2 STICKS","2 PLANKS 1 STICK","8 PLANKS","3 PLANKS 3 SAPLINGS","6 PLANKS","3 COBBLE - 6 STONE SLABS","4 PLANKS 2 STICKS - 3 FENCES","6 COBBLE - 4 STONE STAIRS","1 COAL 1 IRON - 4 DUST","4 DUST 4 GLASS","1 STICK 1 COBBLE","1 PLANK"};
 unsigned MC_RecipeCount(void){return sizeof(recipes)/sizeof(recipes[0]);}const char*MC_RecipeName(unsigned r){return r<MC_RecipeCount()?MC_ItemName(recipes[r].out):"";}const char*MC_RecipeCost(unsigned r){return r<MC_RecipeCount()?cost[r]:"";}
 unsigned MC_RecipeResult(unsigned r){return r<MC_RecipeCount()?recipes[r].out:0;}
 unsigned MC_RecipeIngredient(unsigned r,unsigned p){if(r>=MC_RecipeCount()||p>1)return 0;return p?recipes[r].b:recipes[r].a;}
@@ -203,6 +258,8 @@ int MC_Place(MC_World *w) {
   if(!MC_Pick(w,400,240,&hit))return 0;
   x=hit.x;y=hit.y;z=hit.z;nx=hit.nx;ny=hit.ny;nz=hit.nz;
   x+=nx;y+=ny;z+=nz;
+  if((b==MC_DUST||b==MC_LEVER||b==MC_BUTTON) &&
+     (ny<=0 || !MC_IsSolid(MC_Get(w,x,y-1,z)))) {w->notice="REDSTONE NEEDS SOLID FLOOR";return 0;}
   uint8_t placed=(uint8_t)b;
   if(b==MC_STAIR) {
     float dx=sinf(w->yaw),dz=cosf(w->yaw);
@@ -234,7 +291,9 @@ int MC_Place(MC_World *w) {
   if(fi>=0){w->furnaces[fi].x=x+1;w->furnaces[fi].y=y+1;w->furnaces[fi].z=z+1;}
   if(gi>=0)w->growers[gi]=(MC_Grower){x+1,y+1,z+1,0};
   if(!w->creative){MC_Stack *s=&w->slots[w->slot];if(!--s->count)memset(s,0,sizeof(*s));}
-  MC_SyncInventory(w);w->notice=MC_ItemName(b);return 1;
+  MC_SyncInventory(w);w->notice=MC_ItemName(b);
+  if(b==MC_DUST||b==MC_LAMP||b==MC_LEVER||b==MC_BUTTON)MC_RedstoneRefresh(w);
+  return 1;
 }
 void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   if(!(dt>0)||w->bag)return;
@@ -301,6 +360,10 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
     MC_SyncInventory(w);w->notice="WHEAT HARVESTED";return;
   }
   unsigned drop=h.block==MC_GRASS||h.block==MC_FARMLAND?MC_DIRT:h.block==MC_STONE?MC_COBBLE:h.block==MC_COAL_ORE?MC_COAL:h.block;
+  if(h.block==MC_DUST_ON||h.block==MC_DUST)drop=MC_DUST;
+  if(h.block==MC_LAMP_ON||h.block==MC_LAMP)drop=MC_LAMP;
+  if(h.block==MC_LEVER_ON||h.block==MC_LEVER)drop=MC_LEVER;
+  if(h.block==MC_BUTTON_ON||h.block==MC_BUTTON)drop=MC_BUTTON;
   if(h.block>=MC_STAIR && h.block<=MC_STAIR_WEST)drop=MC_STAIR;
   if(h.block==MC_DOOR_OPEN)drop=MC_DOOR;
   if(h.block==MC_SLAB_TOP)drop=MC_SLAB;
@@ -320,6 +383,7 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   if(fi>=0)memset(&w->furnaces[fi],0,sizeof(MC_Furnace));
   for(unsigned i=0;i<MC_GROWERS;i++)if(w->growers[i].x==h.x+1 && w->growers[i].y==h.y+1 && w->growers[i].z==h.z+1)memset(&w->growers[i],0,sizeof(MC_Grower));
   if(w->spawn[0]==h.x+1 && w->spawn[1]==h.y+1 && w->spawn[2]==h.z+1)memset(w->spawn,0,sizeof(w->spawn));
+  if(redstone_kind(h.block))MC_RedstoneRefresh(w);
   w->notice=harvest?(drop?MC_ItemName(drop):"LEAVES CLEARED"):"NEEDS BETTER PICK  NO DROP";
   if(!w->creative && ti>=0) {
     MC_Stack *t=&w->slots[w->slot];
@@ -354,6 +418,18 @@ static void falling_sand(MC_World *w,float dt)
 void MC_SystemsTick(MC_World *w,float dt) {
   if(!(dt>0))return;
   dt=fminf(dt,.1f);
+  int redstone_dirty=0;
+  for(unsigned i=0;i<MC_REDSTONE_BUTTONS;i++) if(w->redstone_button_timer[i]>0) {
+    w->redstone_button_timer[i]-=dt;
+    if(w->redstone_button_timer[i]<=0) {
+      int x=(int)w->redstone_button_pos[i][0]-1,y=(int)w->redstone_button_pos[i][1]-1,z=(int)w->redstone_button_pos[i][2]-1;
+      if(MC_Get(w,x,y,z)==MC_BUTTON_ON)MC_Set(w,x,y,z,MC_BUTTON);
+      memset(w->redstone_button_pos[i],0,sizeof(w->redstone_button_pos[i]));w->redstone_button_timer[i]=0;redstone_dirty=1;
+    }
+  }
+  w->redstone_clock+=dt;
+  if(w->redstone_clock>=.25f){w->redstone_clock=fmodf(w->redstone_clock,.25f);redstone_dirty=1;}
+  if(redstone_dirty)MC_RedstoneRefresh(w);
   falling_sand(w,dt);
   for(unsigned i=0;i<MC_DROPS;i++) {
     MC_Drop *d=&w->drops[i];if(!d->count)continue;
@@ -432,6 +508,14 @@ void MC_SystemsTick(MC_World *w,float dt) {
 int MC_OpenTarget(MC_World *w) {
   int x,y,z,nx,ny,nz;if(!MC_Raycast(w,&x,&y,&z,&nx,&ny,&nz,4))return 0;
   uint8_t b=MC_Get(w,x,y,z);w->moving_slot=255;
+  if(b==MC_LEVER || b==MC_LEVER_ON) {
+    MC_Set(w,x,y,z,b==MC_LEVER?MC_LEVER_ON:MC_LEVER);MC_RedstoneRefresh(w);
+    w->notice=b==MC_LEVER?"LEVER ON":"LEVER OFF";w->target_valid=0;w->mining=0;return 1;
+  }
+  if(b==MC_BUTTON || b==MC_BUTTON_ON) {
+    redstone_button_press(w,x,y,z);MC_RedstoneRefresh(w);
+    w->notice="BUTTON PULSE";w->target_valid=0;w->mining=0;return 1;
+  }
   if(b==MC_DOOR || b==MC_DOOR_OPEN) {
     if(b==MC_DOOR_OPEN) {
       MC_Set(w,x,y,z,MC_DOOR);
