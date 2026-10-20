@@ -161,7 +161,7 @@ void MC_Hurt(MC_World *w,unsigned damage)
 {
   if(w->creative||w->hurt_timer>0||!damage)return;
   w->hurt_timer=1;
-  if(damage>=w->health){MC_Respawn(w);w->health=20;w->air=10;w->notice="RESPAWNED  INVENTORY KEPT";}
+  if(damage>=w->health){MC_Respawn(w);w->health=20;w->air=10;w->hunger=20;w->hunger_clock=w->starvation_clock=0;w->notice="RESPAWNED  INVENTORY KEPT";}
   else w->health=(uint8_t)(w->health-damage);
 }
 

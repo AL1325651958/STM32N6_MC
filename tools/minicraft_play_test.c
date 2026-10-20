@@ -100,7 +100,10 @@ int main(void) {
  /* Bed night skip, safe respawn and survival food/oxygen/death. */
  scene(&w);MC_Set(&w,10,3,13,MC_BED);w.pitch=-.15f;w.time=435;assert(MC_Use(&w)&&w.time==90&&w.spawn[2]==14);w.time=150;assert(MC_Use(&w)&&w.time==150);
  MC_Respawn(&w);assert(w.x>9&&w.x<15&&w.z>10&&w.z<16);
- scene(&w);assert(MC_Give(&w,MC_APPLE,2));w.health=12;assert(MC_Use(&w)&&w.health==17&&w.items[MC_APPLE]==1);
+ scene(&w);assert(MC_Give(&w,MC_APPLE,3));w.health=12;w.hunger=8;
+ assert(MC_Use(&w)&&w.health==17&&w.hunger==14&&w.items[MC_APPLE]==2);
+ w.health=20;assert(MC_Use(&w)&&w.health==20&&w.hunger==20&&w.items[MC_APPLE]==1);
+ w.hunger=1;for(int i=0;i<320;i++)MC_PlayTick(&w,.1f,0,400,240);assert(w.hunger==0&&w.health<20);
  MC_Set(&w,10,3,10,MC_WATER);for(int i=0;i<140;i++)MC_PlayTick(&w,.1f,0,400,240);assert(w.health<17);
  MC_Set(&w,10,3,10,MC_AIR);MC_PlayTick(&w,.1f,0,400,240);assert(w.air==10);w.health=2;w.fall_speed=18;w.hurt_timer=0;MC_PlayTick(&w,.1f,0,400,240);assert(w.health==20&&w.items[MC_APPLE]==1);
  /* Touch layout: all 18 recipes reachable, real slot moves, split and mode. */

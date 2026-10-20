@@ -46,8 +46,8 @@ typedef struct {
   float x, y, z, yaw, pitch, vy;
   uint8_t on_ground, sneak; /* sneak is a transient held input, never serialized */
   uint16_t items[MC_ITEM_COUNT], durability[MC_TOOLS];
-  uint8_t hotbar[MC_HOTBAR], creative_bar[MC_HOTBAR], slot, creative, health, air, equipped;
-  float time, fall_speed, breath, hurt_timer;
+  uint8_t hotbar[MC_HOTBAR], creative_bar[MC_HOTBAR], slot, creative, health, air, equipped, hunger;
+  float time, fall_speed, breath, hurt_timer, hunger_clock, starvation_clock;
   MC_Hit target;
   float mining;
   MC_Stack slots[MC_SLOTS];

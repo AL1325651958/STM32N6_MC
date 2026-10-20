@@ -228,8 +228,13 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     panel(fb,240,393,400,25);text(fb,249,399,MC_ItemName(w->hotbar[w->slot]),0xffff);
     if(w->mining>0){rect(fb,300,274,200,8,0x2104);rect(fb,302,276,(int)(196*fminf(1,w->mining)),4,0xffe0);}
     for(unsigned i=0;i<10;i++){int x=246+(int)i*22;rect(fb,x,369,16,12,i*2<w->health?0xe924:0x4208);if(i*2+1>=w->health)rect(fb,x+8,369,8,12,0x4208);}
-    if(w->air<10){snprintf(info,sizeof(info),"AIR %u",w->air);text(fb,490,369,info,0x7fff);}
-    if(!w->creative&&w->slots[w->slot].wear){snprintf(info,sizeof(info),"TOOL %u",w->slots[w->slot].wear);text(fb,490,347,info,0xffff);}
+    small(fb,492,347,"FOOD",0xffc0);
+    for(unsigned i=0;i<10;i++) {
+      int x=522+(int)i*17;rect(fb,x,369,13,12,i*2<w->hunger?0xfaa0:0x4208);
+      if(i*2+1>=w->hunger)rect(fb,x+7,369,6,12,0x4208);
+    }
+    if(w->air<10){snprintf(info,sizeof(info),"AIR %u",w->air);text(fb,490,325,info,0x7fff);}
+    if(!w->creative&&w->slots[w->slot].wear){snprintf(info,sizeof(info),"TOOL %u",w->slots[w->slot].wear);text(fb,550,347,info,0xffff);}
     if(w->hurt_timer>0){rect(fb,0,0,800,4,0xf800);rect(fb,0,476,800,4,0xf800);}
     if(w->mob_target<MC_MOBS && w->mobs[w->mob_target].health){
       rect(fb,330,252,140,14,0x2104);rect(fb,332,254,136*w->mobs[w->mob_target].health/MC_MOB_HEALTH,10,0xe924);

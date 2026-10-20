@@ -33,7 +33,7 @@ static unsigned output(unsigned id){return id==MC_IRON_ORE?MC_IRON:id==MC_SAND?M
 void MC_SaveEncode(const MC_World*w,uint32_t generation,uint8_t*p){
   memset(p,0,MC_SAVE_HEADER);memcpy(p,"N6MC",4);put32(p+4,4);put32(p+8,MC_MAP_X);put32(p+12,MC_MAP_Y);put32(p+16,MC_MAP_Z);put32(p+20,generation);put32(p+24,w->seed);
   putfloat(p+28,w->x);putfloat(p+32,w->y);putfloat(p+36,w->z);putfloat(p+40,w->yaw);putfloat(p+44,w->pitch);memcpy(p+MC_SAVE_HEADER,w->blocks,MC_MAP_BYTES);
-  uint8_t*m=p+MC_SAVE_V1_SIZE;memset(m,0,MC_SAVE_META);m[0]=1;m[1]=w->creative;m[2]=w->slot;m[3]=w->health;m[4]=w->air;m[5]=w->equipped;
+  uint8_t*m=p+MC_SAVE_V1_SIZE;memset(m,0,MC_SAVE_META);m[0]=1;m[1]=w->creative;m[2]=w->slot;m[3]=w->health;m[4]=w->air;m[5]=w->equipped;m[6]=w->hunger;m[7]=1;
   putfloat(m+8,w->time);putfloat(m+12,w->fall_speed);
   for(unsigned i=0;i<3;i++)put16(m+16+i*2,w->spawn[i]);
   for(unsigned i=0;i<25;i++)put16(m+24+i*2,w->reserve[i]);
@@ -102,6 +102,7 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
         if(get16(q))for(unsigned j=0;j<i;j++)if(!memcmp(q,m+M_GROWERS+j*10,6))return 0;
       }
       if(v==4) {
+        if(m[7]>1 || (m[7] && m[6]>20))return 0;
         for(unsigned i=0;i<MC_MOBS;i++) {
           const uint8_t*q=m+M_MOBS+i*32;float x=getfloat(q),y=getfloat(q+4),z=getfloat(q+8),vy=getfloat(q+12);
           if(q[24]>MC_MOB_HEALTH||q[25]>1||q[26]>1||!range(getfloat(q+16),0,1.5f)||!range(getfloat(q+20),0,1)||!range(getfloat(q+28),-3.15f,3.15f)||
@@ -141,7 +142,7 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
     }
     w->equipped=m[62];w->notice="V2 MIGRATED  EXTRA ITEMS IN RESERVE";
   }else if(v>=3){
-    w->creative=m[1];w->slot=m[2];w->health=m[3];w->air=m[4];w->equipped=m[5];w->time=getfloat(m+8);w->fall_speed=getfloat(m+12);
+      w->creative=m[1];w->slot=m[2];w->health=m[3];w->air=m[4];w->equipped=m[5];w->hunger=v==4&&m[7]==1?m[6]:20;w->time=getfloat(m+8);w->fall_speed=getfloat(m+12);
     for(unsigned i=0;i<3;i++)w->spawn[i]=get16(m+16+i*2);
     for(unsigned i=0;i<25;i++)w->reserve[i]=get16(m+24+i*2);
     for(unsigned i=0;i<3;i++)w->reserve_wear[i]=get16(m+74+i*2);

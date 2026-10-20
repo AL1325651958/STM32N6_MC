@@ -82,7 +82,9 @@ int MC_MoveStack(MC_Stack *a,MC_Stack *b,int split) {
   return 1;
 }
 void MC_SetMode(MC_World *w,int creative) {
-  w->creative=(uint8_t)!!creative;MC_SyncInventory(w);w->moving_slot=255;
+  w->creative=(uint8_t)!!creative;
+  if(w->creative){w->hunger=20;w->hunger_clock=w->starvation_clock=0;}
+  MC_SyncInventory(w);w->moving_slot=255;
 }
 void MC_CloseBag(MC_World *w) {
   w->bag=0;w->open_chest=w->open_furnace=255;w->moving_slot=255;
@@ -96,7 +98,8 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   memset(w->reserve_wear,0,sizeof(w->reserve_wear));
   const uint8_t bar[8]={MC_WOOD,MC_DIRT,MC_COBBLE,MC_PLANKS,MC_TABLE,MC_TORCH,MC_GLASS,MC_APPLE};
   memcpy(w->creative_bar,bar,8);w->slot=0;w->creative=(uint8_t)legacy;
-  w->health=20;w->air=10;w->equipped=0;w->time=90;
+  w->health=20;w->air=10;w->hunger=20;w->equipped=0;w->time=90;
+  w->hunger_clock=w->starvation_clock=0;
   w->fall_speed=w->breath=w->hurt_timer=0;w->target_valid=0;w->mining=0;
   w->bag=w->recipe_page=w->change_world=w->bag_page=w->recipe_requires=w->split=0;
   w->selected_slot=0;w->open_chest=w->open_furnace=w->moving_slot=255;
@@ -165,9 +168,10 @@ static unsigned smelt(unsigned item){return item==MC_IRON_ORE?MC_IRON:item==MC_S
 int MC_Use(MC_World *w) {
   if(MC_OpenTarget(w))return 1;
   unsigned b=w->hotbar[w->slot];
-  if((b==MC_APPLE || b==MC_RAW_MEAT) && w->health<20 && (w->creative || w->items[b])) {
+  if((b==MC_APPLE || b==MC_RAW_MEAT) && (w->health<20 || w->hunger<20) && (w->creative || w->items[b])) {
     if(!w->creative){MC_Stack *s=&w->slots[w->slot];if(!--s->count)memset(s,0,sizeof(*s));}
-    MC_SyncInventory(w);w->health=(uint8_t)fminf(20,w->health+(b==MC_APPLE?5:4));w->notice=b==MC_APPLE?"ATE APPLE":"ATE RAW MEAT";return 1;
+    MC_SyncInventory(w);w->health=(uint8_t)fminf(20,w->health+(b==MC_APPLE?5:4));
+    w->hunger=(uint8_t)fminf(20,w->hunger+(b==MC_APPLE?6:5));w->notice=b==MC_APPLE?"ATE APPLE":"ATE RAW MEAT";return 1;
   }
   if(b==MC_SHOVEL) {
     MC_Hit h;if(MC_Pick(w,400,240,&h) && (h.block==MC_GRASS||h.block==MC_DIRT) && MC_Get(w,h.x,h.y+1,h.z)==MC_AIR) {
@@ -235,6 +239,21 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   if(!(dt>0)||w->bag)return;
   dt=fminf(dt,.1f);w->time=fmodf(w->time+dt,600);
   w->hurt_timer=fmaxf(0,w->hurt_timer-dt);
+  if(!w->creative) {
+    w->hunger_clock+=dt;
+    while(w->hunger_clock>=30) {
+      w->hunger_clock-=30;
+      if(w->hunger)w->hunger--;
+    }
+    if(w->hunger)w->starvation_clock=0;
+    else {
+      w->starvation_clock+=dt;
+      while(w->starvation_clock>=2) {
+        w->starvation_clock-=2;
+        MC_Hurt(w,1);
+      }
+    }
+  }
   if(MC_Get(w,(int)w->x,(int)(w->y+1.62f),(int)w->z)==MC_WATER) {
     w->fall_speed=0;w->breath+=dt;
     if(w->breath>=1){w->breath-=1;if(w->air)w->air--;else MC_Hurt(w,2);}

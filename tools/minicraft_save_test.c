@@ -20,7 +20,7 @@ int main(int argc,char **argv) {
  uint8_t *save=calloc(1,MC_SAVE_SIZE),*copy=malloc(MC_SAVE_SIZE);assert(a.blocks&&b.blocks&&save&&copy);
  MC_Generate(&a,77);a.x=12.5f;a.y=22;a.z=19.5f;a.yaw=2.1f;a.pitch=-.4f;
  assert(MC_Give(&a,MC_IRON,99));assert(MC_Give(&a,MC_STONE_PICK,1));a.slots[2].wear=71;a.equipped=MC_STONE_PICK;
- a.slot=3;a.health=13;a.air=7;a.time=599.75f;a.reserve[MC_WOOD]=999;
+ a.slot=3;a.health=13;a.air=7;a.hunger=7;a.time=599.75f;a.reserve[MC_WOOD]=999;
  a.reserve[MC_WOOD_PICK]=2;a.reserve_wear[0]=17;
  MC_Set(&a,30,40,30,MC_CHEST);a.chest_map[0][0]=31;a.chest_map[0][1]=41;a.chest_map[0][2]=31;
  a.chest_blocks[0][2]=(MC_Stack){MC_AXE,1,17};a.chest_blocks[0][23]=(MC_Stack){MC_PLANKS,64,0};
@@ -31,12 +31,17 @@ int main(int argc,char **argv) {
  MC_Set(&a,40,40,30,MC_DOOR);MC_Set(&a,41,40,30,MC_DOOR_OPEN);
  roundtrip(&a,&b,save);assert(b.seed==a.seed&&b.x==a.x&&!memcmp(a.blocks,b.blocks,MC_MAP_BYTES));
  assert(MC_Get(&b,40,40,30)==MC_DOOR&&MC_Get(&b,41,40,30)==MC_DOOR_OPEN);
- assert(b.items[MC_IRON]==99&&b.equipped==MC_STONE_PICK&&b.slots[2].wear==71&&b.slot==3&&b.health==13&&b.air==7&&b.time==a.time);
+ assert(b.items[MC_IRON]==99&&b.equipped==MC_STONE_PICK&&b.slots[2].wear==71&&b.slot==3&&b.health==13&&b.air==7&&b.hunger==7&&b.time==a.time);
  assert(!memcmp(a.slots,b.slots,sizeof(a.slots))&&!memcmp(a.chest_blocks,b.chest_blocks,sizeof(a.chest_blocks)));
  assert(!memcmp(a.chest_map,b.chest_map,sizeof(a.chest_map))&&!memcmp(a.spawn,b.spawn,sizeof(a.spawn))&&b.reserve[MC_WOOD]==999);
  assert(b.reserve[MC_WOOD_PICK]==2&&b.reserve_wear[0]==17);
  assert(b.furnaces[0].progress==2.5f&&b.furnaces[0].burn==21.5f&&b.growers[0].age==78.5f);
  assert(MC_Get(&b,50,40,30)==MC_FARMLAND&&MC_Get(&b,50,41,30)==MC_WHEAT_CROP&&b.growers[1].age==32.5f);
+ /* Old v4 metadata has no hunger marker and therefore loads with full hunger. */
+ memcpy(copy,save,MC_SAVE_SIZE);uint8_t *meta=save+MC_SAVE_V1_SIZE;meta[6]=0;meta[7]=0;crc(save,MC_SAVE_META);
+ assert(MC_SaveValidate(save,MC_SAVE_SIZE)==4);assert(MC_SaveDecode(&b,save,MC_SAVE_SIZE)&&b.hunger==20);
+ memcpy(save,copy,MC_SAVE_SIZE);meta=save+MC_SAVE_V1_SIZE;meta[6]=21;meta[7]=1;crc(save,MC_SAVE_META);assert(!MC_SaveValidate(save,MC_SAVE_SIZE));
+ memcpy(save,copy,MC_SAVE_SIZE);
  /* A v3 file has identical legacy metadata but no entities. */
  memcpy(copy,save,MC_SAVE_SIZE);put32(save+4,3);crc(save,MC_SAVE_V3_META);
  assert(MC_SaveDecode(&b,save,MC_SAVE_V3_SIZE));
