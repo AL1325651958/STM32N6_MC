@@ -50,14 +50,14 @@ int main(void)
   w.y=2.40f;assert(!MC_Pick(&w,400,240,&small)); /* Above the corrected 14/16 flame. */
   assert(MC_BodyClear(&w,10.5f,2.01f,13.5f)); /* Fire and stem remain passable. */
   w.y=1.88f;assert(MC_Pick(&w,400,240,&small));
-  assert(small.block==MC_TORCH&&small.nz==-1&&fabsf(small.distance-2.9375f)<.001f);
-  assert(!MC_Raycast(&w,&x,&y,&z,&nx,&ny,&nz,2.9f));
+  assert(small.block==MC_TORCH&&small.nz==-1&&fabsf(small.distance-2.875f)<.001f);
+  assert(!MC_Raycast(&w,&x,&y,&z,&nx,&ny,&nz,2.8f));
   MC_Set(&w,10,3,14,MC_STONE);w.x=10.3f;
   assert(MC_Pick(&w,400,240,&small)&&small.block==MC_STONE); /* Gap continues to background. */
   w.x=10.5f;w.z=13.5f; /* Inside shape: exit surface and normal. */
-  assert(MC_Pick(&w,400,240,&small)&&small.nz==1&&fabsf(small.distance-.0625f)<.001f);
+  assert(MC_Pick(&w,400,240,&small)&&small.nz==1&&fabsf(small.distance-.125f)<.001f);
   w.z=15;w.yaw=3.14159265f;MC_Set(&w,10,3,14,MC_AIR);
-  assert(MC_Pick(&w,400,240,&small)&&small.nz==1&&fabsf(small.distance-1.4375f)<.001f);
+  assert(MC_Pick(&w,400,240,&small)&&small.nz==1&&fabsf(small.distance-1.375f)<.001f);
   w.x=10.5f;w.z=13.5f;w.y=2.38f;w.pitch=-1.5707963f;
   assert(MC_Pick(&w,400,240,&small)&&small.ny==1&&fabsf(small.distance-.125f)<.001f);
   /* Starting within either part must exit the union, never its hidden seam. */
@@ -67,6 +67,8 @@ int main(void)
   assert(MC_Pick(&w,400,240,&small)&&small.ny==-1&&fabsf(small.distance-.75f)<.001f);
   w.x=10.45f;w.z=10.5f;w.y=3.65f-1.62f;w.pitch=0;w.yaw=0;
   assert(MC_Pick(&w,400,240,&small)&&small.block==MC_TORCH&&fabsf(small.distance-2.875f)<.001f);
+  /* The stem occupies the standard 4/16 square, including its near edge. */
+  w.x=10.38f;w.y=3.40f-1.62f;assert(MC_Pick(&w,400,240,&small)&&small.block==MC_TORCH);
   w.x=10.39f;w.y=3.8f-1.62f;assert(!MC_Pick(&w,400,240,&small)); /* Stepped flame narrows above its base. */
   w.x=10.5f;w.y=3.85f-1.62f;assert(MC_Pick(&w,400,240,&small)); /* The corrected cap reaches 14/16. */
   flat(&w);MC_Set(&w,10,3,13,MC_SAPLING);w.y=1.88f;

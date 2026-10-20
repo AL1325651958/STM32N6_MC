@@ -38,7 +38,8 @@ typedef struct { float lo[3], hi[3]; } MC_Part;
 
 /* Cell-local parts.  The same data drives bounds, picking and rendering. */
 static const MC_Part torch_parts[] = {
-  {{7/16.f, 0/16.f, 7/16.f}, {9/16.f, 10/16.f, 9/16.f}},
+  /* The vanilla ground torch stem is a 4/16 square, not a 2/16 stick. */
+  {{6/16.f, 0/16.f, 6/16.f}, {10/16.f, 10/16.f, 10/16.f}},
   /* The flame is fuller than the stem and tapers to the standard 14/16 top. */
   {{6/16.f, 9/16.f, 6/16.f}, {10/16.f, 12/16.f, 10/16.f}},
   {{13/32.f, 10/16.f, 13/32.f}, {19/32.f, 13/16.f, 19/32.f}},
