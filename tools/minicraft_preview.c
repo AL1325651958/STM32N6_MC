@@ -21,7 +21,8 @@ int main(int argc,char **argv)
     "crop_dry","crop_dark","crop_growing","crop_ready","action_eat","main_menu","create_world","slab_merge","cave_threat","cave_lit",
     "save_busy","save_ok","save_no_sd","save_locked","save_write_failed","save_verify_failed","creative_page1","creative_page2",
     "tool_interact","sneak_build","tool_chest_open","door_closed","door_open","lever_off","lever_on","slab_steps","delete_world","worlds_delete",
-    "arrow_door_closed","arrow_door_open","arrow_slab_gap","cave_cache","cave_cache_loot"};
+    "arrow_door_closed","arrow_door_open","arrow_slab_gap","cave_cache","cave_cache_loot",
+    "hud_meters","empty_hand","armor_storage","armor_equip"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -166,6 +167,30 @@ int main(int argc,char **argv)
       if(k==48) {
         w.z=cz+.5f;w.yaw=1.570796327f;w.pitch=-.8f;
         assert(MC_SceneTap(&w,400,240)&&w.bag&&w.open_chest==slot);
+      }
+      w.notice=NULL;
+    }
+    if(k>=49 && k<=52) {
+      MC_Generate(&w,0x20261020);
+      if(k==49) {
+        w.health=13;w.hunger=9;w.experience=MC_XpForLevel(5)+5;w.level=5;
+        MC_Give(&w,MC_STONE_PICK,1);w.slots[0].wear=3;MC_SyncInventory(&w);
+      }
+      if(k>=51) {
+        memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+        for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++)MC_Set(&w,x,1,z,MC_GRASS);
+        w.x=10.5f;w.y=2.01f;w.z=10.5f;w.yaw=0;w.pitch=-.35f;
+        for(unsigned a=0;a<MC_ARMOR_SLOTS;a++){MC_Give(&w,MC_IRON_HELMET+a,1);w.slots[a].wear=(uint16_t)(17+a*21);}
+        if(k==51) {
+          MC_Set(&w,10,2,13,MC_CHEST);w.chest_map[0][0]=11;w.chest_map[0][1]=3;w.chest_map[0][2]=14;
+          assert(MC_SceneTap(&w,400,240)&&w.bag&&w.open_chest==0);
+          MC_UIBagTap(&w,30,115);MC_UIBagTap(&w,435,115);
+          assert(w.chest_blocks[0][0].item==MC_IRON_HELMET&&!w.armor[0].count);
+          MC_UIBagTap(&w,80,115);
+        } else {
+          w.bag=1;MC_UIBagTap(&w,30,115);MC_UIBagTap(&w,440,410);
+          MC_UIBagTap(&w,80,115);assert(w.armor[0].count&&!w.armor[1].count);
+        }
       }
       w.notice=NULL;
     }

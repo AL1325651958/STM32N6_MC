@@ -26,11 +26,23 @@ static void rect(uint16_t *fb,int x,int y,int w,int h,uint16_t c)
 }
 static void stroke(uint16_t *fb,int x0,int y0,int x1,int y1,int width,uint16_t c)
 {
+  if(width<=0)return;
   int dx=x1-x0,dy=y1-y0,steps=abs(dx)>abs(dy)?abs(dx):abs(dy);
   if(!steps){rect(fb,x0-width/2,y0-width/2,width,width,c);return;}
-  for(int i=0;i<=steps;i++) {
-    int x=x0+(dx*i)/steps,y=y0+(dy*i)/steps;
-    rect(fb,x-width/2,y-width/2,width,width,c);
+  /* Center points are monotonic on both axes. Sweep their visible range
+     per row and paint the union once, retaining the exact square-brush edge. */
+  int first=(y0<y1?y0:y1)-width/2,last=(y0>y1?y0:y1)-width/2+width;
+  if(first<0)first=0;
+  if(last>480)last=480;
+  int begin=0,end=-1;
+  for(int row=first;row<last;row++) {
+    int low=row+width/2-width+1,high=row+width/2;
+    while(begin<=steps && y0+dy*(dy<0?steps-begin:begin)/steps<low)begin++;
+    while(end<steps && y0+dy*(dy<0?steps-end-1:end+1)/steps<=high)end++;
+    if(begin>end || begin>steps)continue;
+    int a=x0+dx*(dy<0?steps-begin:begin)/steps,b=x0+dx*(dy<0?steps-end:end)/steps;
+    if(a>b){int swap=a;a=b;b=swap;}
+    rect(fb,a-width/2,row,b-a+width,1,c);
   }
 }
 const char *MC_Localize(const char *s)
@@ -168,19 +180,22 @@ void MC_UIBagTap(MC_World *w,unsigned x,unsigned y)
     else if(x>=290 && x<404)w->change_world=1;
     return;
   }
-  /* The four bottom-right slots are armor slots in survival inventory.  A
-     direct tap equips an armor item from the bag or removes the worn piece. */
+  /* Inventory items are selected/moved uniformly. Existing equipment slots
+     equip a matching selected piece, or remove gear when no armor is selected. */
   if(!w->creative && w->open_chest>=MC_CHESTS && w->open_furnace>=MC_FURNACES &&
      x>=430 && x<782 && y>=390 && y<440) {
     unsigned a=(x-430)/88;
-    if(a<MC_ARMOR_SLOTS)MC_UnequipArmor(w,a);
+    if(a<MC_ARMOR_SLOTS) {
+      int selected_armor=MC_ArmorIndex(w->slots[w->selected_slot].item);
+      int changed=selected_armor>=0?(selected_armor==(int)a && MC_EquipArmor(w,w->selected_slot)):MC_UnequipArmor(w,a);
+      if(changed)w->moving_slot=255;
+    }
     return;
   }
   if(w->creative && x>=430 && x<782 && y>=390 && y<440) {w->slot=(uint8_t)((x-430)/44);return;}
   if(x>=24 && x<408 && y>=108 && y<380) {
     unsigned i=(x-24)/48+((y-108)/68)*8;
     if(w->creative)MC_SelectItem(w,catalog_item(w->bag_page*MC_SLOTS+i));
-    else if(MC_ArmorIndex(w->slots[i].item)>=0)MC_EquipArmor(w,i);
     else MC_TransferSlot(w,i,w->split);
     return;
   }
@@ -244,7 +259,7 @@ static unsigned catalog_item(unsigned index)
 static void held_item(uint16_t *fb,const MC_World *w)
 {
   unsigned id=w->hotbar[w->slot];
-  if(!id || id>=MC_ITEM_COUNT)return;
+  if(id>=MC_ITEM_COUNT)return;
   int swing=w->attack_flash>0?(int)(sinf((.18f-w->attack_flash)*18.0f)*18.0f):0;
   /* Handheld geometry follows the silhouette instead of scaling every icon
      to the same square.  This keeps torches and saplings slender while
@@ -444,6 +459,30 @@ static void stack(uint16_t *fb,int x,int y,int width,int height,const MC_Stack *
     }
   }
 }
+static void item_detail(uint16_t *fb,int x,int y,const MC_Stack *s,int infinite)
+{
+  if(!s->item || !s->count)return;
+  char detail[48];unsigned life=MC_ToolLife(s->item);if(!life)life=MC_ArmorLife(s->item);
+  if(infinite)snprintf(detail,sizeof(detail),"%s",MC_Localize("INF"));
+  else if(life)snprintf(detail,sizeof(detail),MC_Localize("DURABILITY %u/%u"),s->wear,life);
+  else snprintf(detail,sizeof(detail),MC_Localize("COUNT %u"),s->count);
+  small(fb,x,y,detail,0xffc0);
+}
+/* Seven rows at 2x give recognizable half-point meters, separate from XP. */
+static void survival_icon(uint16_t *fb,int x,int y,unsigned value,int food)
+{
+  static const uint8_t outline[2][7]={{0x66,0xff,0xff,0xff,0x7e,0x3c,0x18},{0x3c,0x7e,0xff,0xff,0xff,0x7e,0x3c}};
+  static const uint8_t fill[2][7]={{0,0x66,0x7e,0x7e,0x3c,0x18,0},{0,0x3c,0x7e,0x7e,0x7e,0x3c,0}};
+  for(int row=0;row<7;row++)for(int col=0;col<8;col++)if(outline[food][row]&(0x80u>>col)) {
+    uint16_t color=0x2104;
+    if(fill[food][row]&(0x80u>>col)) {
+      int full=value>=2 || (value==1 && col<4);
+      color=full?(food?0xfaa0:0xe924):0x4208;
+      if(full && row==2 && col==2)color=food?0xffcb:0xfbae;
+    }
+    rect(fb,x+col*2,y+row*2,2,2,color);
+  }
+}
 void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,unsigned max_ms,const char *status,int touch_ready,float move,float strafe)
 {
   (void)selected;(void)status;(void)touch_ready;
@@ -501,15 +540,22 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
       }
     }
     unsigned id=w->creative?w->hotbar[w->slot]:w->slots[w->selected_slot].item;
-    text(fb,24,386,MC_ItemName(id),0xffff);
+    text(fb,24,386,id?MC_ItemName(id):"EMPTY SLOT",0xffff);
+    MC_Stack focus=w->creative?(MC_Stack){id,1,0}:w->slots[w->selected_slot];
+    item_detail(fb,250,388,&focus,w->creative);
     panel(fb,24,410,128,30);text(fb,72,418,w->creative?"CREATIVE":"SURVIVAL",0xffe0);
     panel(fb,160,410,120,30);text(fb,196,418,w->split?"HALF ON":"HALF OFF",0xffff);
     panel(fb,290,410,114,30);text(fb,331,418,"MENU",0xffff);
     if(w->creative)for(unsigned i=0;i<8;i++){MC_Stack s={w->hotbar[i],1,0};stack(fb,430+i*44,390,44,50,&s,i==w->slot,1);}
     else if(w->open_chest>=MC_CHESTS&&w->open_furnace>=MC_FURNACES) {
 
-      for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)stack(fb,430+(int)i*88,394,82,46,&w->armor[i],0,0);
+      for(unsigned i=0;i<MC_ARMOR_SLOTS;i++) {
+        int x=430+(int)i*88;int compatible=MC_ArmorIndex(w->slots[w->selected_slot].item)==(int)i;
+        stack(fb,x,394,82,46,&w->armor[i],compatible,0);
+        if(!w->armor[i].count)small(fb,x+10,415,MC_ItemName(MC_IRON_HELMET+i),0x94b2);
+      }
       char armor[24];snprintf(armor,sizeof(armor),MC_Localize("ARMOR %u PTS"),MC_ArmorPoints(w));small(fb,430,380,armor,0xffc0);
+      small(fb,558,380,"SELECT THEN EQUIP",0x94b2);
     }
   } else {
     mini_map(fb,w);
@@ -529,26 +575,24 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     panel(fb,690,360,100,62);text(fb,724,384,"JUMP",0xffff);
     for(unsigned i=0;i<MC_HOTBAR;i++){MC_Stack s=w->creative?(MC_Stack){w->hotbar[i],1,0}:w->slots[i];stack(fb,240+i*50,424,50,56,&s,i==w->slot,w->creative);}
     panel(fb,640,393,44,56);icon(fb,642,397,w->hotbar[w->slot],40);
-    panel(fb,240,393,400,25);text(fb,249,399,MC_ItemName(w->hotbar[w->slot]),0xffff);
+    panel(fb,240,393,400,25);text(fb,249,399,held?MC_ItemName(held):"EMPTY HAND",0xffff);
+    MC_Stack focus=w->creative?(MC_Stack){held,1,0}:w->slots[w->slot];
+    item_detail(fb,520,400,&focus,w->creative);
     /* Compact XP bar fits between the survival meters and the item label. */
     {
       unsigned next=MC_XpToNext(w),progress=MC_XpProgress(w);
       char xp[24];snprintf(xp,sizeof(xp),MC_Localize("LVL %u"),(unsigned)MC_XpLevel(w));
-      small(fb,240,378,xp,w->level_flash>0?0xffe0:0xffc0);
-      rect(fb,282,378,350,6,0x2104);
-      if(next)rect(fb,283,379,(int)(348u*(progress>next?next:progress)/next),4,w->level_flash>0?0xffe0:0x07e0);
-      if(w->level_flash>0)small(fb,500,378,"LEVEL UP",0xffe0);
+      small(fb,240,380,xp,w->level_flash>0?0xffe0:0xffc0);
+      rect(fb,282,382,350,6,0x2104);
+      if(next)rect(fb,283,383,(int)(348u*(progress>next?next:progress)/next),4,w->level_flash>0?0xffe0:0x07e0);
+      if(w->level_flash>0)small(fb,500,380,"LEVEL UP",0xffe0);
     }
     if(w->mining>0){rect(fb,300,274,200,8,0x2104);rect(fb,302,276,(int)(196*fminf(1,w->mining)),4,0xffe0);}
     crop_hint(fb,w);
-    for(unsigned i=0;i<10;i++){int x=246+(int)i*22;rect(fb,x,369,16,12,i*2<w->health?0xe924:0x4208);if(i*2+1>=w->health)rect(fb,x+8,369,8,12,0x4208);}
-    small(fb,492,347,"FOOD",0xffc0);
-    for(unsigned i=0;i<10;i++) {
-      int x=522+(int)i*17;rect(fb,x,369,13,12,i*2<w->hunger?0xfaa0:0x4208);
-      if(i*2+1>=w->hunger)rect(fb,x+7,369,6,12,0x4208);
-    }
+    for(unsigned i=0;i<10;i++)survival_icon(fb,246+(int)i*22,359,w->health>i*2?w->health-i*2:0,0);
+    small(fb,486,361,"FOOD",0xffc0);
+    for(unsigned i=0;i<10;i++)survival_icon(fb,522+(int)i*17,359,w->hunger>i*2?w->hunger-i*2:0,1);
     if(w->air<10){snprintf(info,sizeof(info),MC_Localize("AIR %u"),w->air);text(fb,490,325,info,0x7fff);}
-    if(!w->creative&&w->slots[w->slot].wear){snprintf(info,sizeof(info),MC_Localize("TOOL %u"),w->slots[w->slot].wear);text(fb,550,347,info,0xffff);}
     if(w->hurt_timer>0){rect(fb,0,0,800,4,0xf800);rect(fb,0,476,800,4,0xf800);}
     if(w->mob_target<MC_MOBS && w->mobs[w->mob_target].health){
       rect(fb,330,252,140,14,0x2104);rect(fb,332,254,136*w->mobs[w->mob_target].health/MC_MOB_HEALTH,10,0xe924);

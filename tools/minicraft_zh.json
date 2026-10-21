@@ -287,5 +287,10 @@
   "NO SD  CANNOT DELETE": "无存储卡 无法删除",
   "WORLD DELETED": "世界已删除",
   "DELETE FAILED  SAVE MAY REMAIN": "删除未完成 请重试",
-  "CHECK WORLD NUMBER BEFORE DELETING": "请先核对世界编号"
+  "CHECK WORLD NUMBER BEFORE DELETING": "请先核对世界编号",
+  "EMPTY HAND": "空手",
+  "EMPTY SLOT": "空槽",
+  "COUNT %u": "数量 %u",
+  "DURABILITY %u/%u": "耐久 %u/%u",
+  "SELECT THEN EQUIP": "选中后点护甲格"
 }

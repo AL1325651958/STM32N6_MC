@@ -315,11 +315,12 @@ int main(void) {
  /* Iron armor is non-stackable, equips from the bag, reduces damage, and
     returns to an empty bag slot when removed. */
  scene(&w);assert(MC_Give(&w,MC_IRON_HELMET,2));assert(w.slots[0].count==1&&w.slots[1].count==1);
- w.bag=1;MC_UIBagTap(&w,30,115);assert(w.armor[0].item==MC_IRON_HELMET&&!w.slots[0].count);
+ w.bag=1;MC_UIBagTap(&w,30,115);assert(!w.armor[0].count&&w.selected_slot==0);
+ MC_UIBagTap(&w,440,410);assert(w.armor[0].item==MC_IRON_HELMET&&!w.slots[0].count&&w.moving_slot==255);
  w.health=20;w.hurt_timer=0;unsigned before=w.armor[0].wear;MC_Hurt(&w,10);
  assert(w.health==11&&w.armor[0].wear==before-1);
  MC_UIBagTap(&w,430,400);assert(!w.armor[0].count&&w.slots[w.selected_slot].item==MC_IRON_HELMET);
- scene(&w);assert(MC_Give(&w,MC_IRON_CHESTPLATE,1));w.bag=1;MC_UIBagTap(&w,30,115);
+ scene(&w);assert(MC_Give(&w,MC_IRON_CHESTPLATE,1));w.bag=1;MC_UIBagTap(&w,30,115);MC_UIBagTap(&w,528,410);
  assert(w.armor[1].item==MC_IRON_CHESTPLATE);w.armor[1].wear=1;w.health=20;w.hurt_timer=0;MC_Hurt(&w,2);
  assert(!w.armor[1].count&&strstr(w.notice,"ARMOR BROKE"));
  /* Touch layout: all 31 recipes reachable, real slot moves, split and mode. */
