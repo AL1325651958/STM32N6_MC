@@ -395,6 +395,7 @@ static void mini_map(uint16_t *fb,const MC_World *w)
   }
   for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++) {
     uint16_t c=cache.colors[(dz+radius)*29+dx+radius];
+    if(!MC_IsExplored(w,px+dx,pz+dz))c=(uint16_t)(((c&0xf7de)>>1)|0x1082);
     rect(fb,cx+dx*cell-1,cy+dz*cell-1,cell,cell,c);
   }
   /* Bed spawn and chest locations are persistent landmarks. */

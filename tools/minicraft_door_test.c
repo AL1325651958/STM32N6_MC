@@ -32,7 +32,7 @@ static int segment(MC_World *w,unsigned facing,float x,float z,float ex,float ez
 static int clear(MC_World *w,unsigned facing,float x,float z)
 {float px,pz;point(facing,x,z,&px,&pz);return MC_BodyClear(w,px,2.01f,pz);}
 static void put32(uint8_t *p,uint32_t n){for(unsigned i=0;i<4;i++)p[i]=(uint8_t)(n>>(i*8));}
-static void version(uint8_t *p,unsigned v){put32(p+4,v);put32(p+60,MC_Crc32(p,60));}
+static void legacy_version(uint8_t *p,unsigned v){put32(p+4,v);put32(p+48,MC_Crc32(p+MC_SAVE_V1_SIZE,MC_SAVE_META));put32(p+52,MC_SAVE_META);put32(p+60,MC_Crc32(p,60));}
 static void roundtrip(MC_World *w,MC_World *loaded,uint8_t *save)
 {MC_SaveEncode(w,12,save);assert(save[4]==MC_SAVE_VERSION&&MC_SaveValidate(save,MC_SAVE_SIZE)==12);assert(MC_SaveDecode(loaded,save,MC_SAVE_SIZE));}
 int main(void)
@@ -110,8 +110,8 @@ int main(void)
       roundtrip(&w,&loaded,save);
       assert(MC_Get(&loaded,10,2,10)==MC_DoorState(facing,(int)open,0));
       assert(MC_Get(&loaded,10,3,10)==MC_DoorState(facing,(int)open,1));
-      if(facing){version(save,6);assert(!MC_SaveValidate(save,MC_SAVE_SIZE));}
-      else {version(save,6);assert(MC_SaveDecode(&loaded,save,MC_SAVE_SIZE));}
+      if(facing){legacy_version(save,6);assert(!MC_SaveValidate(save,MC_SAVE_V8_SIZE));}
+      else {legacy_version(save,6);assert(MC_SaveDecode(&loaded,save,MC_SAVE_V8_SIZE));}
       MC_Set(&w,10,2,10,MC_DoorState((facing+1)%4,(int)open,0));
       MC_SaveEncode(&w,12,save);assert(!MC_SaveValidate(save,MC_SAVE_SIZE));
       set_door(&w,facing,(int)open);MC_Set(&w,10,2,10,MC_AIR);

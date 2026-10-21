@@ -253,6 +253,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   memset(w->furnaces,0,sizeof(w->furnaces));memset(w->growers,0,sizeof(w->growers));
   memset(w->reserve,0,sizeof(w->reserve));memset(w->spawn,0,sizeof(w->spawn));memset(w->durability,0,sizeof(w->durability));
   memset(w->reserve_wear,0,sizeof(w->reserve_wear));
+  memset(w->explored,0,sizeof(w->explored));
   const uint8_t bar[8]={MC_WOOD,MC_DIRT,MC_COBBLE,MC_PLANKS,MC_TABLE,MC_TORCH,MC_GLASS,MC_BOW};
   memcpy(w->creative_bar,bar,8);w->slot=0;w->creative=(uint8_t)legacy;
   w->health=20;w->air=10;w->hunger=20;w->equipped=0;w->time=90;
@@ -272,6 +273,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   w->redstone_clock=0;memset(w->redstone_button_pos,0,sizeof(w->redstone_button_pos));memset(w->redstone_button_timer,0,sizeof(w->redstone_button_timer));
   memset(w->mob_fed,0,sizeof(w->mob_fed));memset(w->mob_fed_age,0,sizeof(w->mob_fed_age));w->breed_cooldown=0;
   MC_SyncInventory(w);
+  MC_UpdateExploration(w);
   MC_Notify(w,legacy?"OLD WORLD  CREATIVE MODE":"HOLD BLOCK TO MINE  BAG TO CRAFT");
 }
 void MC_SelectItem(MC_World *w,unsigned item) {
@@ -801,6 +803,7 @@ void MC_NotifySave(MC_World *w,unsigned result) {
 }
 void MC_SystemsTick(MC_World *w,float dt) {
   if(!(dt>0))return;
+  MC_UpdateExploration(w);
   /* UI feedback keeps wall-clock duration even while the inventory pauses
      gameplay or a long frame forces physics to clamp its time step. */
   if(w->notice_time>0) {

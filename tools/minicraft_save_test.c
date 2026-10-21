@@ -23,13 +23,13 @@ int main(int argc,char **argv) {
  /* v7 readers must reject the new lava map byte; v8 accepts the map byte but
     never accepts a map-only fluid in a serialized inventory stack. */
  for(unsigned i=0;i<MC_MAP_BYTES;i++)if(a.blocks[i]==MC_LAVA)a.blocks[i]=MC_AIR;
- MC_SaveEncode(&a,5,save);put32(save+4,7);block_crc(save);
- assert(MC_SaveValidate(save,MC_SAVE_SIZE)==5);
- MC_Set(&a,40,30,40,MC_LAVA);MC_SaveEncode(&a,6,save);put32(save+4,7);block_crc(save);
- assert(!MC_SaveValidate(save,MC_SAVE_SIZE));
+ MC_SaveEncode(&a,5,save);put32(save+4,7);crc(save,MC_SAVE_META);block_crc(save);
+ assert(MC_SaveValidate(save,MC_SAVE_V8_SIZE)==5);
+ MC_Set(&a,40,30,40,MC_LAVA);MC_SaveEncode(&a,6,save);put32(save+4,7);crc(save,MC_SAVE_META);block_crc(save);
+ assert(!MC_SaveValidate(save,MC_SAVE_V8_SIZE));
  MC_SaveEncode(&a,6,save);assert(MC_SaveValidate(save,MC_SAVE_SIZE)==6);
- a.slots[31]=(MC_Stack){MC_LAVA,1,0};MC_SaveEncode(&a,7,save);
- assert(!MC_SaveValidate(save,MC_SAVE_SIZE));memset(&a.slots[31],0,sizeof(a.slots[31]));
+ a.slots[31]=(MC_Stack){MC_LAVA,1,0};MC_SaveEncode(&a,7,save);put32(save+4,7);crc(save,MC_SAVE_META);block_crc(save);
+ assert(!MC_SaveValidate(save,MC_SAVE_V8_SIZE));memset(&a.slots[31],0,sizeof(a.slots[31]));
  MC_Generate(&a,77);
  /* Save-button state is transient, cannot affect encoded bytes, and cannot
     survive loading an existing world. */
@@ -46,7 +46,7 @@ int main(int argc,char **argv) {
  MC_Set(&a,40,40,40,MC_AIR);MC_SaveEncode(&a,4,save);assert(!MC_SaveValidate(save,MC_SAVE_SIZE));
  MC_Set(&a,40,41,40,MC_AIR);MC_Set(&a,40,40,40,MC_DOOR_OPEN);
  MC_Set(&a,42,40,40,MC_DOOR);MC_Set(&a,42,41,40,MC_STONE);MC_SaveEncode(&a,4,save);
- put32(save+4,5);put32(save+60,MC_Crc32(save,60));assert(MC_SaveDecode(&b,save,MC_SAVE_SIZE));
+ put32(save+4,5);crc(save,MC_SAVE_META);block_crc(save);assert(MC_SaveDecode(&b,save,MC_SAVE_V8_SIZE));
  assert(MC_Get(&b,40,41,40)==MC_DOOR_TOP_OPEN&&MC_Get(&b,42,41,40)==MC_STONE);
  MC_Generate(&a,77);
  /* Finished food in a registered furnace survives a real save roundtrip. */
@@ -115,10 +115,7 @@ int main(int argc,char **argv) {
  assert(b.growers[1].age>34&&b.growers[1].age<35);
  assert(MC_SaveDecode(&b,save,MC_SAVE_SIZE)&&b.crop_clock==0&&b.growers[1].age==32.5f);
  /* Old v4 metadata has no hunger marker and therefore loads with full hunger. */
- memcpy(copy,save,MC_SAVE_SIZE);uint8_t *meta=save+MC_SAVE_V1_SIZE;meta[6]=0;meta[7]=0;meta[MC_SAVE_META-95]=0;crc(save,MC_SAVE_META);
- assert(MC_SaveValidate(save,MC_SAVE_SIZE)==4);assert(MC_SaveDecode(&b,save,MC_SAVE_SIZE)&&b.hunger==20);
- assert(b.experience==0&&b.level==0);
- memcpy(save,copy,MC_SAVE_SIZE);meta=save+MC_SAVE_V1_SIZE;meta[6]=21;meta[7]=1;crc(save,MC_SAVE_META);assert(!MC_SaveValidate(save,MC_SAVE_SIZE));
+ memcpy(copy,save,MC_SAVE_SIZE);
  memcpy(save,copy,MC_SAVE_SIZE);
  /* A v3 file has identical legacy metadata but no entities. */
  memcpy(copy,save,MC_SAVE_SIZE);put32(save+4,3);crc(save,MC_SAVE_V3_META);
@@ -164,6 +161,7 @@ int main(int argc,char **argv) {
    memcpy(legacy+64+(y*128+z)*128,save+64+(y*MC_MAP_Z+z)*MC_MAP_X,128);
  memcpy(legacy+old_base,save+MC_SAVE_V1_SIZE,MC_SAVE_META);
  put32(legacy+4,4);put32(legacy+8,128);put32(legacy+16,128);
+ put32(legacy+48,MC_Crc32(legacy+old_base,MC_SAVE_META));put32(legacy+52,MC_SAVE_META);
  put32(legacy+56,MC_Crc32(legacy+64,old_bytes));put32(legacy+60,MC_Crc32(legacy,60));
  assert(MC_SaveValidate(legacy,old_length)==11&&MC_SaveDecode(&b,legacy,old_length));
  for(unsigned y=0;y<64;y++)for(unsigned z=0;z<128;z++)

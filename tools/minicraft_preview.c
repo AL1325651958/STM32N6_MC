@@ -300,7 +300,7 @@ int main(int argc,char **argv)
     fclose(f);
   }
   MC_Generate(&w,0x20261020);
-  MC_SaveEncode(&w,1,save);snprintf(path,sizeof(path),"%s/initial-world-v8.SAV",argv[1]);
+  MC_SaveEncode(&w,1,save);snprintf(path,sizeof(path),"%s/initial-world-v9.SAV",argv[1]);
   FILE *f=fopen(path,"wb");if(!f)return 1;
   if(fwrite(save,1,MC_SAVE_SIZE,f)!=MC_SAVE_SIZE)return 1;
   fclose(f);

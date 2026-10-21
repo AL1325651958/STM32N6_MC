@@ -17,7 +17,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/minicraft"
-GAME_VERSION = "v37"
+GAME_VERSION = "v38"
 ARCHIVE_ROOT = ROOT / f"out/verified-{GAME_VERSION}"
 
 
@@ -117,7 +117,7 @@ def main():
         "MiniCraft_N6-Trusted.bin": signed,
         "MiniCraft_N6.bin": raw,
         "MiniCraft_N6.elf": elf.read_bytes(),
-        "initial-world-v8.SAV": (preview_dir / "initial-world-v8.SAV").read_bytes(),
+        "initial-world-v9.SAV": (preview_dir / "initial-world-v9.SAV").read_bytes(),
         "tests.log": tests.encode("utf-8"),
         "build.log": (OUT / "snapshot-build.log").read_bytes() if not args.skip_build else (OUT / "compile.log").read_bytes() + (OUT / "link.log").read_bytes(),
         "geometry.png": (preview_dir / "geometry.png").read_bytes(),
@@ -153,9 +153,9 @@ def main():
     validation = {
         "recorded_utc": stamp,
         "game_version": GAME_VERSION,
-        "version": 8,
+        "version": 9,
         "world_dimensions": [256, 64, 256],
-        "save_bytes": 4195904,
+        "save_bytes": 4204096,
         "firmware_bytes": len(raw),
         "signed_firmware_bytes": len(signed),
         "signed_header_bytes": 1024,
@@ -173,7 +173,7 @@ def main():
         "source_hashes_verified": True,
         "geometry": "Torch stem 4/16 wide × 10/16 high; stepped flame widths 4/16, 3/16, 2/16 reaching 14/16 total height; chest 14/16; bed 9/16; sapling crossed planes.",
         "geometry_revision": 5,
-        "hardware": "Not flashed in this task. Four-facing two-cell doors, melee/block-part segment collision, bounded natural lava pools/downward flow/water contact, picking, body/projectile collision, FileX delete remount flow and v1-v8 saves tested on host; touch, LCD, real SD deletion/persistence and FPS require board verification.",
+        "hardware": "Not flashed in this task. Four-facing two-cell doors, melee/block-part segment collision, bounded natural lava pools/downward flow/water contact, picking, body/projectile collision, FileX delete remount flow and v1-v9 saves tested on host; persistent exploration mask is covered by host tests; touch, LCD, real SD deletion/persistence and FPS require board verification.",
         "artifacts": {},
     }
     for name in [source_zip.name, *artifacts]:

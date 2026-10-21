@@ -72,7 +72,8 @@ void MC_SaveEncode(const MC_World*w,uint32_t generation,uint8_t*p){
   putfloat(m+M_MOB_STATE+12,w->attack_cooldown);putfloat(m+M_MOB_STATE+16,w->attack_flash);
   for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)swrite(m+M_ARMOR+i*4,&w->armor[i]);
   put32(m+M_XP,w->experience>MC_XpForLevel(MC_MAX_LEVEL)?MC_XpForLevel(MC_MAX_LEVEL):w->experience);m[M_XP+4]=(uint8_t)MC_XpLevel(w);m[M_XP+5]=1;
-  put32(p+48,MC_Crc32(m,MC_SAVE_META));put32(p+52,MC_SAVE_META);put32(p+56,MC_Crc32(p+MC_SAVE_HEADER,MC_MAP_BYTES));put32(p+60,MC_Crc32(p,60));
+  memcpy(m+MC_SAVE_META,w->explored,MC_EXPLORE_BYTES);
+  put32(p+48,MC_Crc32(m,MC_SAVE_META+MC_EXPLORE_BYTES));put32(p+52,MC_SAVE_META+MC_EXPLORE_BYTES);put32(p+56,MC_Crc32(p+MC_SAVE_HEADER,MC_MAP_BYTES));put32(p+60,MC_Crc32(p,60));
 }
 static uint8_t saved_block(const uint8_t*p,const uint8_t*q,unsigned mx,unsigned mz){return p[MC_SAVE_HEADER+((get16(q+2)-1)*mz+get16(q+4)-1)*mx+get16(q)-1];}
 uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
@@ -80,7 +81,7 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
   unsigned v=get32(p+4),mx=get32(p+8),my=get32(p+12),mz=get32(p+16);
   if(memcmp(p,"N6MC",4)||v<1||v>MC_SAVE_VERSION||my!=MC_MAP_Y||mx!=mz||(mx!=128&&mx!=MC_MAP_X)||!get32(p+20))return 0;
   unsigned bytes=mx*my*mz,base=MC_SAVE_HEADER+bytes;
-  unsigned metadata=v==1?0:v==2?MC_SAVE_V2_META:v==3?MC_SAVE_V3_META:MC_SAVE_META;
+  unsigned metadata=v==1?0:v==2?MC_SAVE_V2_META:v==3?MC_SAVE_V3_META:v>=9?MC_SAVE_META+MC_EXPLORE_BYTES:MC_SAVE_META;
   if(length!=base+metadata)return 0;
   if(get32(p+60)!=MC_Crc32(p,60)||get32(p+56)!=MC_Crc32(p+MC_SAVE_HEADER,bytes))return 0;
   if(!range(getfloat(p+28),.28f,mx-.28f)||!range(getfloat(p+32),1,MC_MAP_Y+4)||!range(getfloat(p+36),.28f,mz-.28f)||!range(getfloat(p+40),-100,100)||!range(getfloat(p+44),-1.4f,1.4f))return 0;
@@ -100,6 +101,7 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
   for(unsigned i=0;i<mx*mz;i++)if(p[MC_SAVE_HEADER+i]!=MC_BEDROCK)return 0;
   if(v>=2){
     const uint8_t*m=p+base;unsigned len=v==2?MC_SAVE_V2_META:v==3?MC_SAVE_V3_META:MC_SAVE_META;
+    if(v>=9)len=MC_SAVE_META+MC_EXPLORE_BYTES;
     if(get32(p+52)!=len||get32(p+48)!=MC_Crc32(m,len))return 0;
     if(v==2){
       for(unsigned i=0;i<25;i++)if(get16(m+i*2)>999)return 0;
@@ -219,8 +221,10 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
       for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)sread(&w->armor[i],m+M_ARMOR+i*4);
       if(m[M_XP+5]) { w->experience=get32(m+M_XP);w->level=(uint8_t)MC_XpLevel(w); }
     }
+    if(v>=9)memcpy(w->explored,m+MC_SAVE_META,MC_EXPLORE_BYTES);
     MC_Notify(w,"WORLD AND INVENTORY LOADED");
   }
+  if(v<9)MC_UpdateExploration(w);
   MC_SyncInventory(w);
   /* Redstone propagation is runtime-only.  Lever states persist in the map;
      button pulses are intentionally cleared on load and the nearby network

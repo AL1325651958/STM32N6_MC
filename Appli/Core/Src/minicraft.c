@@ -187,6 +187,21 @@ void MC_Set(MC_World *w, int x, int y, int z, uint8_t b)
     }
   }
 }
+static unsigned explore_index(int x,int z){return (unsigned)z*MC_MAP_X+(unsigned)x;}
+int MC_IsExplored(const MC_World *w,int x,int z)
+{
+  if(!w||x<0||z<0||x>=MC_MAP_X||z>=MC_MAP_Z)return 0;
+  unsigned i=explore_index(x,z);return (w->explored[i>>3]>>(i&7))&1u;
+}
+void MC_UpdateExploration(MC_World *w)
+{
+  if(!w||!w->blocks)return;
+  int px=(int)floorf(w->x),pz=(int)floorf(w->z);
+  for(int dz=-8;dz<=8;dz++)for(int dx=-8;dx<=8;dx++) {
+    int x=px+dx,z=pz+dz;if(x<0||z<0||x>=MC_MAP_X||z>=MC_MAP_Z)continue;
+    unsigned i=explore_index(x,z);w->explored[i>>3]|=(uint8_t)(1u<<(i&7));
+  }
+}
 static int rotated_door(uint8_t b){return b>=MC_DOOR_ROTATED_FIRST&&b<=MC_DOOR_ROTATED_LAST;}
 uint8_t MC_DoorBase(uint8_t b){if(rotated_door(b))return (uint8_t)(b-((b-MC_DOOR_ROTATED_FIRST)&2));return b==MC_DOOR_TOP?MC_DOOR:b==MC_DOOR_TOP_OPEN?MC_DOOR_OPEN:b;}
 int MC_DoorUpper(uint8_t b){return rotated_door(b)?((b-MC_DOOR_ROTATED_FIRST)&2)!=0:b==MC_DOOR_TOP||b==MC_DOOR_TOP_OPEN;}

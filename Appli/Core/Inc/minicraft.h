@@ -7,6 +7,7 @@
 #define MC_MAP_Y 64
 #define MC_MAP_Z 256
 #define MC_MAP_BYTES (MC_MAP_X * MC_MAP_Y * MC_MAP_Z)
+#define MC_EXPLORE_BYTES ((MC_MAP_X * MC_MAP_Z + 7U) / 8U)
 enum { MC_SAVE_IDLE, MC_SAVE_BUSY, MC_SAVE_OK, MC_SAVE_NO_SD,
        MC_SAVE_LOCKED, MC_SAVE_WRITE_FAILED, MC_SAVE_VERIFY_FAILED };
 #define MC_VIEW_W 160
@@ -98,6 +99,8 @@ typedef struct {
   uint16_t reserve_wear[3];
   uint16_t chest_map[MC_CHESTS][3];
   uint8_t target_valid, bag_page;
+  /* Persistent top-down exploration mask, one bit per horizontal map cell. */
+  uint8_t explored[MC_EXPLORE_BYTES];
   MC_Mob mobs[MC_MOBS];
   /* Runtime-only breeding state; v4 mob slots remain exactly 32 bytes. */
   uint8_t mob_fed[MC_MOBS];
@@ -141,6 +144,8 @@ uint8_t MC_Get(const MC_World *world, int x, int y, int z);
 void MC_Set(MC_World *world, int x, int y, int z, uint8_t block);
 void MC_Generate(MC_World *world, uint32_t seed);
 void MC_GenerateTerrain(MC_World *world,uint32_t seed);
+void MC_UpdateExploration(MC_World *world);
+int MC_IsExplored(const MC_World *world,int x,int z);
 void MC_NotifySave(MC_World *world,unsigned result);
 void MC_Notify(MC_World *world,const char *message);
 int MC_FurnaceBurningAt(const MC_World *world,int x,int y,int z);
