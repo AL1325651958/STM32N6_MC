@@ -211,8 +211,15 @@ int main(void) {
  /* Touch layout: all 31 recipes reachable, real slot moves, split and mode. */
  scene(&w);w.bag=1;assert(MC_Give(&w,MC_WOOD,10));MC_UIBagTap(&w,30,115);MC_UIBagTap(&w,78,183);assert(w.slots[9].count==10&&!w.slots[0].count);
  MC_UIBagTap(&w,200,420);assert(w.split);MC_UIBagTap(&w,78,183);MC_UIBagTap(&w,30,115);assert(w.slots[0].count==5&&w.slots[9].count==5);
- for(unsigned i=1;i<=8;i++){MC_UIBagTap(&w,450,85);assert(w.recipe_page==i%9);}assert(MC_RecipeCount()==33);
+ for(unsigned i=1;i<=8;i++){MC_UIBagTap(&w,450,85);assert(w.recipe_page==i%9);}assert(MC_RecipeCount()==34);
  assert(MC_RecipeResult(0)==MC_PLANKS&&MC_RecipeIngredient(0,0)==MC_WOOD&&MC_RecipeIngredientCount(0,0)==1);
+ assert(MC_RecipeResult(33)==MC_BREAD&&MC_RecipeIngredient(33,0)==MC_WHEAT&&MC_RecipeIngredientCount(33,0)==3);
+ scene(&w);assert(MC_Give(&w,MC_WHEAT,3));assert(MC_Craft(&w,33)&&w.items[MC_BREAD]==1);
+ assert(MC_FoodHealth(MC_BREAD)==5&&MC_FoodHunger(MC_BREAD)==8);
+ assert(MC_Give(&w,MC_RAW_MEAT,1));MC_Set(&w,10,3,10,MC_FURNACE);
+ w.furnaces[0]=(MC_Furnace){11,4,11,{MC_RAW_MEAT,1,0},{MC_COAL,1,0},{0},0,0};tick(&w,56);
+ assert(w.furnaces[0].output.item==MC_COOKED_MEAT&&MC_FoodHunger(MC_COOKED_MEAT)==10);
+ assert(MC_Give(&w,MC_WOOD,10));
  assert(MC_IsBlock(MC_BIRCH_WOOD)&&MC_IsBlock(MC_DARK_PLANKS));
  /* The former attack button area is now scene input; weapon taps are handled
     by voxel_game.c so the right side only keeps the essential controls. */
@@ -228,13 +235,13 @@ int main(void) {
  MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);unsigned held_pixels=0;
  for(int yy=270;yy<400;yy++)for(int xx=570;xx<685;xx++)if(fb[yy*800+xx])held_pixels++;
  assert(held_pixels>100);
- uint16_t action_pixels[5][100*8];const unsigned action_items[]={MC_SWORD,MC_BOW,MC_WHEAT,MC_DIRT,MC_APPLE};
- for(unsigned a=0;a<5;a++) {
+ uint16_t action_pixels[7][100*8];const unsigned action_items[]={MC_SWORD,MC_BOW,MC_WHEAT,MC_DIRT,MC_APPLE,MC_BREAD,MC_COOKED_MEAT};
+ for(unsigned a=0;a<7;a++) {
    w.slots[0]=(MC_Stack){action_items[a],1,0};MC_SyncInventory(&w);
    memset(fb,0,800*480*sizeof(*fb));MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);
    for(int yy=0;yy<8;yy++)memcpy(&action_pixels[a][yy*100],&fb[(288+yy)*800+690],100*sizeof(*fb));
  }
- for(unsigned a=1;a<5;a++)assert(memcmp(action_pixels[0],action_pixels[a],sizeof(action_pixels[0]))!=0);
+ for(unsigned a=1;a<7;a++)assert(memcmp(action_pixels[0],action_pixels[a],sizeof(action_pixels[0]))!=0);
  /* The crop hint responds to irrigation without another action button. */
  scene(&w);MC_Set(&w,10,3,13,MC_FARMLAND);MC_Set(&w,10,4,13,MC_WHEAT_CROP);w.pitch=.25f;
  w.growers[0]=(MC_Grower){11,5,14,30};w.target_valid=MC_Pick(&w,400,240,&w.target);

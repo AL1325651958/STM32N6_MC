@@ -19,6 +19,7 @@ NAMES += ['REDSTONE DUST', 'REDSTONE DUST ON', 'REDSTONE LAMP', 'REDSTONE LAMP O
 NAMES += ['BOW', 'ARROW']
 NAMES += ['IRON HELMET', 'IRON CHESTPLATE', 'IRON LEGGINGS', 'IRON BOOTS']
 NAMES += ['BIRCH LOG', 'BIRCH PLANKS', 'DARK LOG', 'DARK PLANKS']
+NAMES += ['BREAD', 'COOKED MEAT']
 BASE = {1:(112,165,55), 2:(139,96,61), 3:(141,145,151), 4:(224,208,150),
         5:(144,100,53), 6:(62,135,49), 7:(67,69,77), 8:(55,135,207),
         9:(133,139,146), 10:(191,145,83), 11:(169,116,59), 12:(115,121,128),
@@ -205,6 +206,16 @@ def sprite(item):
         d.polygon([(4,7),(7,5),(10,5),(12,7),(10,8),(7,7),(5,9)], fill='#ef8c7f')
         d.polygon([(10,9),(13,7),(13,10),(10,12)], fill='#a93645')
         d.ellipse((2,9,5,12), fill='#f1d7bd', outline=edge)
+    elif item == 64:
+        d.polygon([(1,8),(3,4),(7,2),(12,3),(15,7),(14,12),(11,15),(4,14)], fill=edge)
+        d.polygon([(3,8),(5,5),(8,4),(12,5),(13,8),(12,11),(10,13),(5,12)], fill='#dca85c')
+        d.polygon([(5,7),(7,5),(11,6),(12,8),(10,9),(7,8)], fill='#f1d48d')
+        d.line([(4,11),(11,12)], fill='#ad7139', width=1)
+    elif item == 65:
+        d.polygon([(1,8),(4,4),(10,3),(15,6),(14,11),(10,14),(4,13)], fill=edge)
+        d.polygon([(3,8),(5,5),(10,4),(13,6),(13,10),(9,12),(5,11)], fill='#a64a3f')
+        d.polygon([(4,7),(7,5),(10,6),(8,8),(5,9)], fill='#e18b69')
+        d.line([(9,10),(12,8)], fill='#6f302e', width=1)
     elif item in (46,47):
         # Redstone dust: a small cross of powder, with a brighter powered state.
         c = '#f12b36' if item == 47 else '#9f1f2b'

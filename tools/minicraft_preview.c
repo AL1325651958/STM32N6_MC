@@ -18,7 +18,7 @@ int main(int argc,char **argv)
   char path[1024];
   const char *variants[]={"preview","night","inventory","mining","chest","furnace","creative","geometry","farming","combat","ruins",
     "action_attack","action_shoot","action_feed","action_place","action_use",
-    "crop_dry","crop_dark","crop_growing","crop_ready"};
+    "crop_dry","crop_dark","crop_growing","crop_ready","action_eat"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -74,6 +74,10 @@ int main(int argc,char **argv)
     if(k>=11 && k<=15) {
       static const unsigned action_items[]={MC_SWORD,MC_BOW,MC_WHEAT,MC_DIRT,MC_APPLE};
       w.slot=0;w.slots[0]=(MC_Stack){action_items[k-11],1,0};MC_SyncInventory(&w);
+    }
+    if(k==20) {
+      w.slot=0;w.slots[0]=(MC_Stack){MC_BREAD,1,0};w.health=12;w.hunger=8;MC_SyncInventory(&w);
+      w.notice="TAP SCREEN TO EAT";
     }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];

@@ -32,7 +32,7 @@ static int svalid(const uint8_t*p){
 static int coord(const uint8_t*p){unsigned x=get16(p),y=get16(p+2),z=get16(p+4);return !x?(!y&&!z):(x<=MC_MAP_X&&y>=2&&y<=MC_MAP_Y&&z>=1&&z<=MC_MAP_Z);}
 static int range(float f,float lo,float hi){return isfinite(f)&&f>=lo&&f<=hi;}
 static int isfuel(unsigned id){return id==MC_COAL||id==MC_WOOD||id==MC_BIRCH_WOOD||id==MC_DARK_WOOD||id==MC_PLANKS||id==MC_BIRCH_PLANKS||id==MC_DARK_PLANKS;}
-static unsigned output(unsigned id){return id==MC_IRON_ORE?MC_IRON:id==MC_SAND?MC_GLASS:id==MC_WOOD?MC_COAL:id==MC_COBBLE?MC_BRICK:0;}
+static unsigned output(unsigned id){return id==MC_IRON_ORE?MC_IRON:id==MC_SAND?MC_GLASS:id==MC_WOOD?MC_COAL:id==MC_COBBLE?MC_BRICK:id==MC_RAW_MEAT?MC_COOKED_MEAT:0;}
 void MC_SaveEncode(const MC_World*w,uint32_t generation,uint8_t*p){
   memset(p,0,MC_SAVE_HEADER);memcpy(p,"N6MC",4);put32(p+4,4);put32(p+8,MC_MAP_X);put32(p+12,MC_MAP_Y);put32(p+16,MC_MAP_Z);put32(p+20,generation);put32(p+24,w->seed);
   putfloat(p+28,w->x);putfloat(p+32,w->y);putfloat(p+36,w->z);putfloat(p+40,w->yaw);putfloat(p+44,w->pitch);memcpy(p+MC_SAVE_HEADER,w->blocks,MC_MAP_BYTES);

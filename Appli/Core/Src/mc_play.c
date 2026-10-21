@@ -2,8 +2,27 @@
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
-static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT","REDSTONE DUST","REDSTONE DUST ON","REDSTONE LAMP","REDSTONE LAMP ON","LEVER","LEVER ON","BUTTON","BUTTON ON","BOW","ARROW","IRON HELMET","IRON CHESTPLATE","IRON LEGGINGS","IRON BOOTS","BIRCH LOG","BIRCH PLANKS","DARK LOG","DARK PLANKS"};
-static const uint16_t colors[MC_ITEM_COUNT]={0,0x6cc6,0x8b07,0x8410,0xd66f,0x8b45,0x3b85,0x3186,0x3397,0x7390,0xb48a,0x9347,0x630c,0x4208,0xb3ac,0x9f7f,0xb2a8,0xff20,0x9b05,0x2104,0xc638,0xa366,0x94b2,0xdefb,0xe924,0x9b05,0x9b05,0xdefb,0x9347,0x6cc6,0x3b85,0xa365,0x9b05,0x8c71,0x8c71,0x6a64,0x4d8b,0xf6A0,0x7e24,0x8410,0x8410,0x8410,0x8410,0xc9b0,0xf800,0xf800,0x8410,0xffe0,0x9b05,0xffc0,0xb48a,0xffe0,0x8a45,0xe7be,0xa514,0xa514,0xa514,0xa514,0xd6b6,0xc5a2,0x5a04,0x7b05};
+static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT","REDSTONE DUST","REDSTONE DUST ON","REDSTONE LAMP","REDSTONE LAMP ON","LEVER","LEVER ON","BUTTON","BUTTON ON","BOW","ARROW","IRON HELMET","IRON CHESTPLATE","IRON LEGGINGS","IRON BOOTS","BIRCH LOG","BIRCH PLANKS","DARK LOG","DARK PLANKS","BREAD","COOKED MEAT"};
+/* Designators prevent an appended item from shifting unrelated drop colors. */
+static const uint16_t colors[MC_ITEM_COUNT]={
+  [MC_GRASS]=0x6cc6,[MC_DIRT]=0x8b07,[MC_STONE]=0x8410,[MC_SAND]=0xd66f,
+  [MC_WOOD]=0x8b45,[MC_LEAVES]=0x3b85,[MC_BEDROCK]=0x3186,[MC_WATER]=0x3397,
+  [MC_COBBLE]=0x7390,[MC_PLANKS]=0xb48a,[MC_TABLE]=0x9347,[MC_FURNACE]=0x630c,
+  [MC_COAL_ORE]=0x4208,[MC_IRON_ORE]=0xb3ac,[MC_GLASS]=0x9f7f,[MC_BRICK]=0xb2a8,
+  [MC_TORCH]=0xff20,[MC_STICK]=0x9b05,[MC_COAL]=0x2104,[MC_IRON]=0xc638,
+  [MC_WOOD_PICK]=0xa366,[MC_STONE_PICK]=0x94b2,[MC_IRON_PICK]=0xdefb,[MC_APPLE]=0xe924,
+  [MC_AXE]=0x9b05,[MC_SHOVEL]=0x9b05,[MC_SWORD]=0xdefb,[MC_CHEST]=0x9347,
+  [MC_BED]=0x6cc6,[MC_SAPLING]=0x3b85,[MC_DOOR]=0xa365,[MC_DOOR_OPEN]=0x9b05,
+  [MC_SLAB]=0x8c71,[MC_SLAB_TOP]=0x8c71,[MC_FARMLAND]=0x6a64,[MC_WHEAT_CROP]=0x4d8b,
+  [MC_WHEAT_MATURE]=0xf6a0,[MC_WHEAT_SEEDS]=0x7e24,[MC_WHEAT]=0xe5a4,[MC_FENCE]=0xa365,
+  [MC_STAIR]=0x8410,[MC_STAIR_EAST]=0x8410,[MC_STAIR_SOUTH]=0x8410,[MC_STAIR_WEST]=0x8410,
+  [MC_RAW_MEAT]=0xc9b0,[MC_DUST]=0xf800,[MC_DUST_ON]=0xf800,[MC_LAMP]=0x8410,
+  [MC_LAMP_ON]=0xffe0,[MC_LEVER]=0x9b05,[MC_LEVER_ON]=0xffc0,[MC_BUTTON]=0xb48a,
+  [MC_BUTTON_ON]=0xffe0,[MC_BOW]=0x8a45,[MC_ARROW]=0xe7be,
+  [MC_IRON_HELMET]=0xa514,[MC_IRON_CHESTPLATE]=0xa514,[MC_IRON_LEGGINGS]=0xa514,[MC_IRON_BOOTS]=0xa514,
+  [MC_BIRCH_WOOD]=0xd6b6,[MC_BIRCH_PLANKS]=0xc5a2,[MC_DARK_WOOD]=0x5a04,[MC_DARK_PLANKS]=0x7b05,
+  [MC_BREAD]=0xdca6,[MC_COOKED_MEAT]=0xa346
+};
 const char *MC_ItemName(unsigned i){return i<MC_ITEM_COUNT?names[i]:"EMPTY";}uint16_t MC_ItemColor(unsigned i){return i<MC_ITEM_COUNT?colors[i]:0;}
 void MC_HoldStart(MC_Hold*h,int x,int y,uint32_t n){*h=(MC_Hold){x,y,x,y,n};}void MC_HoldMove(MC_Hold*h,int x,int y,uint32_t n){int dx=x-h->anchor_x,dy=y-h->anchor_y;h->x=x;h->y=y;if(dx*dx+dy*dy>144){h->anchor_x=x;h->anchor_y=y;h->since=n;}}int MC_HoldReady(const MC_Hold*h,uint32_t n){return(uint32_t)(n-h->since)>=450;}
 int MC_IsBlock(unsigned i) {
@@ -249,8 +268,8 @@ void MC_SelectItem(MC_World *w,unsigned item) {
   if(MC_ToolIndex(item)>=0 && (w->creative || w->items[item]))w->equipped=(uint8_t)item;
 }
 typedef struct{uint8_t out,n,a,na,b,nb,station;}R;
-static const R recipes[]={{MC_PLANKS,4,MC_WOOD,1,0,0,0},{MC_STICK,4,MC_PLANKS,2,0,0,0},{MC_TABLE,1,MC_PLANKS,4,0,0,0},{MC_WOOD_PICK,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_STONE_PICK,1,MC_COBBLE,3,MC_STICK,2,MC_TABLE},{MC_FURNACE,1,MC_COBBLE,8,0,0,MC_TABLE},{MC_COAL,1,MC_WOOD,1,MC_PLANKS,1,MC_FURNACE},{MC_TORCH,4,MC_COAL,1,MC_STICK,1,0},{MC_IRON,1,MC_IRON_ORE,1,MC_COAL,1,MC_FURNACE},{MC_IRON_PICK,1,MC_IRON,3,MC_STICK,2,MC_TABLE},{MC_GLASS,4,MC_SAND,4,MC_COAL,1,MC_FURNACE},{MC_BRICK,4,MC_COBBLE,4,MC_COAL,1,MC_FURNACE},{MC_AXE,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_SHOVEL,1,MC_PLANKS,1,MC_STICK,2,MC_TABLE},{MC_SWORD,1,MC_PLANKS,2,MC_STICK,1,MC_TABLE},{MC_CHEST,1,MC_PLANKS,8,0,0,MC_TABLE},{MC_BED,1,MC_PLANKS,3,MC_SAPLING,3,MC_TABLE},{MC_DOOR,1,MC_PLANKS,6,0,0,MC_TABLE},{MC_SLAB,6,MC_COBBLE,3,0,0,MC_TABLE},{MC_FENCE,3,MC_PLANKS,4,MC_STICK,2,MC_TABLE},{MC_STAIR,4,MC_COBBLE,6,0,0,MC_TABLE},{MC_DUST,4,MC_COAL,1,MC_IRON,1,MC_TABLE},{MC_LAMP,1,MC_DUST,4,MC_GLASS,4,MC_TABLE},{MC_LEVER,1,MC_STICK,1,MC_COBBLE,1,MC_TABLE},{MC_BUTTON,1,MC_PLANKS,1,0,0,MC_TABLE},{MC_BOW,1,MC_PLANKS,3,MC_STICK,3,MC_TABLE},{MC_ARROW,4,MC_STICK,1,MC_IRON,1,MC_TABLE},{MC_IRON_HELMET,1,MC_IRON,5,0,0,MC_TABLE},{MC_IRON_CHESTPLATE,1,MC_IRON,8,0,0,MC_TABLE},{MC_IRON_LEGGINGS,1,MC_IRON,7,0,0,MC_TABLE},{MC_IRON_BOOTS,1,MC_IRON,4,0,0,MC_TABLE},{MC_BIRCH_PLANKS,4,MC_BIRCH_WOOD,1,0,0,0},{MC_DARK_PLANKS,4,MC_DARK_WOOD,1,0,0,0}};
-static const char*cost[]={"1 LOG - 4 PLANKS","2 PLANKS - 4 STICKS","4 PLANKS","3 PLANKS 2 STICKS","3 COBBLE 2 STICKS","8 COBBLE","1 LOG 1 PLANK","1 COAL 1 STICK","1 ORE 1 COAL","3 IRON 2 STICKS","4 SAND 1 COAL","4 COBBLE 1 COAL","3 PLANKS 2 STICKS","1 PLANK 2 STICKS","2 PLANKS 1 STICK","8 PLANKS","3 PLANKS 3 SAPLINGS","6 PLANKS","3 COBBLE - 6 STONE SLABS","4 PLANKS 2 STICKS - 3 FENCES","6 COBBLE - 4 STONE STAIRS","1 COAL 1 IRON - 4 DUST","4 DUST 4 GLASS","1 STICK 1 COBBLE","1 PLANK","3 PLANKS 3 STICKS","1 STICK 1 IRON - 4 ARROWS","5 IRON","8 IRON","7 IRON","4 IRON","1 BIRCH LOG - 4 BIRCH PLANKS","1 DARK LOG - 4 DARK PLANKS"};
+static const R recipes[]={{MC_PLANKS,4,MC_WOOD,1,0,0,0},{MC_STICK,4,MC_PLANKS,2,0,0,0},{MC_TABLE,1,MC_PLANKS,4,0,0,0},{MC_WOOD_PICK,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_STONE_PICK,1,MC_COBBLE,3,MC_STICK,2,MC_TABLE},{MC_FURNACE,1,MC_COBBLE,8,0,0,MC_TABLE},{MC_COAL,1,MC_WOOD,1,MC_PLANKS,1,MC_FURNACE},{MC_TORCH,4,MC_COAL,1,MC_STICK,1,0},{MC_IRON,1,MC_IRON_ORE,1,MC_COAL,1,MC_FURNACE},{MC_IRON_PICK,1,MC_IRON,3,MC_STICK,2,MC_TABLE},{MC_GLASS,4,MC_SAND,4,MC_COAL,1,MC_FURNACE},{MC_BRICK,4,MC_COBBLE,4,MC_COAL,1,MC_FURNACE},{MC_AXE,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_SHOVEL,1,MC_PLANKS,1,MC_STICK,2,MC_TABLE},{MC_SWORD,1,MC_PLANKS,2,MC_STICK,1,MC_TABLE},{MC_CHEST,1,MC_PLANKS,8,0,0,MC_TABLE},{MC_BED,1,MC_PLANKS,3,MC_SAPLING,3,MC_TABLE},{MC_DOOR,1,MC_PLANKS,6,0,0,MC_TABLE},{MC_SLAB,6,MC_COBBLE,3,0,0,MC_TABLE},{MC_FENCE,3,MC_PLANKS,4,MC_STICK,2,MC_TABLE},{MC_STAIR,4,MC_COBBLE,6,0,0,MC_TABLE},{MC_DUST,4,MC_COAL,1,MC_IRON,1,MC_TABLE},{MC_LAMP,1,MC_DUST,4,MC_GLASS,4,MC_TABLE},{MC_LEVER,1,MC_STICK,1,MC_COBBLE,1,MC_TABLE},{MC_BUTTON,1,MC_PLANKS,1,0,0,MC_TABLE},{MC_BOW,1,MC_PLANKS,3,MC_STICK,3,MC_TABLE},{MC_ARROW,4,MC_STICK,1,MC_IRON,1,MC_TABLE},{MC_IRON_HELMET,1,MC_IRON,5,0,0,MC_TABLE},{MC_IRON_CHESTPLATE,1,MC_IRON,8,0,0,MC_TABLE},{MC_IRON_LEGGINGS,1,MC_IRON,7,0,0,MC_TABLE},{MC_IRON_BOOTS,1,MC_IRON,4,0,0,MC_TABLE},{MC_BIRCH_PLANKS,4,MC_BIRCH_WOOD,1,0,0,0},{MC_DARK_PLANKS,4,MC_DARK_WOOD,1,0,0,0},{MC_BREAD,1,MC_WHEAT,3,0,0,0}};
+static const char*cost[]={"1 LOG - 4 PLANKS","2 PLANKS - 4 STICKS","4 PLANKS","3 PLANKS 2 STICKS","3 COBBLE 2 STICKS","8 COBBLE","1 LOG 1 PLANK","1 COAL 1 STICK","1 ORE 1 COAL","3 IRON 2 STICKS","4 SAND 1 COAL","4 COBBLE 1 COAL","3 PLANKS 2 STICKS","1 PLANK 2 STICKS","2 PLANKS 1 STICK","8 PLANKS","3 PLANKS 3 SAPLINGS","6 PLANKS","3 COBBLE - 6 STONE SLABS","4 PLANKS 2 STICKS - 3 FENCES","6 COBBLE - 4 STONE STAIRS","1 COAL 1 IRON - 4 DUST","4 DUST 4 GLASS","1 STICK 1 COBBLE","1 PLANK","3 PLANKS 3 STICKS","1 STICK 1 IRON - 4 ARROWS","5 IRON","8 IRON","7 IRON","4 IRON","1 BIRCH LOG - 4 BIRCH PLANKS","1 DARK LOG - 4 DARK PLANKS","3 WHEAT - 1 BREAD"};
 unsigned MC_RecipeCount(void){return sizeof(recipes)/sizeof(recipes[0]);}const char*MC_RecipeName(unsigned r){return r<MC_RecipeCount()?MC_ItemName(recipes[r].out):"";}const char*MC_RecipeCost(unsigned r){return r<MC_RecipeCount()?cost[r]:"";}
 unsigned MC_RecipeResult(unsigned r){return r<MC_RecipeCount()?recipes[r].out:0;}
 unsigned MC_RecipeIngredient(unsigned r,unsigned p){if(r>=MC_RecipeCount()||p>1)return 0;return p?recipes[r].b:recipes[r].a;}
@@ -308,7 +327,7 @@ int MC_DropSpawn(MC_World *w,unsigned item,unsigned count,float x,float y,float 
   return count==0;
 }
 static int fuel_time(unsigned item){return item==MC_COAL?40:(item==MC_WOOD||item==MC_BIRCH_WOOD||item==MC_DARK_WOOD)?15:(item==MC_PLANKS||item==MC_BIRCH_PLANKS||item==MC_DARK_PLANKS)?10:0;}
-static unsigned smelt(unsigned item){return item==MC_IRON_ORE?MC_IRON:item==MC_SAND?MC_GLASS:item==MC_COBBLE?MC_BRICK:item==MC_WOOD?MC_COAL:0;}
+static unsigned smelt(unsigned item){return item==MC_IRON_ORE?MC_IRON:item==MC_SAND?MC_GLASS:item==MC_COBBLE?MC_BRICK:item==MC_WOOD?MC_COAL:item==MC_RAW_MEAT?MC_COOKED_MEAT:0;}
 /* A chest touching a furnace becomes a small, deterministic automation link.
    It feeds one input/fuel stack when the corresponding furnace slot has room
    and receives finished output.  The scan is limited to six furnaces and six
@@ -411,13 +430,19 @@ static int open_target_at(MC_World *w,float sx,float sy) {
   }
   return 0;
 }
+unsigned MC_FoodHealth(unsigned item) {
+  return item==MC_APPLE||item==MC_BREAD?5:item==MC_RAW_MEAT?4:item==MC_COOKED_MEAT?8:0;
+}
+unsigned MC_FoodHunger(unsigned item) {
+  return item==MC_APPLE?6:item==MC_RAW_MEAT?5:item==MC_BREAD?8:item==MC_COOKED_MEAT?10:0;
+}
 int MC_UseAt(MC_World *w,float sx,float sy) {
   if(open_target_at(w,sx,sy))return 1;
   unsigned b=w->hotbar[w->slot];
-  if((b==MC_APPLE || b==MC_RAW_MEAT) && (w->health<20 || w->hunger<20) && (w->creative || w->items[b])) {
+  if(MC_FoodHunger(b) && (w->health<20 || w->hunger<20) && (w->creative || w->items[b])) {
     if(!w->creative){MC_Stack *s=&w->slots[w->slot];if(!--s->count)memset(s,0,sizeof(*s));}
-    MC_SyncInventory(w);w->health=(uint8_t)fminf(20,w->health+(b==MC_APPLE?5:4));
-    w->hunger=(uint8_t)fminf(20,w->hunger+(b==MC_APPLE?6:5));w->notice=b==MC_APPLE?"ATE APPLE":"ATE RAW MEAT";return 1;
+    MC_SyncInventory(w);w->health=(uint8_t)fminf(20,w->health+MC_FoodHealth(b));
+    w->hunger=(uint8_t)fminf(20,w->hunger+MC_FoodHunger(b));w->notice=b==MC_APPLE?"ATE APPLE":b==MC_RAW_MEAT?"ATE RAW MEAT":b==MC_BREAD?"ATE BREAD":"ATE COOKED MEAT";return 1;
   }
   if(b==MC_SHOVEL) {
     MC_Hit h;if(MC_Pick(w,sx,sy,&h) && (h.block==MC_GRASS||h.block==MC_DIRT) && MC_Get(w,h.x,h.y+1,h.z)==MC_AIR) {

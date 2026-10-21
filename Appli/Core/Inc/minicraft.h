@@ -33,6 +33,7 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
           stable.  They are explicit blocks even though they live after the
           legacy item range. */
        MC_BIRCH_WOOD, MC_BIRCH_PLANKS, MC_DARK_WOOD, MC_DARK_PLANKS,
+       MC_BREAD, MC_COOKED_MEAT,
        MC_ITEM_COUNT };
 #define MC_HOTBAR 8
 #define MC_SLOTS 32
@@ -139,6 +140,8 @@ int MC_MobSpawn(MC_World *w,int x,int y,int z);
 int MC_PassiveSpawn(MC_World *w,int x,int y,int z);
 int MC_DarkAt(const MC_World *w,int x,int y,int z);
 unsigned MC_CropGrowthNeeds(const MC_World *w,int x,int y,int z);
+unsigned MC_FoodHealth(unsigned item);
+unsigned MC_FoodHunger(unsigned item);
 void MC_Hurt(MC_World *w,unsigned damage);
 void MC_NewPlayer(MC_World *w, int legacy);
 void MC_PlayTick(MC_World *w, float dt, int holding, float x, float y);

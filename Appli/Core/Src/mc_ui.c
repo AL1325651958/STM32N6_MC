@@ -156,6 +156,8 @@ static void held_item(uint16_t *fb,const MC_World *w)
     case MC_STICK: iw=24;ih=76;ix=635+swing;iy=267;gx=648+swing;gy=338;break;
     case MC_APPLE: iw=46;ih=46;ix=627+swing;iy=292;gx=648+swing;gy=337;break;
     case MC_RAW_MEAT: iw=46;ih=42;ix=627+swing;iy=296;gx=648+swing;gy=337;break;
+    case MC_BREAD: iw=54;ih=34;ix=622+swing;iy=302;gx=646+swing;gy=337;break;
+    case MC_COOKED_MEAT: iw=46;ih=42;ix=627+swing;iy=296;gx=648+swing;gy=337;break;
     case MC_SWORD: iw=46;ih=101;ix=620+swing;iy=246;gx=648+swing;gy=343;break;
     case MC_BOW: iw=78;ih=84;ix=588+swing;iy=268;gx=639+swing;gy=342;break;
     case MC_ARROW: iw=22;ih=78;ix=640+swing;iy=268;gx=650+swing;gy=340;break;
@@ -298,6 +300,7 @@ static const char *scene_action_hint(unsigned item)
   if(item==MC_BOW)return "TAP SHOOT";
   if(item==MC_SHOVEL)return "TAP TILL";
   if(item==MC_WHEAT)return "TAP FEED";
+  if(MC_FoodHunger(item))return "TAP EAT";
   if(item==MC_SWORD||item==MC_AXE||item==MC_WOOD_PICK||item==MC_STONE_PICK||item==MC_IRON_PICK)return "TAP ATTACK";
   return MC_IsBlock(item)?"TAP PLACE":"TAP USE";
 }
