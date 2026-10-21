@@ -188,7 +188,7 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
         if(wear && wear<=MC_ToolLife(id))w->slots[i].wear=(uint16_t)wear;
       }
     }
-    w->equipped=m[62];w->notice="V2 MIGRATED  EXTRA ITEMS IN RESERVE";
+    w->equipped=m[62];MC_Notify(w,"V2 MIGRATED  EXTRA ITEMS IN RESERVE");
   }else if(v>=3){
       w->creative=m[1];w->slot=m[2];w->health=m[3];w->air=m[4];w->equipped=m[5];w->hunger=v>=4&&m[7]==1?m[6]:20;w->time=getfloat(m+8);w->fall_speed=getfloat(m+12);
     for(unsigned i=0;i<3;i++)w->spawn[i]=get16(m+16+i*2);
@@ -211,7 +211,7 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
       for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)sread(&w->armor[i],m+M_ARMOR+i*4);
       if(m[M_XP+5]) { w->experience=get32(m+M_XP);w->level=(uint8_t)MC_XpLevel(w); }
     }
-    w->notice="WORLD AND INVENTORY LOADED";
+    MC_Notify(w,"WORLD AND INVENTORY LOADED");
   }
   MC_SyncInventory(w);
   /* Redstone propagation is runtime-only.  Lever states persist in the map;

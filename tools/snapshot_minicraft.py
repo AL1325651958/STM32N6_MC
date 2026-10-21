@@ -17,7 +17,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/minicraft"
-ARCHIVE_ROOT = ROOT / "out/verified-v29"
+ARCHIVE_ROOT = ROOT / "out/verified-v30"
 
 
 def digest(data):
@@ -38,7 +38,7 @@ def main():
     parser.add_argument("--benchmark-baseline", help="Git revision for optional host render comparison")
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
-    font_audit = OUT / "font-audit-v29"
+    font_audit = OUT / "font-audit-v30"
     run([sys.executable, "tools/make_minicraft_zh.py", "--font", str(OUT / "fonts/NotoSansSC.ttf"),
          "--pixel-font", str(OUT / "fonts/ark-pixel-12px-monospaced-zh_hans.ttf"),
          "--check", "--audit-dir", str(font_audit)], "snapshot-font.log")
@@ -64,7 +64,7 @@ def main():
     (OUT / "snapshot-preview-build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
     if result.returncode:
         raise SystemExit(f"preview build failed; see {OUT / 'snapshot-preview-build.log'}\n{result.stdout}{result.stderr}")
-    preview_dir = OUT / "ui-v29"
+    preview_dir = OUT / "ui-v30"
     preview_dir.mkdir(parents=True, exist_ok=True)
     result = subprocess.run([str(preview_exe), str(preview_dir)], cwd=ROOT,
                             text=True, capture_output=True, encoding="utf-8")
@@ -93,7 +93,7 @@ def main():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archive_root = ARCHIVE_ROOT / stamp
     archive_root.mkdir(parents=True, exist_ok=False)
-    source_zip = archive_root / "MiniCraft-v29-source.zip"
+    source_zip = archive_root / "MiniCraft-v30-source.zip"
     source_hashes = {}
     with zipfile.ZipFile(source_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for rel in sources:
@@ -168,7 +168,7 @@ def main():
         "source_hashes_verified": True,
         "geometry": "Torch stem 4/16 wide × 10/16 high; stepped flame widths 4/16, 3/16, 2/16 reaching 14/16 total height; chest 14/16; bed 9/16; sapling crossed planes.",
         "geometry_revision": 4,
-        "hardware": "Not flashed in this task. User-reported ~15 FPS refers to an earlier version; v29 initial view, bed respawn clearance, fence footing, touch, LCD, SD and FPS need board verification.",
+        "hardware": "Not flashed in this task. User-reported ~15 FPS refers to an earlier version; v30 short action notice timing/width and broken-tool feedback, touch, LCD, SD and FPS need board verification.",
         "artifacts": {},
     }
     for name in [source_zip.name, *artifacts]:

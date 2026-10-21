@@ -284,7 +284,7 @@ void VoxelGame_Run(void)
       world.change_world=0;
       int needs_save=dirty && sd_ready && !save_locked;
       if(needs_save)save_world();
-      if(needs_save && dirty)world.notice="SAVE FAILED OR LOCKED  STAYING IN WORLD";
+      if(needs_save && dirty)MC_Notify(&world,"SAVE FAILED OR LOCKED  STAYING IN WORLD");
       else {
         main_menu=1;creating=0;menu_down=0;menu_release=1;
         menu_message="SELECT A WORLD";scan_worlds();

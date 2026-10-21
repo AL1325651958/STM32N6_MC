@@ -121,12 +121,12 @@ static void mob_killed(MC_World *w,unsigned type,float x,float y,float z)
   if(type) {
     if(!MC_Give(w,MC_RAW_MEAT,1))MC_DropSpawn(w,MC_RAW_MEAT,1,x,y+.45f,z);
     MC_AddExperience(w,3);
-    w->notice="ANIMAL DOWN  RAW MEAT";
+    MC_Notify(w,"ANIMAL DOWN  RAW MEAT");
   } else {
     int stored=MC_Give(w,MC_ARROW,1);
     if(!stored)MC_DropSpawn(w,MC_ARROW,1,x,y+.45f,z);
     MC_AddExperience(w,5);
-    w->notice=stored?"NIGHT STALKER DOWN  ARROW":"NIGHT STALKER DOWN";
+    MC_Notify(w,stored?"NIGHT STALKER DOWN  ARROW":"NIGHT STALKER DOWN");
   }
 }
 
@@ -142,7 +142,7 @@ int MC_Attack(MC_World *w,float x,float y)
   if(!mob->health){
     unsigned type=mob->type;float x=mob->x,y=mob->y,z=mob->z;memset(mob,0,sizeof(*mob));w->mob_target=255;
     mob_killed(w,type,x,y,z);
-  } else w->notice=mob->type?"ANIMAL HIT":"NIGHT STALKER HIT";
+  } else MC_Notify(w,mob->type?"ANIMAL HIT":"NIGHT STALKER HIT");
   return 1;
 }
 
@@ -166,19 +166,20 @@ int MC_Shoot(MC_World *w,float x,float y)
 {
   if(w->bag || w->hotbar[w->slot]!=MC_BOW || w->shoot_cooldown>0)return 0;
   if(!w->creative && (!w->slots[w->slot].count || w->slots[w->slot].item!=MC_BOW))return 0;
-  if(!w->creative && !w->items[MC_ARROW]){w->notice="NEED ARROWS";return 0;}
+  if(!w->creative && !w->items[MC_ARROW]){MC_Notify(w,"NEED ARROWS");return 0;}
   int slot=-1;for(unsigned i=0;i<MC_PROJECTILES;i++)if(!w->projectiles[i].active){slot=(int)i;break;}
-  if(slot<0){w->notice="TOO MANY ARROWS";return 0;}
+  if(slot<0){MC_Notify(w,"TOO MANY ARROWS");return 0;}
   float dx,dy,dz;camera_ray(w,x,y,&dx,&dy,&dz);
   MC_Projectile *p=&w->projectiles[slot];
   p->x=w->x;p->y=w->y+1.62f;p->z=w->z;
   p->vx=dx*18;p->vy=dy*18;p->vz=dz*18;p->age=0;p->active=1;
+  int broke=0;
   if(!w->creative) {
     consume_arrow(w);MC_Stack *bow=&w->slots[w->slot];
-    if(bow->wear && !--bow->wear){memset(bow,0,sizeof(*bow));w->equipped=0;w->notice="BOW BROKE";}
+    if(bow->wear && !--bow->wear){memset(bow,0,sizeof(*bow));w->equipped=0;broke=1;}
     MC_SyncInventory(w);
   }
-  w->shoot_cooldown=.42f;w->attack_flash=.18f;w->notice="ARROW FIRED";return 1;
+  w->shoot_cooldown=.42f;w->attack_flash=.18f;MC_Notify(w,broke?"BOW BROKE":"ARROW FIRED");return 1;
 }
 
 /* Share the visible head/body/limbs with picking; reject distant entities
@@ -227,9 +228,9 @@ void MC_ProjectilesTick(MC_World *w,float dt)
       int m=segment_mob(w,origin,delta,blocked?fraction:2);
       if(m>=0) {
         MC_Mob *hit=&w->mobs[m];hit->health=hit->health>5?(uint8_t)(hit->health-5):0;hit->hurt=.35f;
-        if(!hit->health)arrow_kill_mob(w,hit);else w->notice=hit->type?"ANIMAL HIT":"NIGHT STALKER HIT";
+        if(!hit->health)arrow_kill_mob(w,hit);else MC_Notify(w,hit->type?"ANIMAL HIT":"NIGHT STALKER HIT");
         gone=1;
-      } else if(blocked){gone=1;w->notice="ARROW HIT BLOCK";}
+      } else if(blocked){gone=1;MC_Notify(w,"ARROW HIT BLOCK");}
       if(!gone){p->x=nx;p->y=ny;p->z=nz;}
     }
     if(gone)memset(p,0,sizeof(*p));
@@ -252,25 +253,25 @@ int MC_MobFeed(MC_World *w,float x,float y)
      (!w->creative && (w->hotbar[w->slot]!=MC_WHEAT || !w->slots[w->slot].count)))return 0;
   float distance;int target=MC_PickMob(w,x,y,3.5f,&distance);
   if(target<0 || !w->mobs[target].type)return 0;
-  if(w->mob_fed[target]) {w->notice="ANIMAL ALREADY FED";return 1;}
+  if(w->mob_fed[target]) {MC_Notify(w,"ANIMAL ALREADY FED");return 1;}
   consume_selected_wheat(w);w->mob_fed[target]=1;w->mob_fed_age[target]=0;
   w->mobs[target].heading=atan2f(w->x-w->mobs[target].x,-(w->z-w->mobs[target].z));
   for(unsigned i=0;i<MC_MOBS;i++) {
     if((int)i==target || !w->mobs[i].health || !w->mobs[i].type || !w->mob_fed[i])continue;
     float dx=w->mobs[i].x-w->mobs[target].x,dy=w->mobs[i].y-w->mobs[target].y,dz=w->mobs[i].z-w->mobs[target].z;
     if(dx*dx+dy*dy+dz*dz>2.6f*2.6f)continue;
-    if(w->breed_cooldown>0) {w->notice="ANIMALS RESTING";return 1;}
+    if(w->breed_cooldown>0) {MC_Notify(w,"ANIMALS RESTING");return 1;}
     unsigned count=0;for(unsigned k=0;k<MC_MOBS;k++)if(w->mobs[k].health&&w->mobs[k].type)count++;
-    if(count>=4) {w->notice="ANIMAL LIMIT 4";return 1;}
+    if(count>=4) {MC_Notify(w,"ANIMAL LIMIT 4");return 1;}
     for(unsigned k=0;k<MC_MOBS;k++)if(!w->mobs[k].health) {
       float px=(w->mobs[i].x+w->mobs[target].x)*.5f,pz=(w->mobs[i].z+w->mobs[target].z)*.5f,py=fminf(w->mobs[i].y,w->mobs[target].y);
-      if(!MC_BodyClear(w,px,py,pz)) {w->notice="NEED OPEN GROUND";return 1;}
+      if(!MC_BodyClear(w,px,py,pz)) {MC_Notify(w,"NEED OPEN GROUND");return 1;}
       unsigned r=next_random(w);w->mobs[k]=(MC_Mob){px,py,pz,0,0,0,8,1,1,((r>>8)&255)*(6.2831853f/256)};
       w->mob_fed[i]=w->mob_fed[target]=0;w->mob_fed_age[i]=w->mob_fed_age[target]=0;w->breed_cooldown=12;
-      w->notice="ANIMAL BORN";return 1;
+      MC_Notify(w,"ANIMAL BORN");return 1;
     }
   }
-  w->notice="ANIMAL FED  FIND A PARTNER";return 1;
+  MC_Notify(w,"ANIMAL FED  FIND A PARTNER");return 1;
 }
 
 void MC_Hurt(MC_World *w,unsigned damage)
@@ -282,11 +283,11 @@ void MC_Hurt(MC_World *w,unsigned damage)
     if(!reduced)reduced=1;
     damage=reduced;
     for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)if(w->armor[i].count&&w->armor[i].wear) {
-      if(--w->armor[i].wear==0){memset(&w->armor[i],0,sizeof(MC_Stack));w->notice="ARMOR BROKE";}
+      if(--w->armor[i].wear==0){memset(&w->armor[i],0,sizeof(MC_Stack));MC_Notify(w,"ARMOR BROKE");}
     }
   }
   w->hurt_timer=1;
-  if(damage>=w->health){MC_Respawn(w);w->health=20;w->air=10;w->hunger=20;w->hunger_clock=w->starvation_clock=0;w->notice="RESPAWNED  INVENTORY KEPT";}
+  if(damage>=w->health){MC_Respawn(w);w->health=20;w->air=10;w->hunger=20;w->hunger_clock=w->starvation_clock=0;MC_Notify(w,"RESPAWNED  INVENTORY KEPT");}
   else w->health=(uint8_t)(w->health-damage);
 }
 

@@ -105,6 +105,23 @@ static void panel(uint16_t *fb,int x,int y,int w,int h)
   rect(fb,x,y,w,2,0x94b2);rect(fb,x,y+h-2,w,2,0x94b2);
   rect(fb,x,y,2,h,0x94b2);rect(fb,x+w-2,y,2,h,0x94b2);
 }
+static void notice_panel(uint16_t *fb,const MC_World *w)
+{
+  if(!w->notice || !*w->notice)return;
+  const unsigned char *source=(const unsigned char *)MC_Localize(w->notice),*p=source;
+  int limit=w->bag?760:550,total=0;
+  while(*p)total+=next_codepoint(&p)>=128?12:6;
+  int clipped=total>limit,used=0;unsigned bytes=0;char label[256];p=source;
+  while(*p) {
+    const unsigned char *start=p;unsigned cp=next_codepoint(&p);int advance=cp>=128?12:6;
+    if(used+advance>limit-(clipped?12:0) || bytes+(unsigned)(p-start)>=sizeof(label))break;
+    memcpy(label+bytes,start,(size_t)(p-start));bytes+=(unsigned)(p-start);used+=advance;
+  }
+  label[bytes]=0;int y=w->bag?450:74,width=used+20+(clipped?12:0);
+  if(width<64)width=64;
+  panel(fb,10,y,width,24);MC_UIText(fb,20,y+8,label,0xffff,1);
+  if(clipped)for(int dot=0;dot<3;dot++)rect(fb,20+used+dot*4,y+13,2,2,0xffff);
+}
 int MC_UIRole(unsigned x,unsigned y)
 {
   if(x>=700 && y<66)return MC_TOUCH_SAVE;
@@ -175,7 +192,7 @@ void MC_UIBagTap(MC_World *w,unsigned x,unsigned y)
     return;
   }
   if(y>=410 && y<440 && x<410) {
-    if(x>=24 && x<152) {MC_SetMode(w,!w->creative);w->notice=w->creative?"CREATIVE CATALOG":"SURVIVAL INVENTORY";}
+    if(x>=24 && x<152) {MC_SetMode(w,!w->creative);MC_Notify(w,w->creative?"CREATIVE CATALOG":"SURVIVAL INVENTORY");}
     else if(x>=160 && x<280){w->split^=1;w->moving_slot=255;}
     else if(x>=290 && x<404)w->change_world=1;
     return;
@@ -599,5 +616,5 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     }
     if(w->attack_flash>0){rect(fb,393,236,15,4,0xffe0);rect(fb,398,231,4,15,0xffe0);}
   }
-  if(w->notice){int y=w->bag?450:74;panel(fb,10,y,w->bag?780:570,24);small(fb,20,y+8,w->notice,0xffff);}
+  notice_panel(fb,w);
 }

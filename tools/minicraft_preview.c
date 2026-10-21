@@ -22,7 +22,8 @@ int main(int argc,char **argv)
     "save_busy","save_ok","save_no_sd","save_locked","save_write_failed","save_verify_failed","creative_page1","creative_page2",
     "tool_interact","sneak_build","tool_chest_open","door_closed","door_open","lever_off","lever_on","slab_steps","delete_world","worlds_delete",
     "arrow_door_closed","arrow_door_open","arrow_slab_gap","cave_cache","cave_cache_loot",
-    "hud_meters","empty_hand","armor_storage","armor_equip","new_world_view","bed_safe_respawn"};
+    "hud_meters","empty_hand","armor_storage","armor_equip","new_world_view","bed_safe_respawn",
+    "notice_short","notice_expired","notice_broken_bow","notice_inventory"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -206,6 +207,19 @@ int main(int argc,char **argv)
       w.spawn[0]=13;w.spawn[1]=3;w.spawn[2]=13;MC_Respawn(&w);
       assert(w.y<2.02f&&MC_BodyClear(&w,w.x,w.y,w.z));
       w.yaw=.78539816f;w.pitch=-.55f;w.notice=NULL;
+    }
+    if(k>=55 && k<=58) {
+      MC_Generate(&w,0x20261020);
+      if(k==55 || k==56) {
+        MC_Notify(&w,"NO BLOCKS");
+        if(k==56){MC_SystemsTick(&w,3.1f);assert(!w.notice);}
+      } else if(k==57) {
+        assert(MC_Give(&w,MC_BOW,1)&&MC_Give(&w,MC_ARROW,1));w.slots[0].wear=1;MC_SyncInventory(&w);
+        assert(MC_Shoot(&w,400,240)&&!strcmp(w.notice,"BOW BROKE"));
+      } else {
+        MC_Set(&w,(int)w.x+1,(int)w.y,(int)w.z,MC_TABLE);w.bag=1;w.recipe_page=2;
+        assert(!MC_Craft(&w,9)&&!strcmp(w.notice,"NEED MORE MATERIALS"));
+      }
     }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];

@@ -124,6 +124,8 @@ typedef struct {
   uint8_t save_feedback;
   uint32_t scene_serial;
   float save_feedback_time;
+  /* Short action feedback; runtime-only, including its remaining duration. */
+  float notice_time;
   const char *notice;
 } MC_World;
 
@@ -132,6 +134,7 @@ void MC_Set(MC_World *world, int x, int y, int z, uint8_t block);
 void MC_Generate(MC_World *world, uint32_t seed);
 void MC_GenerateTerrain(MC_World *world,uint32_t seed);
 void MC_NotifySave(MC_World *world,unsigned result);
+void MC_Notify(MC_World *world,const char *message);
 uint8_t MC_DoorBase(uint8_t block);
 int MC_IsDoor(uint8_t block);
 int MC_DoorUpper(uint8_t block);

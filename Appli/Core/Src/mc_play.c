@@ -143,7 +143,7 @@ unsigned MC_AddExperience(MC_World *w,unsigned amount) {
   w->level=(uint8_t)new_level;
   if(new_level>old_level) {
     w->level_flash=.9f;
-    w->notice="LEVEL UP";
+    MC_Notify(w,"LEVEL UP");
   }
   return amount;
 }
@@ -201,16 +201,16 @@ int MC_EquipArmor(MC_World *w,unsigned inventory_slot) {
   if(slot<0||src->count!=1)return 0;
   MC_Stack old=w->armor[slot];w->armor[slot]=*src;
   if(old.count)*src=old;else memset(src,0,sizeof(*src));
-  MC_SyncInventory(w);w->notice="ARMOR EQUIPPED";return 1;
+  MC_SyncInventory(w);MC_Notify(w,"ARMOR EQUIPPED");return 1;
 }
 int MC_UnequipArmor(MC_World *w,unsigned armor_slot) {
   if(armor_slot>=MC_ARMOR_SLOTS||!w->armor[armor_slot].count)return 0;
   unsigned dst=MC_SLOTS;
   if(w->selected_slot<MC_SLOTS&&!w->slots[w->selected_slot].count)dst=w->selected_slot;
   if(dst==MC_SLOTS)for(unsigned i=0;i<MC_SLOTS;i++)if(!w->slots[i].count){dst=i;break;}
-  if(dst==MC_SLOTS){w->notice="BAG FULL  ARMOR STAYS ON";return 0;}
+  if(dst==MC_SLOTS){MC_Notify(w,"BAG FULL  ARMOR STAYS ON");return 0;}
   w->slots[dst]=w->armor[armor_slot];memset(&w->armor[armor_slot],0,sizeof(MC_Stack));
-  w->selected_slot=(uint8_t)dst;MC_SyncInventory(w);w->notice="ARMOR REMOVED";return 1;
+  w->selected_slot=(uint8_t)dst;MC_SyncInventory(w);MC_Notify(w,"ARMOR REMOVED");return 1;
 }
 static void remove_item(MC_World *w,unsigned id,unsigned n) {
   for(unsigned i=0;i<MC_SLOTS && n;i++)if(w->slots[i].item==id) {
@@ -272,7 +272,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   w->redstone_clock=0;memset(w->redstone_button_pos,0,sizeof(w->redstone_button_pos));memset(w->redstone_button_timer,0,sizeof(w->redstone_button_timer));
   memset(w->mob_fed,0,sizeof(w->mob_fed));memset(w->mob_fed_age,0,sizeof(w->mob_fed_age));w->breed_cooldown=0;
   MC_SyncInventory(w);
-  w->notice=legacy?"OLD WORLD  CREATIVE MODE":"HOLD BLOCK TO MINE  BAG TO CRAFT";
+  MC_Notify(w,legacy?"OLD WORLD  CREATIVE MODE":"HOLD BLOCK TO MINE  BAG TO CRAFT");
 }
 void MC_SelectItem(MC_World *w,unsigned item) {
   if(!item || item>=MC_ITEM_COUNT || item==MC_BEDROCK || item==MC_WATER || item==MC_SLAB_TOP || map_only(item))return;
@@ -304,18 +304,18 @@ int MC_Craft(MC_World *w,unsigned r) {
   if(r>=MC_RecipeCount())return 0;
   R c=recipes[r];
   /* Smelting has its own persistent input/fuel/output and timer. */
-  if(c.station==MC_FURNACE){w->notice="OPEN FURNACE  ADD INPUT AND FUEL";return 0;}
-  if(!w->creative && c.station && !near(w,c.station)){w->notice="PLACE WORKBENCH NEARBY";return 0;}
-  if(!w->creative && (material_count(w,c.a)<c.na || (c.nb && material_count(w,c.b)<c.nb))){w->notice="NEED MORE MATERIALS";return 0;}
+  if(c.station==MC_FURNACE){MC_Notify(w,"OPEN FURNACE  ADD INPUT AND FUEL");return 0;}
+  if(!w->creative && c.station && !near(w,c.station)){MC_Notify(w,"PLACE WORKBENCH NEARBY");return 0;}
+  if(!w->creative && (material_count(w,c.a)<c.na || (c.nb && material_count(w,c.b)<c.nb))){MC_Notify(w,"NEED MORE MATERIALS");return 0;}
   MC_Stack before[MC_SLOTS];memcpy(before,w->slots,sizeof(before));
   if(!w->creative){remove_material(w,c.a,c.na);if(c.nb)remove_material(w,c.b,c.nb);}
   if(!MC_Give(w,c.out,c.n)) {
-    memcpy(w->slots,before,sizeof(before));MC_SyncInventory(w);w->notice="BAG FULL  NO MATERIALS USED";return 0;
+    memcpy(w->slots,before,sizeof(before));MC_SyncInventory(w);MC_Notify(w,"BAG FULL  NO MATERIALS USED");return 0;
   }
   if(MC_ToolIndex(c.out)>=0){w->equipped=c.out;for(unsigned i=0;i<MC_HOTBAR;i++)if(w->slots[i].item==c.out){w->slot=i;break;}}
   else MC_SelectItem(w,c.out);
   MC_AddExperience(w,1);
-  w->notice="CRAFTED  CHECK INVENTORY";return 1;
+  MC_Notify(w,"CRAFTED  CHECK INVENTORY");return 1;
 }
 static int chest_at(const MC_World *w,int x,int y,int z) {
   for(unsigned i=0;i<MC_CHESTS;i++)if(w->chest_map[i][0]==x+1 && w->chest_map[i][1]==y+1 && w->chest_map[i][2]==z+1)return (int)i;
@@ -413,11 +413,11 @@ static int open_target_at(MC_World *w,float sx,float sy) {
   w->moving_slot=255;
   if(b==MC_LEVER || b==MC_LEVER_ON) {
     MC_Set(w,x,y,z,b==MC_LEVER?MC_LEVER_ON:MC_LEVER);MC_RedstoneRefresh(w);
-    w->notice=b==MC_LEVER?"LEVER ON":"LEVER OFF";w->target_valid=0;w->mining=0;return 1;
+    MC_Notify(w,b==MC_LEVER?"LEVER ON":"LEVER OFF");w->target_valid=0;w->mining=0;return 1;
   }
   if(b==MC_BUTTON || b==MC_BUTTON_ON) {
     redstone_button_press(w,x,y,z);MC_RedstoneRefresh(w);
-    w->notice="BUTTON PULSE";w->target_valid=0;w->mining=0;return 1;
+    MC_Notify(w,"BUTTON PULSE");w->target_valid=0;w->mining=0;return 1;
   }
   if(MC_IsDoor(b)) {
     int upper=MC_DoorUpper(b);if(upper)y--;
@@ -427,30 +427,30 @@ static int open_target_at(MC_World *w,float sx,float sy) {
     if(MC_DoorUpper(old_top))MC_Set(w,x,y+1,z,next==MC_DOOR?MC_DOOR_TOP:MC_DOOR_TOP_OPEN);
     if(!MC_BodyClear(w,w->x,w->y,w->z)) {
       MC_Set(w,x,y,z,b);if(MC_DoorUpper(old_top))MC_Set(w,x,y+1,z,old_top);
-      w->notice="MOVE CLEAR TO CLOSE";return 1;
+      MC_Notify(w,"MOVE CLEAR TO CLOSE");return 1;
     }
-    w->notice=b==MC_DOOR?"DOOR OPEN":"DOOR CLOSED";
+    MC_Notify(w,b==MC_DOOR?"DOOR OPEN":"DOOR CLOSED");
     w->target_valid=0;w->mining=0;return 1;
   }
   if(b==MC_TABLE){w->bag=1;w->recipe_requires=b;w->open_chest=w->open_furnace=255;return 1;}
   if(b==MC_FURNACE) {
     int fi=furnace_at(w,x,y,z);
     if(fi<0)for(unsigned i=0;i<MC_FURNACES;i++)if(!w->furnaces[i].x){fi=(int)i;w->furnaces[i].x=x+1;w->furnaces[i].y=y+1;w->furnaces[i].z=z+1;break;}
-    if(fi<0){w->notice="MAX 6 ACTIVE FURNACES";return 1;}
-    w->open_furnace=(uint8_t)fi;w->open_chest=255;w->bag=1;w->notice="SELECT ITEM THEN INPUT OR FUEL";return 1;
+    if(fi<0){MC_Notify(w,"MAX 6 ACTIVE FURNACES");return 1;}
+    w->open_furnace=(uint8_t)fi;w->open_chest=255;w->bag=1;MC_Notify(w,"SELECT ITEM THEN INPUT OR FUEL");return 1;
   }
   if(b==MC_CHEST) {
     int ci=chest_at(w,x,y,z);if(ci<0)return 0;
-    w->open_chest=(uint8_t)ci;w->open_furnace=255;w->bag=1;w->notice="SELECT INVENTORY THEN CHEST SLOT";return 1;
+    w->open_chest=(uint8_t)ci;w->open_furnace=255;w->bag=1;MC_Notify(w,"SELECT INVENTORY THEN CHEST SLOT");return 1;
   }
   if(b==MC_BED) {
     for(unsigned i=0;i<MC_MOBS;i++)if(w->mobs[i].health&&!w->mobs[i].type) {
       float dx=w->mobs[i].x-w->x,dy=w->mobs[i].y-w->y,dz=w->mobs[i].z-w->z;
-      if(dx*dx+dy*dy+dz*dz<64){w->notice="ENEMIES NEARBY  CANNOT SLEEP";return 1;}
+      if(dx*dx+dy*dy+dz*dz<64){MC_Notify(w,"ENEMIES NEARBY  CANNOT SLEEP");return 1;}
     }
     w->spawn[0]=x+1;w->spawn[1]=y+1;w->spawn[2]=z+1;
-    if(w->time>=300 || w->time<25){w->time=90;w->notice="SLEPT  SPAWN POINT SET";}
-    else w->notice="SPAWN SET  SLEEP AT NIGHT";
+    if(w->time>=300 || w->time<25){w->time=90;MC_Notify(w,"SLEPT  SPAWN POINT SET");}
+    else MC_Notify(w,"SPAWN SET  SLEEP AT NIGHT");
     return 1;
   }
   return 0;
@@ -467,24 +467,25 @@ int MC_UseAt(MC_World *w,float sx,float sy) {
   if(MC_FoodHunger(b) && (w->health<20 || w->hunger<20) && (w->creative || w->items[b])) {
     if(!w->creative){MC_Stack *s=&w->slots[w->slot];if(!--s->count)memset(s,0,sizeof(*s));}
     MC_SyncInventory(w);w->health=(uint8_t)fminf(20,w->health+MC_FoodHealth(b));
-    w->hunger=(uint8_t)fminf(20,w->hunger+MC_FoodHunger(b));w->notice=b==MC_APPLE?"ATE APPLE":b==MC_RAW_MEAT?"ATE RAW MEAT":b==MC_BREAD?"ATE BREAD":"ATE COOKED MEAT";return 1;
+    w->hunger=(uint8_t)fminf(20,w->hunger+MC_FoodHunger(b));MC_Notify(w,b==MC_APPLE?"ATE APPLE":b==MC_RAW_MEAT?"ATE RAW MEAT":b==MC_BREAD?"ATE BREAD":"ATE COOKED MEAT");return 1;
   }
   if(b==MC_SHOVEL) {
     MC_Hit h;if(MC_Pick(w,sx,sy,&h) && (h.block==MC_GRASS||h.block==MC_DIRT) && MC_Get(w,h.x,h.y+1,h.z)==MC_AIR) {
       MC_Set(w,h.x,h.y,h.z,MC_FARMLAND);
-      if(!w->creative) { MC_Stack *s=&w->slots[w->slot]; if(s->wear && !--s->wear){memset(s,0,sizeof(*s));w->equipped=0;w->notice="SHOVEL BROKE";} MC_SyncInventory(w); }
-      w->notice="TILLED SOIL";return 1;
+      int broke=0;
+      if(!w->creative) { MC_Stack *s=&w->slots[w->slot]; if(s->wear && !--s->wear){memset(s,0,sizeof(*s));w->equipped=0;broke=1;} MC_SyncInventory(w); }
+      MC_Notify(w,broke?"SHOVEL BROKE":"TILLED SOIL");return 1;
     }
-    w->notice="TILL GRASS OR DIRT";return 0;
+    MC_Notify(w,"TILL GRASS OR DIRT");return 0;
   }
   if(b==MC_WHEAT_SEEDS) {
     MC_Hit h;if(MC_Pick(w,sx,sy,&h) && h.block==MC_FARMLAND && MC_Get(w,h.x,h.y+1,h.z)==MC_AIR) {
       int gi=-1;for(unsigned i=0;i<MC_GROWERS;i++)if(!w->growers[i].x){gi=(int)i;break;}
-      if(gi<0){w->notice="MAX 16 CROPS";return 0;}
+      if(gi<0){MC_Notify(w,"MAX 16 CROPS");return 0;}
       MC_Set(w,h.x,h.y+1,h.z,MC_WHEAT_CROP);w->growers[gi]=(MC_Grower){h.x+1,h.y+2,h.z+1,0};
-      if(!w->creative){MC_Stack*s=&w->slots[w->slot];if(!--s->count)memset(s,0,sizeof(*s));MC_SyncInventory(w);}w->notice="WHEAT PLANTED";return 1;
+      if(!w->creative){MC_Stack*s=&w->slots[w->slot];if(!--s->count)memset(s,0,sizeof(*s));MC_SyncInventory(w);}MC_Notify(w,"WHEAT PLANTED");return 1;
     }
-    w->notice="PLANT ON TILLED SOIL";return 0;
+    MC_Notify(w,"PLANT ON TILLED SOIL");return 0;
   }
   if(MC_ToolIndex(b)>=0){MC_SelectItem(w,b);return 0;}
   return MC_PlaceAt(w,sx,sy);
@@ -519,14 +520,14 @@ int MC_Place(MC_World *w) { return MC_PlaceAt(w,400,240); }
 int MC_PlaceAt(MC_World *w,float sx,float sy) {
   unsigned b=w->hotbar[w->slot];
   if(!MC_IsBlock(b) || map_only(b) || b==MC_BEDROCK || b==MC_WATER || b==MC_DOOR_OPEN || b==MC_SLAB_TOP)return 0;
-  if(!w->creative && !w->items[b]){w->notice="NO BLOCKS";return 0;}
+  if(!w->creative && !w->items[b]){MC_Notify(w,"NO BLOCKS");return 0;}
   int x,y,z,nx,ny,nz,ci=-1,fi=-1,gi=-1;
   MC_Hit hit;
   if(!MC_Pick(w,sx,sy,&hit))return 0;
   x=hit.x;y=hit.y;z=hit.z;nx=hit.nx;ny=hit.ny;nz=hit.nz;
   x+=nx;y+=ny;z+=nz;
   if((b==MC_DUST||b==MC_LEVER||b==MC_BUTTON) &&
-     (ny<=0 || !MC_IsSolid(MC_Get(w,x,y-1,z)))) {w->notice="REDSTONE NEEDS SOLID FLOOR";return 0;}
+     (ny<=0 || !MC_IsSolid(MC_Get(w,x,y-1,z)))) {MC_Notify(w,"REDSTONE NEEDS SOLID FLOOR");return 0;}
   uint8_t placed=(uint8_t)b;
   if(b==MC_STAIR) {
     float dx=sinf(w->yaw),dz=cosf(w->yaw);
@@ -543,24 +544,24 @@ int MC_PlaceAt(MC_World *w,float sx,float sy) {
   }
   if(b==MC_CHEST) {
     for(unsigned i=0;i<MC_CHESTS;i++)if(!w->chest_map[i][0]){ci=(int)i;break;}
-    if(ci<0){w->notice="MAX 6 CHESTS";return 0;}
+    if(ci<0){MC_Notify(w,"MAX 6 CHESTS");return 0;}
   }
   if(b==MC_FURNACE) {
     for(unsigned i=0;i<MC_FURNACES;i++)if(!w->furnaces[i].x){fi=(int)i;break;}
-    if(fi<0){w->notice="MAX 6 FURNACES";return 0;}
+    if(fi<0){MC_Notify(w,"MAX 6 FURNACES");return 0;}
   }
   if(b==MC_SAPLING) {
     uint8_t ground=MC_Get(w,x,y-1,z);
-    if(ground!=MC_GRASS && ground!=MC_DIRT){w->notice="PLANT ON DIRT OR GRASS";return 0;}
+    if(ground!=MC_GRASS && ground!=MC_DIRT){MC_Notify(w,"PLANT ON DIRT OR GRASS");return 0;}
     for(unsigned i=0;i<MC_GROWERS;i++)if(!w->growers[i].x){gi=(int)i;break;}
-    if(gi<0){w->notice="MAX 16 GROWING TREES";return 0;}
+    if(gi<0){MC_Notify(w,"MAX 16 GROWING TREES");return 0;}
   }
   if(!MC_EditAt(w,1,placed,sx,sy))return 0;
   if(ci>=0){w->chest_map[ci][0]=x+1;w->chest_map[ci][1]=y+1;w->chest_map[ci][2]=z+1;}
   if(fi>=0){w->furnaces[fi].x=x+1;w->furnaces[fi].y=y+1;w->furnaces[fi].z=z+1;}
   if(gi>=0)w->growers[gi]=(MC_Grower){x+1,y+1,z+1,0};
   if(!w->creative){MC_Stack *s=&w->slots[w->slot];if(!--s->count)memset(s,0,sizeof(*s));}
-  MC_SyncInventory(w);w->notice=MC_ItemName(b);
+  MC_SyncInventory(w);MC_Notify(w,MC_ItemName(b));
   if(b==MC_DUST||b==MC_LAMP||b==MC_LEVER||b==MC_BUTTON)MC_RedstoneRefresh(w);
   return 1;
 }
@@ -620,20 +621,20 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   if(w->creative)sec=.15f;
   w->mining+=dt/sec;if(w->mining<1)return;
   int ci=chest_at(w,h.x,h.y,h.z),fi=furnace_at(w,h.x,h.y,h.z);
-  if(ci>=0)for(unsigned i=0;i<MC_CHEST_SLOTS;i++)if(w->chest_blocks[ci][i].count){w->notice="EMPTY CHEST BEFORE MINING";w->mining=0;return;}
+  if(ci>=0)for(unsigned i=0;i<MC_CHEST_SLOTS;i++)if(w->chest_blocks[ci][i].count){MC_Notify(w,"EMPTY CHEST BEFORE MINING");w->mining=0;return;}
   if(fi>=0 && (w->furnaces[fi].input.count || w->furnaces[fi].fuel.count || w->furnaces[fi].output.count || w->furnaces[fi].burn>0)) {
-    w->notice="EMPTY FURNACE AND LET FIRE OUT";w->mining=0;return;
+    MC_Notify(w,"EMPTY FURNACE AND LET FIRE OUT");w->mining=0;return;
   }
   if(h.block==MC_WHEAT_CROP || h.block==MC_WHEAT_MATURE) {
     w->mining+=dt/.45f;if(w->mining<1)return;
-    if(h.block==MC_WHEAT_CROP){w->notice="WHEAT IS STILL GROWING";w->mining=0;return;}
+    if(h.block==MC_WHEAT_CROP){MC_Notify(w,"WHEAT IS STILL GROWING");w->mining=0;return;}
     float px=h.x+.5f,py=h.y+.55f,pz=h.z+.5f;
-    if(!MC_Give(w,MC_WHEAT,1) && !MC_DropSpawn(w,MC_WHEAT,1,px,py,pz)){w->notice="BAG FULL";w->mining=0;return;}
+    if(!MC_Give(w,MC_WHEAT,1) && !MC_DropSpawn(w,MC_WHEAT,1,px,py,pz)){MC_Notify(w,"BAG FULL");w->mining=0;return;}
     unsigned seeds=1u+(unsigned)((h.x*17+h.z*31)&1u);
     if(!MC_Give(w,MC_WHEAT_SEEDS,seeds))MC_DropSpawn(w,MC_WHEAT_SEEDS,seeds,px,py,pz);
     MC_RemoveBlock(w,h.x,h.y,h.z);w->mining=0;w->target_valid=0;
     for(unsigned i=0;i<MC_GROWERS;i++)if(w->growers[i].x==h.x+1 && w->growers[i].y==h.y+1 && w->growers[i].z==h.z+1)memset(&w->growers[i],0,sizeof(MC_Grower));
-    MC_SyncInventory(w);w->notice="WHEAT HARVESTED";return;
+    MC_SyncInventory(w);MC_Notify(w,"WHEAT HARVESTED");return;
   }
   unsigned drop=h.block==MC_GRASS||h.block==MC_FARMLAND?MC_DIRT:h.block==MC_STONE?MC_COBBLE:h.block==MC_COAL_ORE?MC_COAL:h.block;
   if(h.block==MC_DUST_ON||h.block==MC_DUST)drop=MC_DUST;
@@ -651,7 +652,7 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   if(!w->creative && harvest && drop) {
     /* Preserve the established direct pickup path; overflow becomes a world drop. */
     if(!MC_Give(w,drop,drop_count) && !MC_DropSpawn(w,drop,drop_count,h.x+.5f,h.y+.55f,h.z+.5f)) {
-      w->notice="BAG FULL";w->mining=0;return;
+      MC_Notify(w,"BAG FULL");w->mining=0;return;
     }
     if(h.block==MC_COAL_ORE)MC_AddExperience(w,2);
     else if(h.block==MC_IRON_ORE)MC_AddExperience(w,3);
@@ -666,10 +667,10 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   for(unsigned i=0;i<MC_GROWERS;i++)if(w->growers[i].x==h.x+1 && w->growers[i].y==h.y+1 && w->growers[i].z==h.z+1)memset(&w->growers[i],0,sizeof(MC_Grower));
   if(w->spawn[0]==h.x+1 && w->spawn[1]==h.y+1 && w->spawn[2]==h.z+1)memset(w->spawn,0,sizeof(w->spawn));
   if(redstone_kind(h.block))MC_RedstoneRefresh(w);
-  w->notice=harvest?(drop?MC_ItemName(drop):"LEAVES CLEARED"):"NEEDS BETTER PICK  NO DROP";
+  MC_Notify(w,harvest?(drop?MC_ItemName(drop):"LEAVES CLEARED"):"NEEDS BETTER PICK  NO DROP");
   if(!w->creative && ti>=0) {
     MC_Stack *t=&w->slots[w->slot];
-    if(t->wear && !--t->wear){memset(t,0,sizeof(*t));w->equipped=0;w->notice="TOOL BROKE";}
+    if(t->wear && !--t->wear){memset(t,0,sizeof(*t));w->equipped=0;MC_Notify(w,"TOOL BROKE");}
     MC_SyncInventory(w);
   }
 }
@@ -759,6 +760,10 @@ unsigned MC_CropGrowthNeeds(const MC_World *w,int x,int y,int z) {
   if(!light)needs|=MC_CROP_NEEDS_LIGHT;
   return needs;
 }
+void MC_Notify(MC_World *w,const char *message) {
+  w->notice=message&&*message?message:NULL;
+  w->notice_time=w->notice?3:0;
+}
 void MC_NotifySave(MC_World *w,unsigned result) {
   if(result>MC_SAVE_VERIFY_FAILED)result=MC_SAVE_IDLE;
   w->save_feedback=(uint8_t)result;
@@ -768,6 +773,10 @@ void MC_SystemsTick(MC_World *w,float dt) {
   if(!(dt>0))return;
   /* UI feedback keeps wall-clock duration even while the inventory pauses
      gameplay or a long frame forces physics to clamp its time step. */
+  if(w->notice_time>0) {
+    w->notice_time=fmaxf(0,w->notice_time-dt);
+    if(!w->notice_time)w->notice=NULL;
+  }
   if(w->save_feedback_time>0) {
     w->save_feedback_time=fmaxf(0,w->save_feedback_time-dt);
     if(!w->save_feedback_time)w->save_feedback=MC_SAVE_IDLE;
@@ -798,7 +807,7 @@ void MC_SystemsTick(MC_World *w,float dt) {
     if(MC_IsSolid(MC_Get(w,bx,by,bz)) && d->y<by+1.12f){d->y=by+1.12f;d->vy=0;}
     float dx=d->x-w->x,dy=d->y-(w->y+.65f),dz=d->z-w->z;
     if(dx*dx+dy*dy+dz*dz<1.35f*1.35f && MC_Give(w,d->item,d->count)) {
-      w->notice=MC_ItemName(d->item);memset(d,0,sizeof(*d));continue;
+      MC_Notify(w,MC_ItemName(d->item));memset(d,0,sizeof(*d));continue;
     }
   }
   /* Merge nearby stacks with a fixed O(16^2) budget. */
@@ -817,7 +826,7 @@ void MC_SystemsTick(MC_World *w,float dt) {
         if(i>=MC_WOOD_PICK && i<=MC_IRON_PICK && empty<MC_SLOTS && w->reserve_wear[i-MC_WOOD_PICK]) {
           w->slots[empty].wear=w->reserve_wear[i-MC_WOOD_PICK];MC_SyncInventory(w);
         }
-        w->reserve[i]-=n;w->notice="OLD INVENTORY ITEMS RESTORED";break;
+        w->reserve[i]-=n;MC_Notify(w,"OLD INVENTORY ITEMS RESTORED");break;
       }
     }
   }
@@ -886,11 +895,11 @@ int MC_ContainerTap(MC_World *w,unsigned slot) {
     MC_Stack *dst=slot==0?&f->input:slot==1?&f->fuel:&f->output;
     if(slot==2 || !src->count) {
       if(!dst->count)return 0;
-      if(!add_stack(w->slots,MC_SLOTS,*dst)){w->notice="BAG FULL";return 0;}
+      if(!add_stack(w->slots,MC_SLOTS,*dst)){MC_Notify(w,"BAG FULL");return 0;}
       memset(dst,0,sizeof(*dst));if(slot==0)f->progress=0;
     } else {
-      if((slot==0 && !smelt(src->item)) || (slot==1 && !fuel_time(src->item))){w->notice="INVALID INPUT OR FUEL";return 0;}
-      if(dst->count && dst->item!=src->item){w->notice="EMPTY SLOT FIRST";return 0;}
+      if((slot==0 && !smelt(src->item)) || (slot==1 && !fuel_time(src->item))){MC_Notify(w,"INVALID INPUT OR FUEL");return 0;}
+      if(dst->count && dst->item!=src->item){MC_Notify(w,"EMPTY SLOT FIRST");return 0;}
       if(!MC_MoveStack(src,dst,w->split))return 0;
     }
     MC_SyncInventory(w);return 1;
