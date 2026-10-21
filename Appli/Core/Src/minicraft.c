@@ -197,6 +197,8 @@ void MC_UpdateExploration(MC_World *w)
 {
   if(!w||!w->blocks)return;
   int px=(int)floorf(w->x),pz=(int)floorf(w->z);
+  if(w->explore_cell_x==px&&w->explore_cell_z==pz)return;
+  w->explore_cell_x=(int16_t)px;w->explore_cell_z=(int16_t)pz;
   for(int dz=-8;dz<=8;dz++)for(int dx=-8;dx<=8;dx++) {
     int x=px+dx,z=pz+dz;if(x<0||z<0||x>=MC_MAP_X||z>=MC_MAP_Z)continue;
     unsigned i=explore_index(x,z);w->explored[i>>3]|=(uint8_t)(1u<<(i&7));

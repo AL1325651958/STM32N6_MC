@@ -101,6 +101,8 @@ typedef struct {
   uint8_t target_valid, bag_page;
   /* Persistent top-down exploration mask, one bit per horizontal map cell. */
   uint8_t explored[MC_EXPLORE_BYTES];
+  /* Runtime cursor: exploration work is only needed after crossing a cell. */
+  int16_t explore_cell_x, explore_cell_z;
   MC_Mob mobs[MC_MOBS];
   /* Runtime-only breeding state; v4 mob slots remain exactly 32 bytes. */
   uint8_t mob_fed[MC_MOBS];

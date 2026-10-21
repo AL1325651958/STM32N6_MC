@@ -221,10 +221,13 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
       for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)sread(&w->armor[i],m+M_ARMOR+i*4);
       if(m[M_XP+5]) { w->experience=get32(m+M_XP);w->level=(uint8_t)MC_XpLevel(w); }
     }
-    if(v>=9)memcpy(w->explored,m+MC_SAVE_META,MC_EXPLORE_BYTES);
+    if(v>=9) {
+      memcpy(w->explored,m+MC_SAVE_META,MC_EXPLORE_BYTES);
+      w->explore_cell_x=(int16_t)floorf(w->x);w->explore_cell_z=(int16_t)floorf(w->z);
+    }
     MC_Notify(w,"WORLD AND INVENTORY LOADED");
   }
-  if(v<9)MC_UpdateExploration(w);
+  if(v<9) { w->explore_cell_x=-32768;w->explore_cell_z=-32768;MC_UpdateExploration(w); }
   MC_SyncInventory(w);
   /* Redstone propagation is runtime-only.  Lever states persist in the map;
      button pulses are intentionally cleared on load and the nearby network

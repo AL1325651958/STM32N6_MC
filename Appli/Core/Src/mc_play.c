@@ -254,6 +254,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   memset(w->reserve,0,sizeof(w->reserve));memset(w->spawn,0,sizeof(w->spawn));memset(w->durability,0,sizeof(w->durability));
   memset(w->reserve_wear,0,sizeof(w->reserve_wear));
   memset(w->explored,0,sizeof(w->explored));
+  w->explore_cell_x=-32768;w->explore_cell_z=-32768;
   const uint8_t bar[8]={MC_WOOD,MC_DIRT,MC_COBBLE,MC_PLANKS,MC_TABLE,MC_TORCH,MC_GLASS,MC_BOW};
   memcpy(w->creative_bar,bar,8);w->slot=0;w->creative=(uint8_t)legacy;
   w->health=20;w->air=10;w->hunger=20;w->equipped=0;w->time=90;
