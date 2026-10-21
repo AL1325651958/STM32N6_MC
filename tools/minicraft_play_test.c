@@ -106,6 +106,12 @@ int main(void) {
  assert(f->output.count==8&&f->input.count+f->output.count==10);unsigned out=f->output.count;tick(&w,100);assert(f->output.count==out);
  assert(MC_ContainerTap(&w,2)&&w.items[MC_IRON]==out&&!f->output.count);
  f->output=(MC_Stack){MC_IRON,64,0};f->burn=10;tick(&w,60);assert(f->output.count==64&&f->progress==0);
+ /* An adjacent chest feeds a furnace and collects its finished output. */
+ scene(&w);MC_Set(&w,10,3,10,MC_FURNACE);w.furnaces[0]=(MC_Furnace){11,4,11,{0},{0},{0},0,0};
+ MC_Set(&w,11,3,10,MC_CHEST);w.chest_map[0][0]=12;w.chest_map[0][1]=4;w.chest_map[0][2]=11;
+ w.chest_blocks[0][0]=(MC_Stack){MC_IRON_ORE,3,0};w.chest_blocks[0][1]=(MC_Stack){MC_COAL,1,0};
+ tick(&w,3);f=&w.furnaces[0];assert(f->input.item==MC_IRON_ORE&&f->input.count==3&&f->burn>0&&w.chest_blocks[0][1].count==0);
+ tick(&w,200);assert(w.chest_blocks[0][0].item==MC_IRON&&w.chest_blocks[0][0].count==3);
  /* Renewable trees, blocked growth retry and no trunk inside player. */
  scene(&w);MC_Set(&w,20,2,20,MC_SAPLING);w.growers[0]=(MC_Grower){21,3,21,119.9f};tick(&w,2);assert(MC_Get(&w,20,2,20)==MC_WOOD&&!w.growers[0].x);
  MC_Set(&w,30,2,30,MC_SAPLING);MC_Set(&w,30,4,30,MC_STONE);w.growers[0]=(MC_Grower){31,3,31,119.9f};tick(&w,2);assert(MC_Get(&w,30,2,30)==MC_SAPLING&&w.growers[0].age<111);

@@ -236,6 +236,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   w->mob_target=255;w->mob_clock=w->spawn_clock=w->attack_cooldown=w->attack_flash=w->shoot_cooldown=0;
   w->gravity_clock=0;w->gravity_cursor=0;
   w->fluid_clock=0;w->fluid_cursor=0;
+  w->automation_clock=0;
   w->redstone_clock=0;memset(w->redstone_button_pos,0,sizeof(w->redstone_button_pos));memset(w->redstone_button_timer,0,sizeof(w->redstone_button_timer));
   memset(w->mob_fed,0,sizeof(w->mob_fed));memset(w->mob_fed_age,0,sizeof(w->mob_fed_age));w->breed_cooldown=0;
   MC_SyncInventory(w);
@@ -297,6 +298,61 @@ int MC_DropSpawn(MC_World *w,unsigned item,unsigned count,float x,float y,float 
 }
 static int fuel_time(unsigned item){return item==MC_COAL?40:item==MC_WOOD?15:item==MC_PLANKS?10:0;}
 static unsigned smelt(unsigned item){return item==MC_IRON_ORE?MC_IRON:item==MC_SAND?MC_GLASS:item==MC_COBBLE?MC_BRICK:item==MC_WOOD?MC_COAL:0;}
+/* A chest touching a furnace becomes a small, deterministic automation link.
+   It feeds one input/fuel stack when the corresponding furnace slot has room
+   and receives finished output.  The scan is limited to six furnaces and six
+   neighbouring cells, and runs at 4 Hz, so it adds no whole-world work. */
+static void automation_tick(MC_World *w,float dt)
+{
+  w->automation_clock+=dt;
+  if(w->automation_clock<.25f)return;
+  w->automation_clock=fmodf(w->automation_clock,.25f);
+  static const int dirs[6][3]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+  for(unsigned fi=0;fi<MC_FURNACES;fi++) {
+    MC_Furnace *f=&w->furnaces[fi];
+    if(!f->x)continue;
+    int fx=(int)f->x-1,fy=(int)f->y-1,fz=(int)f->z-1;
+    for(unsigned di=0;di<6;di++) {
+      int ci=chest_at(w,fx+dirs[di][0],fy+dirs[di][1],fz+dirs[di][2]);
+      if(ci<0)continue;
+      MC_Stack *chest=w->chest_blocks[ci];
+      if(f->input.count<64) {
+        for(unsigned si=0;si<MC_CHEST_SLOTS;si++) {
+          MC_Stack *s=&chest[si];unsigned out=smelt(s->item);
+          if(!s->count||!out)continue;
+          if(f->input.count && f->input.item!=s->item)continue;
+          unsigned n=64-f->input.count;if(n>s->count)n=s->count;
+          if(!f->input.count)f->input=(MC_Stack){s->item,0,0};
+          f->input.count+=(uint8_t)n;s->count-=(uint8_t)n;if(!s->count)memset(s,0,sizeof(*s));
+          break;
+        }
+      }
+      if(f->fuel.count<64) {
+        for(unsigned si=0;si<MC_CHEST_SLOTS;si++) {
+          MC_Stack *s=&chest[si];if(!s->count||!fuel_time(s->item))continue;
+          if(f->fuel.count && f->fuel.item!=s->item)continue;
+          unsigned n=64-f->fuel.count;if(n>s->count)n=s->count;
+          if(!f->fuel.count)f->fuel=(MC_Stack){s->item,0,0};
+          f->fuel.count+=(uint8_t)n;s->count-=(uint8_t)n;if(!s->count)memset(s,0,sizeof(*s));
+          break;
+        }
+      }
+      if(f->output.count) {
+        for(unsigned si=0;si<MC_CHEST_SLOTS;si++) {
+          MC_Stack *s=&chest[si];
+          if(s->count && (s->item!=f->output.item || s->count>=64))continue;
+          unsigned n=f->output.count;
+          if(s->count && n>(unsigned)(64u-s->count))n=(unsigned)(64u-s->count);
+          if(!n)continue;
+          if(!s->count)*s=(MC_Stack){f->output.item,0,0};
+          s->count+=(uint8_t)n;f->output.count-=(uint8_t)n;
+          if(!f->output.count)memset(&f->output,0,sizeof(f->output));
+          break;
+        }
+      }
+    }
+  }
+}
 int MC_Use(MC_World *w) {
   if(MC_OpenTarget(w))return 1;
   unsigned b=w->hotbar[w->slot];
@@ -556,6 +612,7 @@ void MC_SystemsTick(MC_World *w,float dt) {
   MC_ProjectilesTick(w,dt);
   falling_sand(w,dt);
   flowing_water(w,dt);
+  automation_tick(w,dt);
   for(unsigned i=0;i<MC_DROPS;i++) {
     MC_Drop *d=&w->drops[i];if(!d->count)continue;
     d->age+=dt;d->spin+=dt*3.2f;

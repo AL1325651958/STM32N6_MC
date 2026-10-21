@@ -93,6 +93,9 @@ typedef struct {
      bytes and therefore remains absent from the fixed v4 save layout. */
   float fluid_clock;
   uint16_t fluid_cursor;
+  /* Runtime-only cadence for adjacent chest/furnace automation.  The link is
+     derived from persistent block coordinates, so no v4 fields are needed. */
+  float automation_clock;
   /* Runtime-only redstone scheduler; map bytes keep lever state, while
      button timers and the propagation clock are discarded on save/load. */
   float redstone_clock;
