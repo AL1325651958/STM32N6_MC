@@ -13,10 +13,11 @@ import struct
 import subprocess
 import sys
 import zipfile
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/minicraft"
-ARCHIVE_ROOT = ROOT / "out/verified-v6"
+ARCHIVE_ROOT = ROOT / "out/verified-v7"
 
 
 def digest(data):
@@ -40,6 +41,28 @@ def main():
         run([sys.executable, "tools/build_minicraft.py"], "snapshot-build.log")
     tests = run([sys.executable, "tools/test_minicraft.py", "--sd", "G:/"], "snapshot-tests.log")
 
+    gcc = shutil.which("gcc") or "C:/Strawberry/c/bin/gcc.exe"
+    preview_exe = OUT / "tests/minicraft_preview.exe"
+    preview_sources = ["tools/minicraft_preview.c", "Appli/Core/Src/minicraft.c",
+                       "Appli/Core/Src/mc_play.c", "Appli/Core/Src/mc_mobs.c",
+                       "Appli/Core/Src/mc_save.c", "Appli/Core/Src/mc_ui.c"]
+    result = subprocess.run([gcc, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-I",
+                             "Appli/Core/Inc", *preview_sources, "-lm", "-o", str(preview_exe)],
+                            cwd=ROOT, text=True, capture_output=True, encoding="utf-8")
+    (OUT / "snapshot-preview-build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
+    if result.returncode:
+        raise SystemExit(f"preview build failed; see {OUT / 'snapshot-preview-build.log'}\n{result.stdout}{result.stderr}")
+    preview_dir = OUT / "ui-v7"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run([str(preview_exe), str(preview_dir)], cwd=ROOT,
+                            text=True, capture_output=True, encoding="utf-8")
+    (OUT / "snapshot-preview.log").write_text(result.stdout + result.stderr, encoding="utf-8")
+    if result.returncode:
+        raise SystemExit(f"preview generation failed; see {OUT / 'snapshot-preview.log'}\n{result.stdout}{result.stderr}")
+    for ppm in preview_dir.glob("*.ppm"):
+        with Image.open(ppm) as preview:
+            preview.save(ppm.with_suffix(".png"))
+
     raw = (OUT / "MiniCraft_N6.bin").read_bytes()
     signed = (OUT / "MiniCraft_N6-Trusted.bin").read_bytes()
     elf = OUT / "MiniCraft_N6.elf"
@@ -58,7 +81,7 @@ def main():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archive_root = ARCHIVE_ROOT / stamp
     archive_root.mkdir(parents=True, exist_ok=False)
-    source_zip = archive_root / "MiniCraft-v6-source.zip"
+    source_zip = archive_root / "MiniCraft-v7-source.zip"
     source_hashes = {}
     with zipfile.ZipFile(source_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for rel in sources:
@@ -80,6 +103,11 @@ def main():
         "build.log": (OUT / "snapshot-build.log").read_bytes() if not args.skip_build else (OUT / "compile.log").read_bytes() + (OUT / "link.log").read_bytes(),
         "geometry.png": (OUT / "geometry.png").read_bytes(),
         "combat.png": (OUT / "combat.png").read_bytes(),
+        "action_attack.png": (preview_dir / "action_attack.png").read_bytes(),
+        "action_shoot.png": (preview_dir / "action_shoot.png").read_bytes(),
+        "action_feed.png": (preview_dir / "action_feed.png").read_bytes(),
+        "action_place.png": (preview_dir / "action_place.png").read_bytes(),
+        "action_use.png": (preview_dir / "action_use.png").read_bytes(),
     }
     for name, data in artifacts.items():
         (archive_root / name).write_bytes(data)

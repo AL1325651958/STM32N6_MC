@@ -62,7 +62,7 @@ python tools/test_minicraft.py --sd G:/
 python tools/snapshot_minicraft.py
 ```
 
-主机 GCC 以 `-Wall -Wextra -Werror` 验证几何、移动、采集、掉落、背包、合成、容器、熔炉、生长、战斗和存档；ARM 构建验证链接与签名。快照脚本在构建后生成源码 ZIP、固件副本、哈希与验证记录，保存到 `out/verified-v5/`。预览工具 `tools/minicraft_preview.c` 共用固件渲染器，可生成十种场景和界面图。
+主机 GCC 以 `-Wall -Wextra -Werror` 验证几何、移动、采集、掉落、背包、合成、容器、熔炉、生长、战斗和存档；ARM 构建验证链接与签名。快照脚本在构建后生成精简源码 ZIP、固件副本、哈希与验证记录，保存到 `out/verified-v7/`。预览工具 `tools/minicraft_preview.c` 共用固件渲染器，可生成十六种场景和界面图，包括按手持物品变化的场景动作提示。
 
 用户此前旧版板上约 15 FPS；**当前 v4 尚未烧录实测**。主机预览不能证明板上性能；触屏多指、LCD、真实 SD 迁移、异常断电和长时间运行仍需板验。
 

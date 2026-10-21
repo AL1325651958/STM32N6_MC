@@ -194,6 +194,13 @@ int main(void) {
  MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);unsigned held_pixels=0;
  for(int yy=270;yy<400;yy++)for(int xx=570;xx<685;xx++)if(fb[yy*800+xx])held_pixels++;
  assert(held_pixels>100);
+ uint16_t action_pixels[5][100*8];const unsigned action_items[]={MC_SWORD,MC_BOW,MC_WHEAT,MC_DIRT,MC_APPLE};
+ for(unsigned a=0;a<5;a++) {
+   w.slots[0]=(MC_Stack){action_items[a],1,0};MC_SyncInventory(&w);
+   memset(fb,0,800*480*sizeof(*fb));MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);
+   for(int yy=0;yy<8;yy++)memcpy(&action_pixels[a][yy*100],&fb[(288+yy)*800+690],100*sizeof(*fb));
+ }
+ for(unsigned a=1;a<5;a++)assert(memcmp(action_pixels[0],action_pixels[a],sizeof(action_pixels[0]))!=0);
  for(int k=0;k<6;k++){w.bag=k>0;MC_SetMode(&w,k==5);w.open_chest=k==2?0:255;w.open_furnace=k==3?0:255;MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);}
  for(int k=0;k<64;k++)assert(fb[800*480+k]==0xa55a);
  free(fb);free(w.blocks);puts("minicraft slots / crafting / containers / furnace / growth / survival / UI: OK");return 0;

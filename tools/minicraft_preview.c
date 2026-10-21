@@ -15,11 +15,12 @@ int main(int argc,char **argv)
   if(!w.blocks||!save||!view||!fb) return 1;
   MC_Generate(&w,0x20261020);
   char path[1024];
-  const char *variants[]={"preview","night","inventory","mining","chest","furnace","creative","geometry","farming","combat","ruins"};
+  const char *variants[]={"preview","night","inventory","mining","chest","furnace","creative","geometry","farming","combat","ruins",
+    "action_attack","action_shoot","action_feed","action_place","action_use"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
-    else w.notice="HOLD BLOCK TO MINE  BAG TO CRAFT";
+    else w.notice="TAP TO ACT  HOLD TO MINE  BAG TO CRAFT";
     if(k==3) {w.pitch=-.5f;w.target_valid=MC_Pick(&w,400,240,&w.target);w.mining=.65f;}
     if(k==4) {w.bag=1;w.open_chest=0;w.chest_blocks[0][0]=(MC_Stack){MC_WOOD,64,0};w.chest_blocks[0][5]=(MC_Stack){MC_AXE,1,17};w.notice="SELECT INVENTORY THEN CHEST SLOT";}
     if(k==5) {w.bag=1;w.open_furnace=0;w.furnaces[0]=(MC_Furnace){1,2,1,{MC_IRON_ORE,8,0},{MC_COAL,2,0},{MC_IRON,3,0},23,2.8f};w.notice="SELECT ITEM THEN INPUT OR FUEL";}
@@ -61,6 +62,10 @@ int main(int argc,char **argv)
       w.x=cx+.5f;w.y=h+2.01f;w.z=cz-5.5f;w.yaw=0;w.pitch=-.08f;w.time=90;
       w.notice="STONE RUIN  TORCHES  SUPPLY CHEST";
     }
+    if(k>=11) {
+      static const unsigned action_items[]={MC_SWORD,MC_BOW,MC_WHEAT,MC_DIRT,MC_APPLE};
+      w.slot=0;w.slots[0]=(MC_Stack){action_items[k-11],1,0};MC_SyncInventory(&w);
+    }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];
     MC_UIDraw(fb,&w,MC_GRASS,0,0,"NEW WORLD  SD READY",1,0,0);
@@ -75,6 +80,6 @@ int main(int argc,char **argv)
   FILE *f=fopen(path,"wb");if(!f)return 1;
   if(fwrite(save,1,MC_SAVE_SIZE,f)!=MC_SAVE_SIZE)return 1;
   fclose(f);
-  printf("Eleven interface/gameplay previews and %u-byte example save generated at %s\n",(unsigned)MC_SAVE_SIZE,argv[1]);
+  printf("Sixteen interface/gameplay previews and %u-byte example save generated at %s\n",(unsigned)MC_SAVE_SIZE,argv[1]);
   free(fb);free(view);free(save);free(w.blocks);return 0;
 }

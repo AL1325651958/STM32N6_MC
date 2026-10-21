@@ -267,6 +267,13 @@ static void mini_map(uint16_t *fb,const MC_World *w)
   small(fb,696,185,"BASE",0xffe0);small(fb,738,185,"YOU",0xffff);
   rect(fb,686+9,199,7,4,0xffe0);small(fb,696,197,"BED",0xffff);
 }
+static const char *scene_action_hint(unsigned item)
+{
+  if(item==MC_BOW)return "TAP SHOOT";
+  if(item==MC_WHEAT)return "TAP FEED";
+  if(item==MC_SWORD||item==MC_AXE||item==MC_WOOD_PICK||item==MC_STONE_PICK||item==MC_IRON_PICK)return "TAP ATTACK";
+  return MC_IsBlock(item)?"TAP PLACE":"TAP USE";
+}
 static void stack(uint16_t *fb,int x,int y,int width,int height,const MC_Stack *s,int chosen,int infinite)
 {
   char n[16];uint16_t rim=chosen?0xffcb:0x52ab;
@@ -350,7 +357,10 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     rect(fb,jx-10,jy-10,20,20,0xffe0);text(fb,86,444,"MOVE",0xffff);
     /* Scene taps are the contextual action.  The held item is visible at
        lower right, so no second PLACE/USE button is needed. */
-    small(fb,690,288,MC_IsBlock(w->hotbar[w->slot])?"TAP PLACE":"TAP ACTION",0xffe0);
+    unsigned held=w->hotbar[w->slot];
+    uint16_t action_color=held==MC_BOW?0xfca0:held==MC_WHEAT?0x07e0:
+      (held==MC_SWORD||held==MC_AXE||held==MC_WOOD_PICK||held==MC_STONE_PICK||held==MC_IRON_PICK)?0xf9a4:0xffe0;
+    small(fb,690,288,scene_action_hint(held),action_color);
     panel(fb,690,216,100,62);text(fb,710,228,"SNEAK",w->sneak?0x07e0:0xffff);small(fb,700,258,w->sneak?"EDGE GUARD":"HOLD TO SNEAK",0xffe0);
     panel(fb,690,360,100,62);text(fb,716,384,"JUMP",0xffff);
     for(unsigned i=0;i<MC_HOTBAR;i++){MC_Stack s=w->creative?(MC_Stack){w->hotbar[i],1,0}:w->slots[i];stack(fb,240+i*50,424,50,56,&s,i==w->slot,w->creative);}
