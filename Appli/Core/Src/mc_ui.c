@@ -254,7 +254,7 @@ static void icon(uint16_t *fb,int x,int y,unsigned id,int size)
 { icon_rect(fb,x,y,size,size,id); }
 static int catalog_visible(unsigned id)
 {
-  return !(MC_DoorUpper((uint8_t)id) || id==MC_DOUBLE_SLAB || id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE || id==MC_DUST_ON || id==MC_LAMP_ON || id==MC_LEVER_ON || id==MC_BUTTON_ON || (id>=MC_STAIR_EAST && id<=MC_STAIR_WEST));
+  return !(MC_DoorUpper((uint8_t)id) || id==MC_DOUBLE_SLAB || id==MC_WATER || id==MC_LAVA || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE || id==MC_DUST_ON || id==MC_LAMP_ON || id==MC_LEVER_ON || id==MC_BUTTON_ON || (id>=MC_STAIR_EAST && id<=MC_STAIR_WEST));
 }
 static unsigned catalog_count(void)
 {
@@ -329,6 +329,7 @@ static uint16_t map_color(uint8_t b)
 {
   switch(b) {
     case MC_WATER:return 0x3d9f;
+    case MC_LAVA:return 0xf9a4;
     case MC_GRASS:return 0x56a5;
     case MC_DIRT:return 0x8b07;
     case MC_SAND:return 0xd66f;

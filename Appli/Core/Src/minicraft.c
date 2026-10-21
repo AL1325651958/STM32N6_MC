@@ -182,7 +182,7 @@ void MC_RemoveBlock(MC_World *w,int x,int y,int z)
   }
   MC_Set(w,x,y,z,MC_AIR);
 }
-int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_TORCH && block != MC_SAPLING && block != MC_WHEAT_CROP && block != MC_WHEAT_MATURE && block != MC_DUST && block != MC_DUST_ON && block != MC_LEVER && block != MC_LEVER_ON && block != MC_BUTTON && block != MC_BUTTON_ON; }
+int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_LAVA && block != MC_TORCH && block != MC_SAPLING && block != MC_WHEAT_CROP && block != MC_WHEAT_MATURE && block != MC_DUST && block != MC_DUST_ON && block != MC_LEVER && block != MC_LEVER_ON && block != MC_BUTTON && block != MC_BUTTON_ON; }
 
 typedef struct { float lo[3], hi[3]; } MC_Part;
 
@@ -294,7 +294,7 @@ static int floor_at(const MC_World *w,float x,float feet,float z)
     int bx=(int)floorf(px),by=(int)floorf(y),bz=(int)floorf(pz);
     for(int below=0;below<2;below++) {
       uint8_t b=MC_Get(w,bx,by-below,bz);
-      if(!MC_IsSolid(b)||(below&&b!=MC_FENCE))continue;
+      if((b!=MC_LAVA&&!MC_IsSolid(b))||(below&&b!=MC_FENCE))continue;
       const MC_Part *parts;unsigned count=parts_for(b,&parts);float lo[3],hi[3];
       if(!count){bounds(b,lo,hi);count=1;}
       float p[3]={px-bx,y-by+below,pz-bz};
@@ -648,7 +648,7 @@ int MC_BlockSegment(const MC_World *w,float px,float py,float pz,float ex,float 
     /* Fence posts extend into the cell above their base. */
     for(int below=0;below<2;below++) {
       uint8_t b=MC_Get(w,x,y-below,z);
-      if(!MC_IsSolid(b)||(below&&b!=MC_FENCE))continue;
+      if((b!=MC_LAVA&&!MC_IsSolid(b))||(below&&b!=MC_FENCE))continue;
       float p[3]={px-x,py-y+below,pz-z},lo[3],hi[3];
       const MC_Part *parts;unsigned count=parts_for(b,&parts);
       if(!count){bounds(b,lo,hi);count=1;}
@@ -910,6 +910,10 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
             water_ready=1;
           }
           n=water_noise[tv*16+tu];break;
+        case MC_LAVA:
+          r=224;g=60;b=18;
+          n=(int)(sinf((float)tu*.9f+(float)tv*.55f+w->time*3.0f)*18.0f);
+          break;
         case MC_COBBLE:if((tu+((tv/5)&1)*4)%7==0 || tv%5==0)n=-45;break;
         case MC_PLANKS:r=179;g=137;b=79;if(tv%4==0 || (tu+(tv/4)*7)%16==0)n=-32;break;
         case MC_BIRCH_PLANKS:r=204;g=181;b=126;if(tv%4==0 || (tu+(tv/4)*7)%16==0)n=-30;break;

@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 from fontTools.ttLib import TTFont
 ROOT = Path(__file__).resolve().parents[1]
 WEIGHT, THRESHOLD = 500, 100
-SMALL_FALLBACK = {0x71C3}  # 燃: absent from the pinned Ark 12px build.
+SMALL_FALLBACK = {0x6D46, 0x71C3}  # 浆 and 燃: absent from the pinned Ark 12px build.
 
 
 def render(font, cp, edge, pixel):

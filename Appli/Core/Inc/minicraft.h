@@ -37,7 +37,7 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
        MC_BIRCH_WOOD, MC_BIRCH_PLANKS, MC_DARK_WOOD, MC_DARK_PLANKS,
        MC_BREAD, MC_COOKED_MEAT,
        MC_DOUBLE_SLAB, /* map-only: two stone slabs, existing IDs unchanged */
-       MC_DOOR_TOP, MC_DOOR_TOP_OPEN,
+       MC_DOOR_TOP, MC_DOOR_TOP_OPEN, MC_LAVA,
        MC_ITEM_COUNT };
 /* Map-only directional doors: three rotations, each closed/open lower then
    closed/open upper. All inventory and existing map IDs stay unchanged. */

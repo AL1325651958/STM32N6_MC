@@ -2,7 +2,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
-static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT","REDSTONE DUST","REDSTONE DUST ON","REDSTONE LAMP","REDSTONE LAMP ON","LEVER","LEVER ON","BUTTON","BUTTON ON","BOW","ARROW","IRON HELMET","IRON CHESTPLATE","IRON LEGGINGS","IRON BOOTS","BIRCH LOG","BIRCH PLANKS","DARK LOG","DARK PLANKS","BREAD","COOKED MEAT","DOUBLE STONE SLAB","DOOR","DOOR OPEN"};
+static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT","REDSTONE DUST","REDSTONE DUST ON","REDSTONE LAMP","REDSTONE LAMP ON","LEVER","LEVER ON","BUTTON","BUTTON ON","BOW","ARROW","IRON HELMET","IRON CHESTPLATE","IRON LEGGINGS","IRON BOOTS","BIRCH LOG","BIRCH PLANKS","DARK LOG","DARK PLANKS","BREAD","COOKED MEAT","DOUBLE STONE SLAB","DOOR","DOOR OPEN","LAVA"};
 /* Designators prevent an appended item from shifting unrelated drop colors. */
 static const uint16_t colors[MC_ITEM_COUNT]={
   [MC_GRASS]=0x6cc6,[MC_DIRT]=0x8b07,[MC_STONE]=0x8410,[MC_SAND]=0xd66f,
@@ -21,15 +21,15 @@ static const uint16_t colors[MC_ITEM_COUNT]={
   [MC_BUTTON_ON]=0xffe0,[MC_BOW]=0x8a45,[MC_ARROW]=0xe7be,
   [MC_IRON_HELMET]=0xa514,[MC_IRON_CHESTPLATE]=0xa514,[MC_IRON_LEGGINGS]=0xa514,[MC_IRON_BOOTS]=0xa514,
   [MC_BIRCH_WOOD]=0xd6b6,[MC_BIRCH_PLANKS]=0xc5a2,[MC_DARK_WOOD]=0x5a04,[MC_DARK_PLANKS]=0x7b05,
-  [MC_BREAD]=0xdca6,[MC_COOKED_MEAT]=0xa346,[MC_DOUBLE_SLAB]=0x8c71
+  [MC_BREAD]=0xdca6,[MC_COOKED_MEAT]=0xa346,[MC_DOUBLE_SLAB]=0x8c71,[MC_LAVA]=0xf9a4
 };
 const char *MC_ItemName(unsigned i){if(i>=MC_ITEM_COUNT&&i<=255&&MC_IsDoor((uint8_t)i))i=MC_DoorOpen((uint8_t)i)?MC_DOOR_OPEN:MC_DOOR;return i<MC_ITEM_COUNT?names[i]:"EMPTY";}uint16_t MC_ItemColor(unsigned i){if(i>=MC_ITEM_COUNT&&i<=255&&MC_IsDoor((uint8_t)i))i=MC_DoorOpen((uint8_t)i)?MC_DOOR_OPEN:MC_DOOR;return i<MC_ITEM_COUNT?colors[i]:0;}
 void MC_HoldStart(MC_Hold*h,int x,int y,uint32_t n){*h=(MC_Hold){x,y,x,y,n,0};}void MC_HoldMove(MC_Hold*h,int x,int y,uint32_t n){int dx=x-h->anchor_x,dy=y-h->anchor_y;h->x=x;h->y=y;if(dx*dx+dy*dy>144){h->moved=1;h->anchor_x=x;h->anchor_y=y;h->since=n;}}int MC_HoldReady(const MC_Hold*h,uint32_t n){return(uint32_t)(n-h->since)>=450;}
 int MC_HoldTap(const MC_Hold*h,uint32_t n){return !h->moved && !MC_HoldReady(h,n);}
 int MC_IsBlock(unsigned i) {
-  return (i>MC_AIR && i<MC_BLOCK_COUNT) || MC_IsDoor((uint8_t)i) || i==MC_DOUBLE_SLAB || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP || i==MC_FARMLAND || i==MC_WHEAT_CROP || i==MC_WHEAT_MATURE || (i>=MC_FENCE && i<=MC_STAIR_WEST) || (i>=MC_DUST && i<=MC_BUTTON_ON) || (i>=MC_BIRCH_WOOD && i<=MC_DARK_PLANKS);
+  return (i>MC_AIR && i<MC_BLOCK_COUNT) || MC_IsDoor((uint8_t)i) || i==MC_DOUBLE_SLAB || i==MC_LAVA || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP || i==MC_FARMLAND || i==MC_WHEAT_CROP || i==MC_WHEAT_MATURE || (i>=MC_FENCE && i<=MC_STAIR_WEST) || (i>=MC_DUST && i<=MC_BUTTON_ON) || (i>=MC_BIRCH_WOOD && i<=MC_DARK_PLANKS);
 }
-static int map_only(unsigned i){return (MC_IsDoor((uint8_t)i)&&i!=MC_DOOR)||i==MC_DOUBLE_SLAB||i==MC_FARMLAND||i==MC_WHEAT_CROP||i==MC_WHEAT_MATURE||(i>=MC_STAIR_EAST&&i<=MC_STAIR_WEST)||i==MC_DUST_ON||i==MC_LAMP_ON||i==MC_LEVER_ON||i==MC_BUTTON_ON;}
+static int map_only(unsigned i){return (MC_IsDoor((uint8_t)i)&&i!=MC_DOOR)||i==MC_DOUBLE_SLAB||i==MC_LAVA||i==MC_FARMLAND||i==MC_WHEAT_CROP||i==MC_WHEAT_MATURE||(i>=MC_STAIR_EAST&&i<=MC_STAIR_WEST)||i==MC_DUST_ON||i==MC_LAMP_ON||i==MC_LEVER_ON||i==MC_BUTTON_ON;}
 static uint8_t redstone_off(uint8_t b)
 {
   if(b==MC_DUST_ON)return MC_DUST;
@@ -604,7 +604,11 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
       }
     }
   }
-  if(MC_Get(w,(int)w->x,(int)(w->y+1.62f),(int)w->z)==MC_WATER) {
+  uint8_t liquid=MC_Get(w,(int)w->x,(int)(w->y+1.0f),(int)w->z);
+  if(liquid==MC_LAVA) {
+    w->air=10;w->breath=0;
+    if(w->hurt_timer<=0)MC_Hurt(w,3);
+  } else if(MC_Get(w,(int)w->x,(int)(w->y+1.62f),(int)w->z)==MC_WATER) {
     w->fall_speed=0;w->breath+=dt;
     if(w->breath>=1){w->breath-=1;if(w->air)w->air--;else MC_Hurt(w,2);}
   } else {w->air=10;w->breath=0;}
@@ -739,10 +743,12 @@ static void flowing_water(MC_World *w,float dt)
     unsigned cell=w->fluid_cursor++%225u;
     int x=bx+(int)(cell%15u),z=bz+(int)(cell/15u);
     for(int y=y1;y>=y0;y--) {
-      if(MC_Get(w,x,y,z)!=MC_WATER)continue;
+      uint8_t liquid=MC_Get(w,x,y,z);
+      if(liquid!=MC_WATER && liquid!=MC_LAVA)continue;
       if(MC_Get(w,x,y-1,z)==MC_AIR) {
-        MC_Set(w,x,y,z,MC_AIR);MC_Set(w,x,y-1,z,MC_WATER);break;
+        MC_Set(w,x,y,z,MC_AIR);MC_Set(w,x,y-1,z,liquid);break;
       }
+      if(liquid==MC_LAVA)break;
       if(!MC_IsSolid(MC_Get(w,x,y-1,z)))break;
       unsigned start=(w->fluid_cursor+n)&3u;
       for(unsigned d=0;d<4;d++) {
