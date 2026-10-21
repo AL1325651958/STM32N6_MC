@@ -68,6 +68,16 @@ int main(void)
     }
     uint32_t crc=MC_Crc32(w.blocks,MC_MAP_BYTES);
     MC_SaveEncode(&w,3,save);assert(MC_SaveDecode(&terrain,save,MC_SAVE_SIZE));
+    assert(MC_IsExplored(&terrain,(int)floorf(terrain.x),(int)floorf(terrain.z)));
+    assert(!memcmp(w.explored,terrain.explored,MC_EXPLORE_BYTES));
+    int px=(int)floorf(w.x),pz=(int)floorf(w.z);
+    assert(MC_IsExplored(&w,px+8,pz)&&!MC_IsExplored(&w,px+9,pz));
+    uint8_t explored_copy[MC_EXPLORE_BYTES];memcpy(explored_copy,w.explored,sizeof(explored_copy));
+    MC_UpdateExploration(&w);assert(!memcmp(explored_copy,w.explored,sizeof(explored_copy)));
+    w.x+=1.1f;MC_UpdateExploration(&w);
+    assert(MC_IsExplored(&w,px+9,pz)&&MC_IsExplored(&w,px-8,pz));
+    MC_SaveEncode(&w,4,save);assert(MC_SaveDecode(&terrain,save,MC_SAVE_SIZE));
+    assert(!memcmp(w.explored,terrain.explored,MC_EXPLORE_BYTES));
     assert(crc==MC_Crc32(terrain.blocks,MC_MAP_BYTES));
     assert(!memcmp(w.chest_map,terrain.chest_map,sizeof(w.chest_map))&&!memcmp(w.chest_blocks,terrain.chest_blocks,sizeof(w.chest_blocks)));
     MC_Generate(&terrain,seeds[seed]);assert(crc==MC_Crc32(terrain.blocks,MC_MAP_BYTES));

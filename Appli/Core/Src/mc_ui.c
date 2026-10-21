@@ -382,21 +382,36 @@ static uint8_t map_surface(const MC_World *w,int x,int z)
 }
 static void mini_map(uint16_t *fb,const MC_World *w)
 {
-  static struct {const MC_World *world;const uint8_t *blocks;uint32_t serial,revision;int x,z;uint16_t colors[29*29];int valid;} cache;
+  static struct {const MC_World *world;const uint8_t *blocks;uint32_t serial,revision;int x,y,z;uint16_t colors[29*29];uint8_t caves[29*29];int valid;} cache;
   const int ox=686,oy=74,ow=104,oh=126,cx=738,cy=139,cell=3,radius=14;
   panel(fb,ox,oy,ow,oh);text(fb,722,80,"MAP",0xffe0);
   rect(fb,ox+7,oy+23,87,87,0x1082);
   int px=(int)floorf(w->x),pz=(int)floorf(w->z);
+  int py=(int)floorf(w->y);
   if(!cache.valid || cache.world!=w || cache.blocks!=w->blocks || cache.serial!=w->scene_serial ||
-     cache.revision!=w->map_revision || cache.x!=px || cache.z!=pz) {
-    for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++)
-      cache.colors[(dz+radius)*29+dx+radius]=map_color(map_surface(w,px+dx,pz+dz));
-    cache.world=w;cache.blocks=w->blocks;cache.serial=w->scene_serial;cache.revision=w->map_revision;cache.x=px;cache.z=pz;cache.valid=1;
+     cache.revision!=w->map_revision || cache.x!=px || cache.y!=py || cache.z!=pz) {
+    for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++) {
+      int i=(dz+radius)*29+dx+radius,x=px+dx,z=pz+dz;
+      cache.colors[i]=map_color(map_surface(w,x,z));cache.caves[i]=0;
+      if(x<1||z<1||x>=MC_MAP_X-1||z>=MC_MAP_Z-1)continue;
+      unsigned column=(unsigned)z*MC_MAP_X+(unsigned)x;
+      int y0=py-2;if(y0<1)y0=1;int y1=py+1;if(y1>MC_MAP_Y-3)y1=MC_MAP_Y-3;
+      for(int y=y0;y<=y1;y++) {
+        unsigned below=w->blocks[(unsigned)(y-1)*MC_MAP_X*MC_MAP_Z+column];
+        unsigned a=w->blocks[(unsigned)y*MC_MAP_X*MC_MAP_Z+column];
+        unsigned b=w->blocks[(unsigned)(y+1)*MC_MAP_X*MC_MAP_Z+column];
+        unsigned roof=w->blocks[(unsigned)(y+2)*MC_MAP_X*MC_MAP_Z+column];
+        if(MC_IsSolid((uint8_t)below)&&a==MC_AIR&&b==MC_AIR&&MC_IsSolid((uint8_t)roof)) {cache.caves[i]=1;break;}
+      }
+    }
+    cache.world=w;cache.blocks=w->blocks;cache.serial=w->scene_serial;cache.revision=w->map_revision;cache.x=px;cache.y=py;cache.z=pz;cache.valid=1;
   }
   for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++) {
     uint16_t c=cache.colors[(dz+radius)*29+dx+radius];
     if(!MC_IsExplored(w,px+dx,pz+dz))c=(uint16_t)(((c&0xf7de)>>1)|0x1082);
     rect(fb,cx+dx*cell-1,cy+dz*cell-1,cell,cell,c);
+    if(cache.caves[(dz+radius)*29+dx+radius] && MC_IsExplored(w,px+dx,pz+dz))
+      rect(fb,cx+dx*cell-1,cy+dz*cell-1,3,3,0x07ff);
   }
   /* Bed spawn and chest locations are persistent landmarks. */
   if(w->spawn[0] && abs((int)w->spawn[0]-1-px)<=radius && abs((int)w->spawn[2]-1-pz)<=radius) {
@@ -412,7 +427,7 @@ static void mini_map(uint16_t *fb,const MC_World *w)
   rect(fb,cx-2,cy-2,5,5,0xffff);
   int ax=(int)roundf(sinf(w->yaw)*4),az=(int)roundf(cosf(w->yaw)*4);
   rect(fb,cx+ax-1,cy+az-1,3,3,0xf800);
-  rect(fb,694,189,5,5,0xffe0);small(fb,702,185,"BED",0xffe0);small(fb,738,185,"YOU",0xffff);
+  rect(fb,694,189,5,5,0xffe0);small(fb,702,185,"BED",0xffe0);rect(fb,738,189,5,5,0x07ff);small(fb,746,185,"CAVE",0x07ff);
 }
 static void crop_hint(uint16_t *fb,const MC_World *w)
 {

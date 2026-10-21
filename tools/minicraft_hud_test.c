@@ -52,6 +52,17 @@ int main(void)
   assert(fb[346*800+642]!=0x4a69);
   assert(storage[0]==0xa55a&&storage[800*480+1]==0xa55a);
 
+  /* Nearby cave columns are marked only after their horizontal cells have
+     been explored; hidden columns keep their terrain fog. */
+  reset(&w);w.x=10.5f;w.y=10.01f;w.z=10.5f;w.yaw=0;
+  for(int x=9;x<=11;x++)for(int z=10;z<=12;z++) {
+    MC_Set(&w,x,9,z,MC_STONE);MC_Set(&w,x,12,z,MC_STONE);
+  }
+  MC_UpdateExploration(&w);draw(&w,fb);
+  assert(fb[142*800+741]==0x07ff);
+  unsigned cave_index=11u*MC_MAP_X+11u;w.explored[cave_index>>3]&=(uint8_t)~(1u<<(cave_index&7));
+  draw(&w,other);assert(other[142*800+741]!=0x07ff);
+
   for(unsigned a=0;a<MC_ARMOR_SLOTS;a++) {
     reset(&w);unsigned id=MC_IRON_HELMET+a;assert(MC_Give(&w,id,1));w.slots[0].wear=17;w.bag=1;w.open_chest=0;
     MC_UIBagTap(&w,30,115);assert(w.selected_slot==0&&w.slots[0].count&&!w.armor[a].count);
