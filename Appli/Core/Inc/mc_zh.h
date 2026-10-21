@@ -79,6 +79,7 @@ static const MC_Translation mc_translations[] = {
   {"BUTTON","按钮"},
   {"BUTTON ON","按下按钮"},
   {"BUTTON PULSE","按钮脉冲"},
+  {"CATALOG %u-%u  NEXT","物品 %u-%u 点击翻页"},
   {"CHEST","箱子"},
   {"CHEST  24 SLOTS","箱子 24 格"},
   {"CHEST TORCH SAPLING BED DOOR SLABS FENCE STAIRS","箱子 火把 树苗 床 门 台阶 栅栏 楼梯"},

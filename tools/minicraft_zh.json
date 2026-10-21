@@ -274,5 +274,6 @@
   "NO SD": "无存储卡",
   "READ ONLY": "只读",
   "WRITE FAILED": "写入失败",
-  "VERIFY FAILED": "校验失败"
+  "VERIFY FAILED": "校验失败",
+  "CATALOG %u-%u  NEXT": "物品 %u-%u 点击翻页"
 }

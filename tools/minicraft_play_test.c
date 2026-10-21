@@ -298,7 +298,29 @@ int main(void) {
         MC_UIRole(720,240)==MC_TOUCH_SNEAK&&MC_UIRole(720,300)==MC_TOUCH_LOOK);
  MC_UIBagTap(&w,40,420);assert(w.creative);MC_UIBagTap(&w,750,415);assert(w.slot==7);
  MC_UIBagTap(&w,24+3*48+5,108+3*68+5);assert(w.hotbar[7]==MC_SAPLING);
+ /* Every selectable item is reachable through catalog pages. Empty cells
+    cannot overwrite a chosen hotbar item, and paging preserves inventory. */
+ MC_Stack original_slots[MC_SLOTS];memcpy(original_slots,w.slots,sizeof(original_slots));
+ uint8_t catalog_seen[MC_ITEM_COUNT]={0};unsigned pages=0;
+ do {
+   assert(w.bag_page==pages && pages<3);
+   for(unsigned cell=0;cell<MC_SLOTS;cell++) {
+     w.creative_bar[7]=0;MC_SyncInventory(&w);
+     MC_UIBagTap(&w,24+(cell%8)*48+5,108+(cell/8)*68+5);
+     unsigned id=w.hotbar[7];if(id){assert(!catalog_seen[id]);catalog_seen[id]=1;}
+   }
+   MC_UIBagTap(&w,100,90);pages++;
+ } while(w.bag_page);
+ assert(pages==2 && catalog_seen[MC_DUST]&&catalog_seen[MC_BOW]&&catalog_seen[MC_IRON_BOOTS]&&catalog_seen[MC_DARK_PLANKS]&&catalog_seen[MC_COOKED_MEAT]);
+ for(unsigned id=1;id<MC_ITEM_COUNT;id++) {
+   w.creative_bar[7]=0;MC_SyncInventory(&w);MC_SelectItem(&w,id);
+   assert(catalog_seen[id]==(w.hotbar[7]!=0 && id!=MC_DOOR_OPEN));
+ }
+ MC_UIBagTap(&w,100,90);assert(w.bag_page==1);
+ MC_SelectItem(&w,MC_TORCH);MC_UIBagTap(&w,24+7*48+5,108+3*68+5);assert(w.hotbar[7]==MC_TORCH);
+ assert(!memcmp(original_slots,w.slots,sizeof(original_slots)));
  MC_UIBagTap(&w,40,420);assert(!w.creative&&w.items[MC_WOOD]==10);MC_UIBagTap(&w,320,420);assert(w.change_world);
+ assert(w.bag_page==0);
  MC_UIBagTap(&w,620,30);assert(!w.bag&&w.open_chest==255&&w.open_furnace==255&&w.moving_slot==255);
  /* Canary catches UI writes beyond framebuffer on every menu. */
  uint16_t *fb=calloc(800*480+64,sizeof(*fb));assert(fb);for(int k=0;k<64;k++)fb[800*480+k]=0xa55a;

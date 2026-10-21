@@ -236,6 +236,7 @@ int MC_MoveStack(MC_Stack *a,MC_Stack *b,int split) {
 }
 void MC_SetMode(MC_World *w,int creative) {
   w->creative=(uint8_t)!!creative;
+  w->bag_page=0;
   if(w->creative){w->hunger=20;w->hunger_clock=w->starvation_clock=0;}
   MC_SyncInventory(w);w->moving_slot=255;
 }

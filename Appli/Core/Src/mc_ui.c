@@ -139,9 +139,14 @@ void MC_MenuDraw(uint16_t *fb,const uint8_t banks[2],int creating,unsigned bank,
 }
 
 static unsigned catalog_item(unsigned index);
+static unsigned catalog_count(void);
 void MC_UIBagTap(MC_World *w,unsigned x,unsigned y)
 {
   if(y<66){if(x>=600&&x<690)MC_CloseBag(w);return;}
+  if(w->creative && x>=24 && x<408 && y>=76 && y<108) {
+    w->bag_page=(uint8_t)((w->bag_page+1)%((catalog_count()+MC_SLOTS-1)/MC_SLOTS));
+    return;
+  }
   if(y>=410 && y<440 && x<410) {
     if(x>=24 && x<152) {MC_SetMode(w,!w->creative);w->notice=w->creative?"CREATIVE CATALOG":"SURVIVAL INVENTORY";}
     else if(x>=160 && x<280){w->split^=1;w->moving_slot=255;}
@@ -159,7 +164,7 @@ void MC_UIBagTap(MC_World *w,unsigned x,unsigned y)
   if(w->creative && x>=430 && x<782 && y>=390 && y<440) {w->slot=(uint8_t)((x-430)/44);return;}
   if(x>=24 && x<408 && y>=108 && y<380) {
     unsigned i=(x-24)/48+((y-108)/68)*8;
-    if(w->creative)MC_SelectItem(w,catalog_item(i));
+    if(w->creative)MC_SelectItem(w,catalog_item(w->bag_page*MC_SLOTS+i));
     else if(MC_ArmorIndex(w->slots[i].item)>=0)MC_EquipArmor(w,i);
     else MC_TransferSlot(w,i,w->split);
     return;
@@ -200,11 +205,21 @@ static void icon_shadow(uint16_t *fb,int x,int y,int width,int height,unsigned i
 }
 static void icon(uint16_t *fb,int x,int y,unsigned id,int size)
 { icon_rect(fb,x,y,size,size,id); }
+static int catalog_visible(unsigned id)
+{
+  return !(id==MC_DOUBLE_SLAB || id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE || id==MC_DUST_ON || id==MC_LAMP_ON || id==MC_LEVER_ON || id==MC_BUTTON_ON || (id>=MC_STAIR_EAST && id<=MC_STAIR_WEST));
+}
+static unsigned catalog_count(void)
+{
+  unsigned count=0;
+  for(unsigned id=1;id<MC_ITEM_COUNT;id++)if(catalog_visible(id))count++;
+  return count;
+}
 static unsigned catalog_item(unsigned index)
 {
   unsigned seen=0;
   for(unsigned id=1;id<MC_ITEM_COUNT;id++) {
-    if(id==MC_DOUBLE_SLAB || id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE || id==MC_DUST_ON || id==MC_LAMP_ON || id==MC_LEVER_ON || id==MC_BUTTON_ON || (id>=MC_STAIR_EAST && id<=MC_STAIR_WEST))continue;
+    if(!catalog_visible(id))continue;
     if(seen++==index)return id;
   }
   return 0;
@@ -414,12 +429,15 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
   }
   if(w->bag) {
     panel(fb,12,76,776,370);
-    text(fb,24,84,w->creative?"CREATIVE CATALOG":"BAG  32 SLOTS",0xffe0);
+    if(w->creative) {
+      snprintf(info,sizeof(info),MC_Localize("CATALOG %u-%u  NEXT"),w->bag_page+1,(catalog_count()+MC_SLOTS-1)/MC_SLOTS);
+      text(fb,24,84,info,0xffe0);
+    } else text(fb,24,84,"BAG  32 SLOTS",0xffe0);
     if(w->open_chest<MC_CHESTS)text(fb,430,84,"CHEST  24 SLOTS",0xffe0);
     else if(w->open_furnace<MC_FURNACES)text(fb,430,84,"FURNACE",0xffe0);
     else {snprintf(info,sizeof(info),MC_Localize("CRAFT %u-%u  NEXT"),w->recipe_page+1,(MC_RecipeCount()+3)/4);text(fb,430,84,info,0xffe0);}
     for(unsigned i=0;i<MC_SLOTS;i++) {
-      MC_Stack s=w->creative?(MC_Stack){catalog_item(i),1,0}:w->slots[i];
+      MC_Stack s=w->creative?(MC_Stack){catalog_item(w->bag_page*MC_SLOTS+i),1,0}:w->slots[i];
       if(s.item==MC_WATER||s.item==MC_BEDROCK)s=(MC_Stack){0};
       stack(fb,24+(i%8)*48,108+(i/8)*68,48,68,&s,!w->creative&&(i==w->selected_slot||i==w->moving_slot),w->creative);
       if(!w->creative && i<8) {snprintf(info,sizeof(info),"%u",i+1);small(fb,26+i*48,110,info,0xffe0);}
