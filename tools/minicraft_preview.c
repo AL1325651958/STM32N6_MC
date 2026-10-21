@@ -18,7 +18,7 @@ int main(int argc,char **argv)
   char path[1024];
   const char *variants[]={"preview","night","inventory","mining","chest","furnace","creative","geometry","farming","combat","ruins",
     "action_attack","action_shoot","action_feed","action_place","action_use",
-    "crop_dry","crop_dark","crop_growing","crop_ready","action_eat","main_menu","create_world"};
+    "crop_dry","crop_dark","crop_growing","crop_ready","action_eat","main_menu","create_world","slab_merge"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -79,10 +79,17 @@ int main(int argc,char **argv)
       w.slot=0;w.slots[0]=(MC_Stack){MC_BREAD,1,0};w.health=12;w.hunger=8;MC_SyncInventory(&w);
       w.notice="TAP SCREEN TO EAT";
     }
+    if(k==23) {
+      memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+      for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++)MC_Set(&w,x,1,z,MC_GRASS);
+      MC_Set(&w,10,2,12,MC_SLAB);MC_Set(&w,12,2,12,MC_SLAB_TOP);MC_Set(&w,14,2,12,MC_DOUBLE_SLAB);
+      w.x=12.5f;w.y=2;w.z=7.2f;w.yaw=0;w.pitch=-.18f;MC_Give(&w,MC_SLAB,8);
+      w.notice="LOWER HALF  UPPER HALF  TWO SLABS MERGED";
+    }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];
     MC_UIDraw(fb,&w,MC_GRASS,0,0,"NEW WORLD  SD READY",1,0,0);
-    if(k>=21) {const uint8_t banks[2]={1,0};MC_MenuDraw(fb,banks,k==22,1,20261021,0,"EXISTING WORLDS ARE PRESERVED");}
+    if(k==21 || k==22) {const uint8_t banks[2]={1,0};MC_MenuDraw(fb,banks,k==22,1,20261021,0,"EXISTING WORLDS ARE PRESERVED");}
     snprintf(path,sizeof(path),"%s/%s.ppm",argv[1],variants[k]);
     FILE *f=fopen(path,"wb");if(!f)return 1;
     fputs("P6\n800 480\n255\n",f);
@@ -90,7 +97,7 @@ int main(int argc,char **argv)
     fclose(f);
   }
   MC_Generate(&w,0x20261020);
-  MC_SaveEncode(&w,1,save);snprintf(path,sizeof(path),"%s/initial-world-v4.SAV",argv[1]);
+  MC_SaveEncode(&w,1,save);snprintf(path,sizeof(path),"%s/initial-world-v5.SAV",argv[1]);
   FILE *f=fopen(path,"wb");if(!f)return 1;
   if(fwrite(save,1,MC_SAVE_SIZE,f)!=MC_SAVE_SIZE)return 1;
   fclose(f);

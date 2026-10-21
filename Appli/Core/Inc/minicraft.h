@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 
-#define MC_MAP_X 128
+#define MC_MAP_X 256
 #define MC_MAP_Y 64
-#define MC_MAP_Z 128
+#define MC_MAP_Z 256
 #define MC_MAP_BYTES (MC_MAP_X * MC_MAP_Y * MC_MAP_Z)
 #define MC_VIEW_W 160
 #define MC_VIEW_H 96
@@ -34,6 +34,7 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
           legacy item range. */
        MC_BIRCH_WOOD, MC_BIRCH_PLANKS, MC_DARK_WOOD, MC_DARK_PLANKS,
        MC_BREAD, MC_COOKED_MEAT,
+       MC_DOUBLE_SLAB, /* map-only: two stone slabs, existing IDs unchanged */
        MC_ITEM_COUNT };
 #define MC_HOTBAR 8
 #define MC_SLOTS 32
@@ -122,9 +123,11 @@ typedef struct {
 uint8_t MC_Get(const MC_World *world, int x, int y, int z);
 void MC_Set(MC_World *world, int x, int y, int z, uint8_t block);
 void MC_Generate(MC_World *world, uint32_t seed);
+void MC_GenerateTerrain(MC_World *world,uint32_t seed);
 void MC_Respawn(MC_World *world);
 int MC_IsSolid(uint8_t block);
 int MC_Edit(MC_World *world, int place, uint8_t selected);
+int MC_EditAt(MC_World *world,int place,uint8_t selected,float sx,float sy);
 void MC_Step(MC_World *world, float forward, float strafe, float dt, int jump);
 void MC_Render(const MC_World *world, uint16_t *pixels, unsigned width, unsigned height);
 int MC_Raycast(const MC_World *world, int *x, int *y, int *z,

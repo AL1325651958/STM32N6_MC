@@ -59,8 +59,10 @@ int main(int argc,char **argv) {
  MC_Set(&a,50,40,30,MC_FARMLAND);MC_Set(&a,50,41,30,MC_WHEAT_CROP);a.growers[1]=(MC_Grower){51,42,31,32.5f};
  a.crop_clock=.7f;b.crop_clock=.9f;
  MC_Set(&a,36,40,30,MC_BED);a.spawn[0]=37;a.spawn[1]=41;a.spawn[2]=31;
+ MC_Set(&a,42,40,30,MC_DOUBLE_SLAB);
  MC_Set(&a,40,40,30,MC_DOOR);MC_Set(&a,41,40,30,MC_DOOR_OPEN);
  roundtrip(&a,&b,save);assert(b.seed==a.seed&&b.x==a.x&&!memcmp(a.blocks,b.blocks,MC_MAP_BYTES));
+ assert(MC_Get(&b,42,40,30)==MC_DOUBLE_SLAB);
  assert(MC_Get(&b,40,40,30)==MC_DOOR&&MC_Get(&b,41,40,30)==MC_DOOR_OPEN);
  assert(b.items[MC_IRON]==99&&b.equipped==MC_STONE_PICK&&b.slots[2].wear==71&&b.slot==3&&b.health==13&&b.air==7&&b.hunger==7&&b.time==a.time);
  assert(b.armor[0].item==MC_IRON_HELMET&&b.armor[0].count==1&&b.armor[0].wear==73);
@@ -100,7 +102,7 @@ int main(int argc,char **argv) {
  assert(!MC_SaveValidate(save,MC_SAVE_SIZE-1));assert(!MC_SaveValidate(save,MC_SAVE_SIZE+1));
  invalid(&b,save,copy,2,8);invalid(&b,save,copy,5,MC_APPLE);invalid(&b,save,copy,81,65);invalid(&b,save,copy,80,MC_AIR);
  invalid(&b,save,copy,80+2*4+2,251);invalid(&b,save,copy,792,255);invalid(&b,save,copy,828+10,MC_STICK);
- invalid(&b,save,copy,74,61);
+ invalid(&b,save,copy,74,61);invalid(&b,save,copy,80,MC_DOUBLE_SLAB);
  invalid(&b,save,copy,1420+1,2);invalid(&b,save,copy,1420+2,0);
  invalid(&b,save,copy,1144+24,MC_MOB_HEALTH+1);
  invalid(&b,save,copy,1144+25,2);
@@ -119,14 +121,36 @@ int main(int argc,char **argv) {
  for(unsigned id=1;id<25;id++)if(id!=MC_BEDROCK&&id!=MC_WATER)assert(b.items[id]+b.reserve[id]==(unsigned)(id>=MC_WOOD_PICK&&id<=MC_IRON_PICK?2:999));
  assert(b.slots[7].item==MC_STONE_PICK&&b.slots[7].wear==71&&b.health==17&&b.slot==7&&b.time==399.5f);
  roundtrip(&b,&a,copy);assert(a.reserve[MC_WOOD]==b.reserve[MC_WOOD]);
+ /* A real legacy-dimension v4 layout migrates without relocating player,
+    containers, or any byte in its original 128x64x128 terrain square. */
+ MC_GenerateTerrain(&a,123);MC_NewPlayer(&a,0);a.x=a.z=10.5f;a.y=40;
+ MC_Set(&a,120,40,120,MC_CHEST);a.chest_map[0][0]=121;a.chest_map[0][1]=41;a.chest_map[0][2]=121;
+ a.chest_blocks[0][0]=(MC_Stack){MC_WOOD,7,0};MC_SaveEncode(&a,11,save);
+ const unsigned old_bytes=128u*64u*128u,old_base=64u+old_bytes,old_length=old_base+MC_SAVE_META;
+ uint8_t *legacy=calloc(1,old_length);assert(legacy);memcpy(legacy,save,64);
+ for(unsigned y=0;y<64;y++)for(unsigned z=0;z<128;z++)
+   memcpy(legacy+64+(y*128+z)*128,save+64+(y*MC_MAP_Z+z)*MC_MAP_X,128);
+ memcpy(legacy+old_base,save+MC_SAVE_V1_SIZE,MC_SAVE_META);
+ put32(legacy+4,4);put32(legacy+8,128);put32(legacy+16,128);
+ put32(legacy+56,MC_Crc32(legacy+64,old_bytes));put32(legacy+60,MC_Crc32(legacy,60));
+ assert(MC_SaveValidate(legacy,old_length)==11&&MC_SaveDecode(&b,legacy,old_length));
+ for(unsigned y=0;y<64;y++)for(unsigned z=0;z<128;z++)
+   assert(!memcmp(legacy+64+(y*128+z)*128,b.blocks+(y*MC_MAP_Z+z)*MC_MAP_X,128));
+ assert(b.x==10.5f&&b.z==10.5f&&b.chest_blocks[0][0].count==7&&MC_Get(&b,200,1,200)!=MC_AIR);
+ MC_SaveEncode(&b,12,copy);assert(copy[4]==5&&MC_SaveValidate(copy,MC_SAVE_SIZE)==12);
+ put16(legacy+old_base+792,129);put32(legacy+48,MC_Crc32(legacy+old_base,MC_SAVE_META));
+ put32(legacy+60,MC_Crc32(legacy,60));assert(!MC_SaveValidate(legacy,old_length));free(legacy);
  /* Real SD files are opened strictly read-only; migrate in memory only. */
  for(int i=1;i<argc;i++) {
    FILE *f=fopen(argv[i],"rb");assert(f);size_t n=fread(save,1,MC_SAVE_SIZE,f);assert(!ferror(f));assert(fgetc(f)==EOF);fclose(f);
-   assert((n==MC_SAVE_V1_SIZE||n==MC_SAVE_V2_SIZE||n==MC_SAVE_V3_SIZE||n==MC_SAVE_SIZE)&&MC_SaveValidate(save,(unsigned)n));
-   uint32_t before=MC_Crc32(save+MC_SAVE_HEADER,MC_MAP_BYTES);assert(MC_SaveDecode(&b,save,(unsigned)n));
-   if(n==MC_SAVE_V1_SIZE)assert(b.creative&&b.health==20);
-   MC_SaveEncode(&b,12,copy);assert(MC_SaveValidate(copy,MC_SAVE_SIZE)==12);assert(MC_Crc32(copy+MC_SAVE_HEADER,MC_MAP_BYTES)==before);
+   assert(MC_SaveValidate(save,(unsigned)n));
+   unsigned mx=save[8]|(unsigned)save[9]<<8,mz=save[16]|(unsigned)save[17]<<8;
+   unsigned version=save[4];assert(MC_SaveDecode(&b,save,(unsigned)n));
+   if(version==1)assert(b.creative&&b.health==20);
+   MC_SaveEncode(&b,12,copy);assert(MC_SaveValidate(copy,MC_SAVE_SIZE)==12);
+   for(unsigned y=0;y<MC_MAP_Y;y++)for(unsigned z=0;z<mz;z++)
+     assert(!memcmp(save+MC_SAVE_HEADER+(y*mz+z)*mx,copy+MC_SAVE_HEADER+(y*MC_MAP_Z+z)*MC_MAP_X,mx));
    printf("Legacy save roundtrip, identical terrain: %s\n",argv[i]);
  }
- free(copy);free(save);free(a.blocks);free(b.blocks);puts("minicraft v1/v2/v3/v4 save / corruption / migration / persistent systems: OK");return 0;
+ free(copy);free(save);free(a.blocks);free(b.blocks);puts("minicraft v1/v2/v3/v4/v5 save / corruption / migration / persistent systems: OK");return 0;
 }

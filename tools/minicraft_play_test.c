@@ -7,7 +7,7 @@
 #include <math.h>
 static void scene(MC_World *w) {
  memset(w->blocks,0,MC_MAP_BYTES);
- for(int z=0;z<128;z++)for(int x=0;x<128;x++){w->blocks[z*128+x]=MC_BEDROCK;MC_Set(w,x,1,z,MC_DIRT);}
+ for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++){w->blocks[z*MC_MAP_X+x]=MC_BEDROCK;MC_Set(w,x,1,z,MC_DIRT);}
  MC_NewPlayer(w,0);w->x=10.5f;w->y=2;w->z=10.5f;w->yaw=w->pitch=0;w->vy=0;w->on_ground=1;
 }
 static void mine(MC_World *w,int frames){for(int i=0;i<frames;i++)MC_PlayTick(w,.1f,1,400,240);}
@@ -19,6 +19,7 @@ int main(void) {
  MC_Hold h;MC_HoldStart(&h,100,100,1000);assert(!MC_HoldReady(&h,1449));assert(MC_HoldReady(&h,1450));
  MC_HoldMove(&h,105,104,1500);assert(MC_HoldReady(&h,1500));MC_HoldMove(&h,125,104,1510);assert(!MC_HoldReady(&h,1600));assert(MC_HoldReady(&h,1960));
  MC_HoldStart(&h,0,0,0xffffff00u);assert(MC_HoldReady(&h,0x100));assert(MC_UIRole(620,310)==MC_TOUCH_LOOK);
+ assert(!strcmp(MC_Localize("BAG"),"背包")&&!strcmp(MC_Localize("STONE SLAB"),"石台阶"));
  MC_World w={.blocks=malloc(MC_MAP_BYTES)};assert(w.blocks);scene(&w);
  /* A release is a tap only before the hold threshold and without a drag.
     Long holds never place/eat first, regardless of the selected item. */
@@ -113,6 +114,37 @@ int main(void) {
  assert(MC_Get(&w,10,3,12)==MC_STAIR_SOUTH);assert(MC_Pick(&w,400,240,&hit)&&hit.block==MC_STAIR_SOUTH);
  assert(MC_Give(&w,MC_STONE_PICK,1));select_item(&w,MC_STONE_PICK);mine(&w,30);assert(MC_Get(&w,10,3,12)==MC_AIR&&w.items[MC_STAIR]>=1);
  MC_Set(&w,10,2,12,MC_STAIR_EAST);assert(!MC_BodyClear(&w,10.5f,1,11.6f));
+ /* Slabs merge only into their empty half, consume one physical item,
+    and never fill space occupied by the player. */
+ scene(&w);assert(MC_Give(&w,MC_SLAB,3));MC_Set(&w,10,3,13,MC_SLAB);w.pitch=-.04f;
+ assert(MC_Pick(&w,400,240,&hit)&&hit.block==MC_SLAB&&hit.ny==1);
+ assert(MC_Place(&w)&&MC_Get(&w,10,3,13)==MC_DOUBLE_SLAB&&w.items[MC_SLAB]==2);
+ scene(&w);assert(MC_Give(&w,MC_SLAB,2));MC_Set(&w,10,4,13,MC_SLAB_TOP);w.pitch=.3f;
+ assert(MC_Pick(&w,400,240,&hit)&&hit.block==MC_SLAB_TOP&&hit.ny==-1);
+ assert(MC_Place(&w)&&MC_Get(&w,10,4,13)==MC_DOUBLE_SLAB&&w.items[MC_SLAB]==1);
+ scene(&w);assert(MC_Give(&w,MC_SLAB,2));MC_Set(&w,10,3,13,MC_SLAB);MC_Set(&w,10,3,14,MC_STONE);
+ w.pitch=.05f;assert(MC_Place(&w)&&MC_Get(&w,10,3,13)==MC_DOUBLE_SLAB);
+ scene(&w);assert(MC_Give(&w,MC_SLAB,2));MC_Set(&w,10,2,10,MC_SLAB);w.y=2.5f;w.pitch=-1.5f;
+ assert(!MC_Place(&w)&&MC_Get(&w,10,2,10)==MC_SLAB&&w.items[MC_SLAB]==2);
+ /* Off-centre placement and half-height choice use the same normalized
+    touch ray, not a second centre-screen pick. */
+ scene(&w);assert(MC_Give(&w,MC_SLAB,2));MC_Set(&w,10,3,13,MC_STONE);MC_Set(&w,11,3,13,MC_STONE);
+ assert(MC_Pick(&w,600,280,&hit)&&hit.x==11);
+ assert(MC_PlaceAt(&w,600,280)&&MC_Get(&w,11,3,12)==MC_SLAB&&MC_Get(&w,10,3,12)==MC_AIR);
+ /* The full-height result uses ordinary cube collision and drops two slabs. */
+ scene(&w);assert(MC_Give(&w,MC_STONE_PICK,1));MC_Set(&w,10,3,13,MC_DOUBLE_SLAB);
+ assert(!MC_Give(&w,MC_DOUBLE_SLAB,1));
+ MC_Set(&w,10,2,12,MC_SLAB);assert(MC_BodyClear(&w,10.5f,2.51f,12.5f));
+ MC_Set(&w,10,2,12,MC_DOUBLE_SLAB);assert(!MC_BodyClear(&w,10.5f,2.51f,12.5f));
+ MC_Set(&w,10,2,12,MC_AIR);mine(&w,25);
+ assert(MC_Get(&w,10,3,13)==MC_AIR&&w.items[MC_SLAB]==2);
+ scene(&w);full(&w);w.slots[0]=(MC_Stack){MC_STONE_PICK,1,132};MC_SyncInventory(&w);
+ for(unsigned i=0;i<MC_DROPS;i++)w.drops[i]=(MC_Drop){50,3,50,0,0,0,MC_DIRT,64};
+ w.drops[0]=(MC_Drop){10.5f,3.55f,13.5f,0,0,0,MC_SLAB,63};
+ MC_Set(&w,10,3,13,MC_DOUBLE_SLAB);mine(&w,25);
+ assert(MC_Get(&w,10,3,13)==MC_DOUBLE_SLAB&&w.drops[0].count==63);
+ w.slots[1]=(MC_Stack){0};MC_SyncInventory(&w);mine(&w,25);
+ assert(MC_Get(&w,10,3,13)==MC_AIR&&w.items[MC_SLAB]==2&&w.drops[0].count==63);
  /* Chest registration, opening and nonempty destruction protection. */
  scene(&w);assert(MC_Give(&w,MC_CHEST,1));MC_Set(&w,10,3,13,MC_STONE);assert(MC_Place(&w));assert(w.chest_map[0][0]==11);
  assert(MC_OpenTarget(&w)&&w.bag&&w.open_chest==0);assert(MC_Give(&w,MC_WOOD,10));w.selected_slot=find(&w,MC_WOOD);
@@ -294,11 +326,24 @@ int main(void) {
  for(int yy=0;yy<8;yy++)if(memcmp(&dry_hint[yy*220],&fb[(309+yy)*800+290],220*sizeof(*fb)))hint_changed=1;
  assert(hint_changed);
  for(int k=0;k<6;k++){w.bag=k>0;MC_SetMode(&w,k==5);w.open_chest=k==2?0:255;w.open_furnace=k==3?0:255;MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);}
- /* Removing the log overlay must leave the upper-left scene untouched,
-    regardless of the former diagnostic values or touch-ready status. */
+ /* Only coordinates/FPS/frame cost occupy the compact top line.
+    Former status/log rows remain transparent. */
  for(unsigned i=0;i<800*480;i++)fb[i]=0x4a69;
  w.bag=0;MC_UIDraw(fb,&w,0,5,999,"DIAGNOSTIC TEXT",0,0,0);
- for(int y=8;y<70;y++)for(int x=10;x<588;x++)assert(fb[y*800+x]==0x4a69);
+ for(int y=39;y<70;y++)for(int x=10;x<588;x++)assert(fb[y*800+x]==0x4a69);
+ uint32_t metrics_crc=0;
+ for(int y=8;y<38;y++)metrics_crc^=MC_Crc32(&fb[y*800+10],578*2);
+ for(unsigned i=0;i<800*480;i++)fb[i]=0x4a69;
+ MC_UIDraw(fb,&w,0,5,999,"OTHER LOG CONTENT",1,0,0);
+ uint32_t same_metrics_crc=0;
+ for(int y=8;y<38;y++)same_metrics_crc^=MC_Crc32(&fb[y*800+10],578*2);
+ assert(metrics_crc==same_metrics_crc);
+ for(unsigned i=0;i<800*480;i++)fb[i]=0x4a69;
+ MC_UIDraw(fb,&w,0,30,33,"OTHER LOG CONTENT",1,0,0);
+ uint32_t new_metrics_crc=0;
+ for(int y=8;y<38;y++)new_metrics_crc^=MC_Crc32(&fb[y*800+10],578*2);
+ assert(metrics_crc!=new_metrics_crc);
+
  const uint8_t banks[2]={1,0};
  MC_MenuDraw(fb,banks,0,0,20261021,0,"TEST");
  MC_MenuDraw(fb,banks,1,1,20261021,1,"TEST");

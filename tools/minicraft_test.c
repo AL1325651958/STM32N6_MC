@@ -16,6 +16,7 @@ static void flat(MC_World *w)
 }
 int main(void)
 {
+  assert(MC_Crc32("123456789",9)==0xcbf43926u&&MC_Crc32("",0)==0);
   uint8_t *allocation=malloc(MC_MAP_BYTES+64);assert(allocation);
   memset(allocation,0xa5,MC_MAP_BYTES+64);
   MC_World w={.blocks=allocation+32};
@@ -35,7 +36,7 @@ int main(void)
   uint32_t crc=MC_Crc32(w.blocks,MC_MAP_BYTES);
   MC_Generate(&w,0x12345678);assert(crc==MC_Crc32(w.blocks,MC_MAP_BYTES));
   MC_Generate(&w,0x12345679);assert(crc!=MC_Crc32(w.blocks,MC_MAP_BYTES));
-  MC_Set(&w,-1,3,0,3);MC_Set(&w,128,3,0,3);MC_Set(&w,0,64,0,3);MC_Set(&w,0,0,0,MC_AIR);
+  MC_Set(&w,-1,3,0,3);MC_Set(&w,MC_MAP_X,3,0,3);MC_Set(&w,0,64,0,3);MC_Set(&w,0,0,0,MC_AIR);
   assert(MC_Get(&w,0,0,0)==MC_BEDROCK);
   for(int i=0;i<32;i++) assert(allocation[i]==0xa5 && allocation[MC_MAP_BYTES+32+i]==0xa5);
 
@@ -110,7 +111,7 @@ int main(void)
   assert(MC_IsSolid(MC_DOOR)&&!MC_IsSolid(MC_DOOR_OPEN));
   assert(MC_Raycast(&w,&x,&y,&z,&nx,&ny,&nz,5)&&x==10&&y==2&&z==13);
   for(int i=0;i<30;i++)MC_Step(&w,1,0,.1f,0);
-  assert(w.z<12.72f);
+  assert(w.z>13.04f&&w.z<13.10f); /* Stop at the actual thin door plane. */
   w.z=10.5f;assert(MC_OpenTarget(&w)&&MC_Get(&w,10,2,13)==MC_DOOR_OPEN);
   assert(MC_Raycast(&w,&x,&y,&z,&nx,&ny,&nz,5)&&z==13);
   w.z=10.5f;for(int i=0;i<30;i++)MC_Step(&w,1,0,.1f,0);assert(w.z>13.2f);

@@ -2,7 +2,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
-static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT","REDSTONE DUST","REDSTONE DUST ON","REDSTONE LAMP","REDSTONE LAMP ON","LEVER","LEVER ON","BUTTON","BUTTON ON","BOW","ARROW","IRON HELMET","IRON CHESTPLATE","IRON LEGGINGS","IRON BOOTS","BIRCH LOG","BIRCH PLANKS","DARK LOG","DARK PLANKS","BREAD","COOKED MEAT"};
+static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT","REDSTONE DUST","REDSTONE DUST ON","REDSTONE LAMP","REDSTONE LAMP ON","LEVER","LEVER ON","BUTTON","BUTTON ON","BOW","ARROW","IRON HELMET","IRON CHESTPLATE","IRON LEGGINGS","IRON BOOTS","BIRCH LOG","BIRCH PLANKS","DARK LOG","DARK PLANKS","BREAD","COOKED MEAT","DOUBLE STONE SLAB"};
 /* Designators prevent an appended item from shifting unrelated drop colors. */
 static const uint16_t colors[MC_ITEM_COUNT]={
   [MC_GRASS]=0x6cc6,[MC_DIRT]=0x8b07,[MC_STONE]=0x8410,[MC_SAND]=0xd66f,
@@ -21,15 +21,15 @@ static const uint16_t colors[MC_ITEM_COUNT]={
   [MC_BUTTON_ON]=0xffe0,[MC_BOW]=0x8a45,[MC_ARROW]=0xe7be,
   [MC_IRON_HELMET]=0xa514,[MC_IRON_CHESTPLATE]=0xa514,[MC_IRON_LEGGINGS]=0xa514,[MC_IRON_BOOTS]=0xa514,
   [MC_BIRCH_WOOD]=0xd6b6,[MC_BIRCH_PLANKS]=0xc5a2,[MC_DARK_WOOD]=0x5a04,[MC_DARK_PLANKS]=0x7b05,
-  [MC_BREAD]=0xdca6,[MC_COOKED_MEAT]=0xa346
+  [MC_BREAD]=0xdca6,[MC_COOKED_MEAT]=0xa346,[MC_DOUBLE_SLAB]=0x8c71
 };
 const char *MC_ItemName(unsigned i){return i<MC_ITEM_COUNT?names[i]:"EMPTY";}uint16_t MC_ItemColor(unsigned i){return i<MC_ITEM_COUNT?colors[i]:0;}
 void MC_HoldStart(MC_Hold*h,int x,int y,uint32_t n){*h=(MC_Hold){x,y,x,y,n,0};}void MC_HoldMove(MC_Hold*h,int x,int y,uint32_t n){int dx=x-h->anchor_x,dy=y-h->anchor_y;h->x=x;h->y=y;if(dx*dx+dy*dy>144){h->moved=1;h->anchor_x=x;h->anchor_y=y;h->since=n;}}int MC_HoldReady(const MC_Hold*h,uint32_t n){return(uint32_t)(n-h->since)>=450;}
 int MC_HoldTap(const MC_Hold*h,uint32_t n){return !h->moved && !MC_HoldReady(h,n);}
 int MC_IsBlock(unsigned i) {
-  return (i>MC_AIR && i<MC_BLOCK_COUNT) || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP || i==MC_FARMLAND || i==MC_WHEAT_CROP || i==MC_WHEAT_MATURE || (i>=MC_FENCE && i<=MC_STAIR_WEST) || (i>=MC_DUST && i<=MC_BUTTON_ON) || (i>=MC_BIRCH_WOOD && i<=MC_DARK_PLANKS);
+  return (i>MC_AIR && i<MC_BLOCK_COUNT) || i==MC_DOUBLE_SLAB || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP || i==MC_FARMLAND || i==MC_WHEAT_CROP || i==MC_WHEAT_MATURE || (i>=MC_FENCE && i<=MC_STAIR_WEST) || (i>=MC_DUST && i<=MC_BUTTON_ON) || (i>=MC_BIRCH_WOOD && i<=MC_DARK_PLANKS);
 }
-static int map_only(unsigned i){return i==MC_FARMLAND||i==MC_WHEAT_CROP||i==MC_WHEAT_MATURE||(i>=MC_STAIR_EAST&&i<=MC_STAIR_WEST)||i==MC_DUST_ON||i==MC_LAMP_ON||i==MC_LEVER_ON||i==MC_BUTTON_ON;}
+static int map_only(unsigned i){return i==MC_DOUBLE_SLAB||i==MC_FARMLAND||i==MC_WHEAT_CROP||i==MC_WHEAT_MATURE||(i>=MC_STAIR_EAST&&i<=MC_STAIR_WEST)||i==MC_DUST_ON||i==MC_LAMP_ON||i==MC_LEVER_ON||i==MC_BUTTON_ON;}
 static uint8_t redstone_off(uint8_t b)
 {
   if(b==MC_DUST_ON)return MC_DUST;
@@ -324,6 +324,15 @@ static int furnace_at(const MC_World *w,int x,int y,int z) {
 }
 int MC_DropSpawn(MC_World *w,unsigned item,unsigned count,float x,float y,float z) {
   if(!item || item>=MC_ITEM_COUNT || !count)return 0;
+  /* Preflight the bounded pool: a failed multi-item drop must not partially
+     mutate stacks while mining leaves the source block intact. */
+  unsigned room=0;
+  for(unsigned i=0;i<MC_DROPS;i++) {
+    const MC_Drop *d=&w->drops[i];
+    if(!d->count)room+=64;
+    else if(d->item==item && fabsf(d->x-x)<.7f && fabsf(d->z-z)<.7f && fabsf(d->y-y)<.9f)room+=64-d->count;
+  }
+  if(room<count)return 0;
   for(unsigned i=0;i<MC_DROPS && count;i++) {
     MC_Drop *d=&w->drops[i];
     if(d->item==item && d->count && fabsf(d->x-x)<.7f && fabsf(d->z-z)<.7f && fabsf(d->y-y)<.9f) {
@@ -511,8 +520,10 @@ int MC_PlaceAt(MC_World *w,float sx,float sy) {
     else placed=dz>0?MC_STAIR_SOUTH:MC_STAIR;
   }
   if(b==MC_SLAB) {
-    float dy=sinf(w->pitch);
-    float py=w->y+1.62f+dy*hit.distance;
+    float u=(sx-400)/576,v=(240-sy)/576,sp=sinf(w->pitch),cp=cosf(w->pitch);
+    float syaw=sinf(w->yaw),cyaw=cosf(w->yaw);
+    float dx=syaw*cp+u*cyaw-v*sp*syaw,dy=sp+v*cp,dz=cyaw*cp-u*syaw-v*sp*cyaw;
+    float py=w->y+1.62f+dy*hit.distance/sqrtf(dx*dx+dy*dy+dz*dz);
     float local=py-hit.y;
     placed=(ny>0 || (ny==0 && local<.5f))?MC_SLAB:MC_SLAB_TOP;
   }
@@ -530,7 +541,7 @@ int MC_PlaceAt(MC_World *w,float sx,float sy) {
     for(unsigned i=0;i<MC_GROWERS;i++)if(!w->growers[i].x){gi=(int)i;break;}
     if(gi<0){w->notice="MAX 16 GROWING TREES";return 0;}
   }
-  if(!MC_Edit(w,1,placed))return 0;
+  if(!MC_EditAt(w,1,placed,sx,sy))return 0;
   if(ci>=0){w->chest_map[ci][0]=x+1;w->chest_map[ci][1]=y+1;w->chest_map[ci][2]=z+1;}
   if(fi>=0){w->furnaces[fi].x=x+1;w->furnaces[fi].y=y+1;w->furnaces[fi].z=z+1;}
   if(gi>=0)w->growers[gi]=(MC_Grower){x+1,y+1,z+1,0};
@@ -587,7 +598,7 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
      and must never fall through into block mining. */
   if(tool==MC_BOW)return;
   unsigned tier=ti>=0 && ti<3?(unsigned)ti+1:0;
-  int hard=h.block==MC_STONE || h.block==MC_COBBLE || h.block==MC_COAL_ORE || h.block==MC_IRON_ORE || h.block==MC_FURNACE || h.block==MC_BRICK || h.block==MC_SLAB || h.block==MC_SLAB_TOP || (h.block>=MC_STAIR && h.block<=MC_STAIR_WEST);
+  int hard=h.block==MC_STONE || h.block==MC_COBBLE || h.block==MC_COAL_ORE || h.block==MC_IRON_ORE || h.block==MC_FURNACE || h.block==MC_BRICK || h.block==MC_SLAB || h.block==MC_SLAB_TOP || h.block==MC_DOUBLE_SLAB || (h.block>=MC_STAIR && h.block<=MC_STAIR_WEST);
   int suited=hard?tier>0:(tool==MC_AXE && (h.block==MC_WOOD || h.block==MC_BIRCH_WOOD || h.block==MC_DARK_WOOD || h.block==MC_PLANKS || h.block==MC_BIRCH_PLANKS || h.block==MC_DARK_PLANKS || h.block==MC_TABLE || h.block==MC_CHEST || h.block==MC_DOOR || h.block==MC_DOOR_OPEN || h.block==MC_FENCE)) ||
     (tool==MC_SHOVEL && (h.block==MC_GRASS || h.block==MC_DIRT || h.block==MC_SAND)) || (tool==MC_SWORD && h.block==MC_LEAVES);
   float sec=hard?(tier?1.3f/(tier*.8f):4):(h.block==MC_WOOD||h.block==MC_BIRCH_WOOD||h.block==MC_DARK_WOOD)?1.4f:h.block==MC_LEAVES?.25f:.55f;
@@ -619,12 +630,13 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   if(h.block==MC_DOOR_OPEN)drop=MC_DOOR;
   if(h.block==MC_BIRCH_WOOD)drop=MC_BIRCH_WOOD;
   if(h.block==MC_DARK_WOOD)drop=MC_DARK_WOOD;
-  if(h.block==MC_SLAB_TOP)drop=MC_SLAB;
+  if(h.block==MC_SLAB_TOP || h.block==MC_DOUBLE_SLAB)drop=MC_SLAB;
+  unsigned drop_count=h.block==MC_DOUBLE_SLAB?2:1;
   if(h.block==MC_LEAVES){unsigned n=(unsigned)(h.x*7+h.y*3+h.z);drop=n%5==0?MC_APPLE:n%3==0?MC_SAPLING:0;}
   int harvest=(!hard || tier>0) && (h.block!=MC_IRON_ORE || tier>=2);
   if(!w->creative && harvest && drop) {
     /* Preserve the established direct pickup path; overflow becomes a world drop. */
-    if(!MC_Give(w,drop,1) && !MC_DropSpawn(w,drop,1,h.x+.5f,h.y+.55f,h.z+.5f)) {
+    if(!MC_Give(w,drop,drop_count) && !MC_DropSpawn(w,drop,drop_count,h.x+.5f,h.y+.55f,h.z+.5f)) {
       w->notice="BAG FULL";w->mining=0;return;
     }
     if(h.block==MC_COAL_ORE)MC_AddExperience(w,2);

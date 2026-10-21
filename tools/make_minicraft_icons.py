@@ -19,7 +19,7 @@ NAMES += ['REDSTONE DUST', 'REDSTONE DUST ON', 'REDSTONE LAMP', 'REDSTONE LAMP O
 NAMES += ['BOW', 'ARROW']
 NAMES += ['IRON HELMET', 'IRON CHESTPLATE', 'IRON LEGGINGS', 'IRON BOOTS']
 NAMES += ['BIRCH LOG', 'BIRCH PLANKS', 'DARK LOG', 'DARK PLANKS']
-NAMES += ['BREAD', 'COOKED MEAT']
+NAMES += ['BREAD', 'COOKED MEAT', 'DOUBLE STONE SLAB']
 BASE = {1:(112,165,55), 2:(139,96,61), 3:(141,145,151), 4:(224,208,150),
         5:(144,100,53), 6:(62,135,49), 7:(67,69,77), 8:(55,135,207),
         9:(133,139,146), 10:(191,145,83), 11:(169,116,59), 12:(115,121,128),
@@ -141,6 +141,8 @@ def cube(item):
 
 
 def sprite(item):
+    if item == 66:
+        return cube(3)
     if item in BASE:
         return cube(item)
     im = Image.new('RGBA', (16,16))

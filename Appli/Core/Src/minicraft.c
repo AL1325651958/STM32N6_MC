@@ -29,7 +29,7 @@ static int height(int x, int z, uint32_t seed)
    forest.  The centre is kept as grassland for a reliable spawn area. */
 static int biome_at(int x,int z,uint32_t seed)
 {
-  if(abs(x-64)<12 && abs(z-64)<12)return 0;
+  if(abs(x-MC_MAP_X/2)<12 && abs(z-MC_MAP_Z/2)<12)return 0;
   float n=noise(x,z,48,seed+0x4d3bu);
   return n<.30f?1:n>.68f?2:0;
 }
@@ -40,7 +40,7 @@ static int biome_at(int x,int z,uint32_t seed)
 static int ruin_site(int cx,int cz,uint32_t seed,int *base)
 {
   int h=height(cx,cz,seed);
-  if(h<17 || h>32 || (abs(cx-64)<18 && abs(cz-64)<18))return 0;
+  if(h<17 || h>32 || (abs(cx-MC_MAP_X/2)<18 && abs(cz-MC_MAP_Z/2)<18))return 0;
   for(int dz=-3;dz<=3;dz++)for(int dx=-3;dx<=3;dx++) {
     int nh=height(cx+dx,cz+dz,seed);
     if(nh<17 || abs(nh-h)>1)return 0;
@@ -193,7 +193,7 @@ static int overlaps(const MC_World *w, float x, float y, float z)
   for(int yy=y0; yy<=y1; ++yy) for(int zz=z0; zz<=z1; ++zz) for(int xx=x0; xx<=x1; ++xx)
     {
       uint8_t b=MC_Get(w,xx,yy,zz);
-      if(MC_IsSolid(b) && ((b!=MC_BED && b!=MC_CHEST) || body_intersects(b,xx,yy,zz,x,y,z)))return 1;
+      if(MC_IsSolid(b) && body_intersects(b,xx,yy,zz,x,y,z))return 1;
     }
   return 0;
 }
@@ -228,15 +228,15 @@ void MC_Respawn(MC_World *w)
   }
   for(int r=0;r<64;r++)for(int dz=-r;dz<=r;dz++)for(int dx=-r;dx<=r;dx++) {
     if(r && abs(dx)!=r && abs(dz)!=r)continue;
-    int x=64+dx,z=64+dz;if(x<1||x>=127||z<1||z>=127)continue;
+    int x=MC_MAP_X/2+dx,z=MC_MAP_Z/2+dz;if(x<1||x>=MC_MAP_X-1||z<1||z>=MC_MAP_Z-1)continue;
     for(int y=MC_MAP_Y-3;y>=1;y--) if(MC_IsSolid(MC_Get(w,x,y,z)) && MC_Get(w,x,y+1,z)==MC_AIR && MC_Get(w,x,y+2,z)==MC_AIR) {
       float lo[3],hi[3];bounds(MC_Get(w,x,y,z),lo,hi);
       w->x=x+.5f;w->y=y+hi[1]+.01f;w->z=z+.5f;return;
     }
   }
-  w->x=64.5f;w->z=64.5f;w->y=MC_MAP_Y+1;
+  w->x=MC_MAP_X/2+.5f;w->z=MC_MAP_Z/2+.5f;w->y=MC_MAP_Y+1;
 }
-void MC_Generate(MC_World *w, uint32_t seed)
+static void generate_world(MC_World *w,uint32_t seed,int structures)
 {
   /* Clear old world's respawn/container state before selecting a new spawn. */
   MC_NewPlayer(w,0);
@@ -253,7 +253,7 @@ void MC_Generate(MC_World *w, uint32_t seed)
   /* Trees are a second pass, so neighboring columns cannot erase their crowns. */
   for(int z=4; z<MC_MAP_Z-4; z+=6) for(int x=4; x<MC_MAP_X-4; x+=6) {
     int biome=biome_at(x,z,seed);
-    if(biome==1 || (hash(x,z,seed)&15)>(biome==2?8:4) || (abs(x-64)<4 && abs(z-64)<4)) continue;
+    if(biome==1 || (hash(x,z,seed)&15)>(biome==2?8:4) || (abs(x-MC_MAP_X/2)<4 && abs(z-MC_MAP_Z/2)<4)) continue;
     int h=height(x,z,seed); if(h<18 || MC_Get(w,x,h,z)!=MC_GRASS) continue;
     uint8_t trunk=biome==2?MC_DARK_WOOD:((hash(x,z,seed+0x9e37u)&7u)==0u?MC_BIRCH_WOOD:MC_WOOD);
     for(int y=h+1; y<=h+4; ++y) MC_Set(w,x,y,z,trunk);
@@ -276,15 +276,17 @@ void MC_Generate(MC_World *w, uint32_t seed)
   w->yaw=.7f; w->pitch=-.12f; MC_Respawn(w);
   /* Start on open grass, near wood, with an unobstructed horizon. */
   int best=-100000;
-  for(int z=24;z<104;z+=2)for(int x=24;x<104;x+=2) {
+  for(int z=MC_MAP_Z/2-40;z<MC_MAP_Z/2+40;z+=2)for(int x=MC_MAP_X/2-40;x<MC_MAP_X/2+40;x+=2) {
     int y=height(x,z,seed);
     if(MC_Get(w,x,y,z)!=MC_GRASS || MC_Get(w,x,y+1,z)!=MC_AIR || MC_Get(w,x,y+2,z)!=MC_AIR)continue;
-    int score=y*8-abs(x-64)-abs(z-64);
+    int score=y*8-abs(x-MC_MAP_X/2)-abs(z-MC_MAP_Z/2);
     if(score>best){best=score;w->x=x+.5f;w->y=y+1.01f;w->z=z+.5f;}
   }
   MC_NewPlayer(w,0);
-  generate_ruins(w,seed);
+  if(structures)generate_ruins(w,seed);
 }
+void MC_Generate(MC_World *w,uint32_t seed){generate_world(w,seed,1);}
+void MC_GenerateTerrain(MC_World *w,uint32_t seed){generate_world(w,seed,0);}
 void MC_Step(MC_World *w, float f, float s, float dt, int jump)
 {
   if(!(dt>0)) return;
@@ -472,14 +474,26 @@ int MC_Pick(const MC_World *w,float x,float y,MC_Hit *hit)
   float len=sqrtf(dx*dx+dy*dy+dz*dz);
   return trace(w,dx/len,dy/len,dz/len,5,hit);
 }
-int MC_Edit(MC_World *w, int place, uint8_t selected)
+int MC_Edit(MC_World *w,int place,uint8_t selected)
+{ return MC_EditAt(w,place,selected,400,240); }
+int MC_EditAt(MC_World *w,int place,uint8_t selected,float sx,float sy)
 {
-  int x,y,z,nx,ny,nz;
-  if(!MC_Raycast(w,&x,&y,&z,&nx,&ny,&nz,5)) return 0;
+  MC_Hit hit;
+  if(!MC_Pick(w,sx,sy,&hit))return 0;
+  int x=hit.x,y=hit.y,z=hit.z,nx=hit.nx,ny=hit.ny,nz=hit.nz;
   if(place) {
-    if(!MC_IsBlock(selected) || selected==MC_BEDROCK || selected==MC_WATER || selected==MC_DOOR_OPEN || !(nx||ny||nz)) return 0;
+    if(!MC_IsBlock(selected) || selected==MC_BEDROCK || selected==MC_WATER || selected==MC_DOOR_OPEN || selected==MC_DOUBLE_SLAB || !(nx||ny||nz)) return 0;
+    if((selected==MC_SLAB || selected==MC_SLAB_TOP) &&
+       ((hit.block==MC_SLAB && ny>0) || (hit.block==MC_SLAB_TOP && ny<0))) {
+      if(body_intersects(MC_DOUBLE_SLAB,x,y,z,w->x,w->y,w->z))return 0;
+      MC_Set(w,x,y,z,MC_DOUBLE_SLAB);return 1;
+    }
     x+=nx; y+=ny; z+=nz;
     uint8_t old=MC_Get(w,x,y,z);
+    if((selected==MC_SLAB && old==MC_SLAB_TOP) || (selected==MC_SLAB_TOP && old==MC_SLAB)) {
+      if(body_intersects(MC_DOUBLE_SLAB,x,y,z,w->x,w->y,w->z))return 0;
+      MC_Set(w,x,y,z,MC_DOUBLE_SLAB);return 1;
+    }
     if(!inside(x,y,z) || y==0 || (old!=MC_AIR && old!=MC_WATER)) return 0;
     if(selected==MC_DOOR && !MC_IsSolid(MC_Get(w,x,y-1,z))) return 0;
     if(MC_IsSolid(selected) && body_intersects(selected,x,y,z,w->x,w->y,w->z)) return 0;
@@ -686,6 +700,7 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
           break;
         case MC_SLAB:
         case MC_SLAB_TOP:
+        case MC_DOUBLE_SLAB:
           r=139;g=143;b=149;
           if((tu+((tv/5)&1)*4)%7==0 || tv%5==0){r=94;g=99;b=106;}
           break;
@@ -804,7 +819,12 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
 }
 uint32_t MC_Crc32(const void *data,unsigned length)
 {
-  uint32_t crc=~0u; const uint8_t *p=data;
-  while(length--) { crc^=*p++; for(unsigned i=0;i<8;i++) crc=(crc>>1)^(0xedb88320u & (uint32_t)-(int32_t)(crc&1)); }
+  /* Same IEEE CRC-32 as old saves, two nibble lookups instead of eight
+     polynomial branches per byte.  Larger maps need no extra work buffer. */
+  static const uint32_t table[16]={0,0x1db71064u,0x3b6e20c8u,0x26d930acu,
+    0x76dc4190u,0x6b6b51f4u,0x4db26158u,0x5005713cu,0xedb88320u,0xf00f9344u,
+    0xd6d6a3e8u,0xcb61b38cu,0x9b64c2b0u,0x86d3d2d4u,0xa00ae278u,0xbdbdf21cu};
+  uint32_t crc=~0u;const uint8_t *p=data;
+  while(length--){crc^=*p++;crc=(crc>>4)^table[crc&15];crc=(crc>>4)^table[crc&15];}
   return ~crc;
 }

@@ -17,7 +17,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/minicraft"
-ARCHIVE_ROOT = ROOT / "out/verified-v16"
+ARCHIVE_ROOT = ROOT / "out/verified-v18"
 
 
 def digest(data):
@@ -56,7 +56,7 @@ def main():
     (OUT / "snapshot-preview-build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
     if result.returncode:
         raise SystemExit(f"preview build failed; see {OUT / 'snapshot-preview-build.log'}\n{result.stdout}{result.stderr}")
-    preview_dir = OUT / "ui-v16"
+    preview_dir = OUT / "ui-v18"
     preview_dir.mkdir(parents=True, exist_ok=True)
     result = subprocess.run([str(preview_exe), str(preview_dir)], cwd=ROOT,
                             text=True, capture_output=True, encoding="utf-8")
@@ -85,7 +85,7 @@ def main():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archive_root = ARCHIVE_ROOT / stamp
     archive_root.mkdir(parents=True, exist_ok=False)
-    source_zip = archive_root / "MiniCraft-v16-source.zip"
+    source_zip = archive_root / "MiniCraft-v18-source.zip"
     source_hashes = {}
     with zipfile.ZipFile(source_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for rel in sources:
@@ -102,7 +102,7 @@ def main():
         "MiniCraft_N6-Trusted.bin": signed,
         "MiniCraft_N6.bin": raw,
         "MiniCraft_N6.elf": elf.read_bytes(),
-        "initial-world-v4.SAV": (preview_dir / "initial-world-v4.SAV").read_bytes(),
+        "initial-world-v5.SAV": (preview_dir / "initial-world-v5.SAV").read_bytes(),
         "tests.log": tests.encode("utf-8"),
         "build.log": (OUT / "snapshot-build.log").read_bytes() if not args.skip_build else (OUT / "compile.log").read_bytes() + (OUT / "link.log").read_bytes(),
         "geometry.png": (preview_dir / "geometry.png").read_bytes(),
@@ -119,6 +119,7 @@ def main():
         "action_use.png": (preview_dir / "action_use.png").read_bytes(),
         "main_menu.png": (preview_dir / "main_menu.png").read_bytes(),
         "create_world.png": (preview_dir / "create_world.png").read_bytes(),
+        "slab_merge.png": (preview_dir / "slab_merge.png").read_bytes(),
         "action_eat.png": (preview_dir / "action_eat.png").read_bytes(),
     }
     if args.benchmark_baseline:
@@ -127,9 +128,9 @@ def main():
         (archive_root / name).write_bytes(data)
     validation = {
         "recorded_utc": stamp,
-        "version": 4,
-        "world_dimensions": [128, 64, 128],
-        "save_bytes": 1050176,
+        "version": 5,
+        "world_dimensions": [256, 64, 256],
+        "save_bytes": 4195904,
         "firmware_bytes": len(raw),
         "signed_firmware_bytes": len(signed),
         "signed_header_bytes": 1024,
@@ -147,7 +148,7 @@ def main():
         "source_hashes_verified": True,
         "geometry": "Torch stem 4/16 wide × 10/16 high; stepped flame widths 4/16, 3/16, 2/16 reaching 14/16 total height; chest 14/16; bed 9/16; sapling crossed planes.",
         "geometry_revision": 4,
-        "hardware": "Not flashed in this task. User-reported ~15 FPS refers to an earlier version; v4 performance, touch, and SD migration need board verification.",
+        "hardware": "Not flashed in this task. User-reported ~15 FPS refers to an earlier version; v18 Chinese LCD layout, 256x64x256 world performance, touch, and v5 SD migration need board verification.",
         "artifacts": {},
     }
     for name in [source_zip.name, *artifacts]:

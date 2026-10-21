@@ -392,3 +392,7 @@ tools/test_minicraft.py
 tools/snapshot_minicraft.py
 tools/bench_minicraft.py
 tools/minicraft_bench.c
+Appli/Core/Inc/mc_zh.h
+tools/make_minicraft_zh.py
+tools/minicraft_zh.json
+assets/minicraft/NotoSansSC-OFL.txt

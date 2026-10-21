@@ -1,5 +1,7 @@
 #include "mc_ui.h"
 #include "mc_icons.h"
+#include "mc_zh.h"
+#include <string.h>
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -31,14 +33,55 @@ static void stroke(uint16_t *fb,int x0,int y0,int x1,int y1,int width,uint16_t c
     rect(fb,x-width/2,y-width/2,width,width,c);
   }
 }
-static void text(uint16_t *fb,int x,int y,const char *s,uint16_t c)
+const char *MC_Localize(const char *s)
 {
-  for(;*s;s++,x+=12) {
-    int k=*s>='0' && *s<='9'?*s-'0':*s>='A' && *s<='Z'?*s-'A'+10:*s=='%'?36:-1;
-    if(k>=0) { for(int col=0;col<5;col++) for(int row=0;row<7;row++) if(font[k][col]&(1<<row)) rect(fb,x+col*2,y+row*2,2,2,c); }
-    else if(*s=='-') rect(fb,x,y+6,8,2,c);
+  if(!s)return "";
+  unsigned lo=0,hi=sizeof(mc_translations)/sizeof(mc_translations[0]);
+  while(lo<hi) {
+    unsigned mid=(lo+hi)/2;int order=strcmp(s,mc_translations[mid].en);
+    if(!order)return mc_translations[mid].zh;
+    if(order<0)hi=mid;else lo=mid+1;
+  }
+  return s;
+}
+static unsigned next_codepoint(const unsigned char **input)
+{
+  const unsigned char *p=*input;unsigned cp=*p++;
+  if(cp>=0xe0 && cp<0xf0 && p[0] && p[1]){cp=((cp&15)<<12)|((p[0]&63)<<6)|(p[1]&63);p+=2;}
+  else if(cp>=0xc0 && cp<0xe0 && p[0]){cp=((cp&31)<<6)|(p[0]&63);p++;}
+  *input=p;return cp;
+}
+static const MC_Hanzi *hanzi(unsigned cp)
+{
+  unsigned lo=0,hi=sizeof(mc_hanzi)/sizeof(mc_hanzi[0]);
+  while(lo<hi){unsigned mid=(lo+hi)/2;if(mc_hanzi[mid].codepoint==cp)return &mc_hanzi[mid];if(mc_hanzi[mid].codepoint>cp)hi=mid;else lo=mid+1;}
+  return NULL;
+}
+static void draw_text(uint16_t *fb,int x,int y,const char *s,uint16_t color,int compact)
+{
+  const unsigned char *p=(const unsigned char *)MC_Localize(s);
+  while(*p) {
+    unsigned cp=next_codepoint(&p);
+    if(cp>=128) {
+      const MC_Hanzi *g=hanzi(cp);int edge=compact?12:16;
+      if(g) {
+        for(int yy=0;yy<edge;yy++)for(int xx=0;xx<edge;xx++)
+          if((compact?g->small[yy]:g->large[yy])&(1u<<(edge-1-xx)))rect(fb,x+xx,y+yy,1,1,color);
+      } else{rect(fb,x,y,edge,1,color);rect(fb,x,y+edge-1,edge,1,color);}
+      x+=edge;
+    } else {
+      int scale=compact?1:2;
+      int k=cp>='0'&&cp<='9'?(int)cp-'0':cp>='A'&&cp<='Z'?(int)cp-'A'+10:cp=='%'?36:-1;
+      if(k>=0)for(int col=0;col<5;col++)for(int row=0;row<7;row++)
+        if(font[k][col]&(1<<row))rect(fb,x+col*scale,y+row*scale,scale,scale,color);
+      if(cp=='-')rect(fb,x,y+3*scale,4*scale,scale,color);
+      if(cp=='/')for(int i=0;i<6;i++)rect(fb,x+(5-i)*scale,y+i*scale,scale,scale,color);
+      x+=6*scale;
+    }
   }
 }
+static void text(uint16_t *fb,int x,int y,const char *s,uint16_t color)
+{draw_text(fb,x,y,s,color,0);}
 static void panel(uint16_t *fb,int x,int y,int w,int h)
 {
   for(int yy=y;yy<y+h;yy++) for(int xx=x;xx<x+w;xx++) fb[yy*800+xx]=(fb[yy*800+xx]>>1)&0x7bef;
@@ -57,15 +100,8 @@ int MC_UIRole(unsigned x,unsigned y)
 }
 
 /* Small text is used only in the inventory; controls retain the 2x font. */
-static void small(uint16_t *fb,int x,int y,const char *s,uint16_t c)
-{
-  for(;*s;s++,x+=6) {
-    int k=*s>='0'&&*s<='9'?*s-'0':*s>='A'&&*s<='Z'?*s-'A'+10:*s=='%'?36:-1;
-    if(k>=0)for(int col=0;col<5;col++)for(int row=0;row<7;row++)
-      if(font[k][col]&(1<<row))rect(fb,x+col,y+row,1,1,c);
-    if(*s=='-')rect(fb,x,y+3,4,1,c);
-  }
-}
+static void small(uint16_t *fb,int x,int y,const char *s,uint16_t color)
+{draw_text(fb,x,y,s,color,1);}
 int MC_MenuTap(unsigned x,unsigned y,int creating)
 {
   if(x<200 || x>=600)return MC_MENU_NONE;
@@ -84,18 +120,18 @@ void MC_MenuDraw(uint16_t *fb,const uint8_t banks[2],int creating,unsigned bank,
 {
   for(int y=0;y<480;y++)rect(fb,0,y,800,1,y<260?0x19ea:0x2225);
   for(int x=0;x<800;x+=40)rect(fb,x,260+(x/40%3)*16,40,220,0x2b46);
-  panel(fb,140,38,520,410);text(fb,292,66,"MINICRAFT N6",0xffe0);
-  text(fb,creating?304:334,110,creating?"CREATE WORLD":"MAIN MENU",0xffff);
+  panel(fb,140,38,520,410);text(fb,350,66,"MINICRAFT N6",0xffe0);
+  text(fb,creating?368:376,110,creating?"CREATE WORLD":"MAIN MENU",0xffff);
   char label[48];
   if(creating) {
-    snprintf(label,sizeof(label),"WORLD %u",bank+1);small(fb,370,148,label,0xffc0);
-    panel(fb,200,180,400,48);snprintf(label,sizeof(label),"SEED %lu  CHANGE",(unsigned long)seed);text(fb,214,196,label,0xffff);
+    snprintf(label,sizeof(label),MC_Localize("WORLD %u"),bank+1);small(fb,370,148,label,0xffc0);
+    panel(fb,200,180,400,48);snprintf(label,sizeof(label),MC_Localize("SEED %lu  CHANGE"),(unsigned long)seed);text(fb,214,196,label,0xffff);
     panel(fb,200,240,400,48);text(fb,260,256,creative?"MODE CREATIVE":"MODE SURVIVAL",0xffff);
     panel(fb,200,306,400,56);text(fb,316,328,"CREATE WORLD",0xffe0);
-    panel(fb,200,378,400,48);text(fb,376,394,"BACK",0xffff);
+    panel(fb,200,378,400,48);text(fb,384,394,"BACK",0xffff);
   } else for(unsigned i=0;i<2;i++) {
     int y=180+(int)i*96;panel(fb,200,y,400,72);
-    snprintf(label,sizeof(label),"WORLD %u  %s",i+1,banks[i]==1?"CONTINUE":banks[i]==2?"UNAVAILABLE":"CREATE");
+    snprintf(label,sizeof(label),MC_Localize("WORLD %u  %s"),i+1,MC_Localize(banks[i]==1?"CONTINUE":banks[i]==2?"UNAVAILABLE":"CREATE"));
     text(fb,220,y+20,label,banks[i]==2?0xf9a4:0xffff);
     small(fb,220,y+48,banks[i]==1?"LOAD SAVED PROGRESS":banks[i]==2?"SAVE EXISTS  PRESERVED":"EMPTY SLOT  NEW SEED AND MODE",0xffc0);
   }
@@ -168,7 +204,7 @@ static unsigned catalog_item(unsigned index)
 {
   unsigned seen=0;
   for(unsigned id=1;id<MC_ITEM_COUNT;id++) {
-    if(id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE || id==MC_DUST_ON || id==MC_LAMP_ON || id==MC_LEVER_ON || id==MC_BUTTON_ON || (id>=MC_STAIR_EAST && id<=MC_STAIR_WEST))continue;
+    if(id==MC_DOUBLE_SLAB || id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE || id==MC_DUST_ON || id==MC_LAMP_ON || id==MC_LEVER_ON || id==MC_BUTTON_ON || (id>=MC_STAIR_EAST && id<=MC_STAIR_WEST))continue;
     if(seen++==index)return id;
   }
   return 0;
@@ -239,6 +275,7 @@ static uint16_t map_color(uint8_t b)
     case MC_BRICK:
     case MC_SLAB:
     case MC_SLAB_TOP:
+    case MC_DOUBLE_SLAB:
     case MC_STAIR:
     case MC_STAIR_EAST:
     case MC_STAIR_SOUTH:
@@ -283,7 +320,7 @@ static uint8_t map_surface(const MC_World *w,int x,int z)
 static void mini_map(uint16_t *fb,const MC_World *w)
 {
   const int ox=686,oy=74,ow=104,oh=126,cx=738,cy=139,cell=3,radius=14;
-  panel(fb,ox,oy,ow,oh);text(fb,698,82,"MAP",0xffe0);
+  panel(fb,ox,oy,ow,oh);text(fb,722,80,"MAP",0xffe0);
   rect(fb,ox+7,oy+23,87,87,0x1082);
   int px=(int)floorf(w->x),pz=(int)floorf(w->z);
   for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++) {
@@ -304,8 +341,7 @@ static void mini_map(uint16_t *fb,const MC_World *w)
   rect(fb,cx-2,cy-2,5,5,0xffff);
   int ax=(int)roundf(sinf(w->yaw)*4),az=(int)roundf(cosf(w->yaw)*4);
   rect(fb,cx+ax-1,cy+az-1,3,3,0xf800);
-  small(fb,696,185,"BASE",0xffe0);small(fb,738,185,"YOU",0xffff);
-  rect(fb,686+9,199,7,4,0xffe0);small(fb,696,197,"BED",0xffff);
+  rect(fb,694,189,5,5,0xffe0);small(fb,702,185,"BED",0xffe0);small(fb,738,185,"YOU",0xffff);
 }
 static void crop_hint(uint16_t *fb,const MC_World *w)
 {
@@ -326,7 +362,7 @@ static void crop_hint(uint16_t *fb,const MC_World *w)
         const MC_Grower *g=&w->growers[i];
         if(g->x==h->x+1 && g->y==h->y+1 && g->z==h->z+1){percent=(unsigned)(fminf(75,g->age)*100/75);break;}
       }
-      snprintf(growing,sizeof(growing),"WHEAT GROWING  %u%%",percent);hint=growing;
+      snprintf(growing,sizeof(growing),MC_Localize("WHEAT GROWING  %u%%"),percent);hint=growing;
     }
     if(needs)color=0xffc0;
   }
@@ -349,7 +385,7 @@ static void stack(uint16_t *fb,int x,int y,int width,int height,const MC_Stack *
   icon(fb,x+(width-(int)size)/2,y+3,s->item,(int)size);
   if(s->item) {
     snprintf(n,sizeof(n),"%u",s->count);const char *label=infinite?"INF":n;
-    int length=infinite?3:s->count>=10?2:1;
+    int length=infinite?4:s->count>=10?2:1;
     if(infinite||s->count>1){int cx=x+width-7-length*6,cy=y+height-19;small(fb,cx+1,cy+1,label,0);small(fb,cx,cy,label,0xffff);}
     unsigned life=MC_ToolLife(s->item);if(!life)life=MC_ArmorLife(s->item);
     if(s->wear && life) {
@@ -361,17 +397,19 @@ static void stack(uint16_t *fb,int x,int y,int width,int height,const MC_Stack *
 }
 void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,unsigned max_ms,const char *status,int touch_ready,float move,float strafe)
 {
-  /* Keep the shared drawing API; runtime diagnostics no longer cover the scene. */
-  (void)selected;(void)fps;(void)max_ms;(void)status;(void)touch_ready;
+  (void)selected;(void)status;(void)touch_ready;
   char info[96];
-  panel(fb,600,8,90,54);text(fb,614,28,w->bag?"CLOSE":"BAG",0xffff);
-  panel(fb,700,8,90,54);text(fb,718,28,"SAVE",0xffff);
+  panel(fb,10,8,578,30);
+  snprintf(info,sizeof(info),MC_Localize("X %d Y %d Z %d FPS %u MAX %uMS"),(int)w->x,(int)w->y,(int)w->z,fps,max_ms);
+  text(fb,20,16,info,0xffff);
+  panel(fb,600,8,90,54);text(fb,629,28,w->bag?"CLOSE":"BAG",0xffff);
+  panel(fb,700,8,90,54);text(fb,729,28,"SAVE",0xffff);
   if(w->bag) {
     panel(fb,12,76,776,370);
     text(fb,24,84,w->creative?"CREATIVE CATALOG":"BAG  32 SLOTS",0xffe0);
     if(w->open_chest<MC_CHESTS)text(fb,430,84,"CHEST  24 SLOTS",0xffe0);
     else if(w->open_furnace<MC_FURNACES)text(fb,430,84,"FURNACE",0xffe0);
-    else {snprintf(info,sizeof(info),"CRAFT %u-%u  NEXT",w->recipe_page+1,(MC_RecipeCount()+3)/4);text(fb,430,84,info,0xffe0);}
+    else {snprintf(info,sizeof(info),MC_Localize("CRAFT %u-%u  NEXT"),w->recipe_page+1,(MC_RecipeCount()+3)/4);text(fb,430,84,info,0xffe0);}
     for(unsigned i=0;i<MC_SLOTS;i++) {
       MC_Stack s=w->creative?(MC_Stack){catalog_item(i),1,0}:w->slots[i];
       if(s.item==MC_WATER||s.item==MC_BEDROCK)s=(MC_Stack){0};
@@ -387,7 +425,7 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
       text(fb,438,120,"INPUT",0xffff);text(fb,552,120,"FUEL",0xffff);text(fb,666,120,"OUT",0xffff);
       stack(fb,430,150,110,90,&f->input,0,0);stack(fb,544,150,110,90,&f->fuel,0,0);stack(fb,658,150,110,90,&f->output,0,0);
       rect(fb,438,260,320,12,0x2104);rect(fb,438,260,(int)(320*f->progress/5),12,0xffe0);
-      snprintf(info,sizeof(info),"FIRE %u SEC  PROCESS 5 SEC",(unsigned)ceilf(f->burn));small(fb,438,286,info,0xffe0);
+      snprintf(info,sizeof(info),MC_Localize("FIRE %u SEC  PROCESS 5 SEC"),(unsigned)ceilf(f->burn));small(fb,438,286,info,0xffe0);
       small(fb,438,310,"INPUT  ORE SAND LOG OR COBBLE",0xffff);
       small(fb,438,328,"FUEL   COAL LOG OR PLANKS",0xffff);
       small(fb,438,350,"SELECT BAG ITEM THEN TAP INPUT OR FUEL",0xffff);
@@ -404,14 +442,14 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     }
     unsigned id=w->creative?w->hotbar[w->slot]:w->slots[w->selected_slot].item;
     text(fb,24,386,MC_ItemName(id),0xffff);
-    panel(fb,24,410,128,30);text(fb,29,418,w->creative?"CREATIVE":"SURVIVAL",0xffe0);
-    panel(fb,160,410,120,30);text(fb,166,418,w->split?"HALF ON":"HALF OFF",0xffff);
-    panel(fb,290,410,114,30);text(fb,310,418,"MENU",0xffff);
+    panel(fb,24,410,128,30);text(fb,72,418,w->creative?"CREATIVE":"SURVIVAL",0xffe0);
+    panel(fb,160,410,120,30);text(fb,196,418,w->split?"HALF ON":"HALF OFF",0xffff);
+    panel(fb,290,410,114,30);text(fb,331,418,"MENU",0xffff);
     if(w->creative)for(unsigned i=0;i<8;i++){MC_Stack s={w->hotbar[i],1,0};stack(fb,430+i*44,390,44,50,&s,i==w->slot,1);}
     else if(w->open_chest>=MC_CHESTS&&w->open_furnace>=MC_FURNACES) {
-      small(fb,430,386,"ARMOR",0xffe0);
+
       for(unsigned i=0;i<MC_ARMOR_SLOTS;i++)stack(fb,430+(int)i*88,394,82,46,&w->armor[i],0,0);
-      char armor[24];snprintf(armor,sizeof(armor),"ARMOR %u PTS",MC_ArmorPoints(w));small(fb,430,444,armor,0xffc0);
+      char armor[24];snprintf(armor,sizeof(armor),MC_Localize("ARMOR %u PTS"),MC_ArmorPoints(w));small(fb,430,380,armor,0xffc0);
     }
   } else {
     mini_map(fb,w);
@@ -419,22 +457,22 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     rect(fb,391,239,19,2,0xffff);rect(fb,400,231,2,19,0xffff);
     for(int yy=-78;yy<=78;yy++)for(int xx=-78;xx<=78;xx++){int d=xx*xx+yy*yy;if(d<78*78&&d>74*74)fb[(350+yy)*800+110+xx]=0xc638;}
     int jx=110+(int)(fmaxf(-1,fminf(1,strafe))*45),jy=350-(int)(fmaxf(-1,fminf(1,move))*45);
-    rect(fb,jx-10,jy-10,20,20,0xffe0);text(fb,86,444,"MOVE",0xffff);
+    rect(fb,jx-10,jy-10,20,20,0xffe0);text(fb,94,444,"MOVE",0xffff);
     /* Scene taps are the contextual action.  The held item is visible at
        lower right, so no second PLACE/USE button is needed. */
     unsigned held=w->hotbar[w->slot];
     uint16_t action_color=held==MC_BOW?0xfca0:held==MC_WHEAT?0x07e0:
       (held==MC_SWORD||held==MC_AXE||held==MC_WOOD_PICK||held==MC_STONE_PICK||held==MC_IRON_PICK)?0xf9a4:0xffe0;
     small(fb,690,288,scene_action_hint(held),action_color);
-    panel(fb,690,216,100,62);text(fb,710,228,"SNEAK",w->sneak?0x07e0:0xffff);small(fb,700,258,w->sneak?"EDGE GUARD":"HOLD TO SNEAK",0xffe0);
-    panel(fb,690,360,100,62);text(fb,716,384,"JUMP",0xffff);
+    panel(fb,690,216,100,62);text(fb,724,228,"SNEAK",w->sneak?0x07e0:0xffff);small(fb,700,258,w->sneak?"EDGE GUARD":"HOLD TO SNEAK",0xffe0);
+    panel(fb,690,360,100,62);text(fb,724,384,"JUMP",0xffff);
     for(unsigned i=0;i<MC_HOTBAR;i++){MC_Stack s=w->creative?(MC_Stack){w->hotbar[i],1,0}:w->slots[i];stack(fb,240+i*50,424,50,56,&s,i==w->slot,w->creative);}
     panel(fb,640,393,44,56);icon(fb,642,397,w->hotbar[w->slot],40);
     panel(fb,240,393,400,25);text(fb,249,399,MC_ItemName(w->hotbar[w->slot]),0xffff);
     /* Compact XP bar fits between the survival meters and the item label. */
     {
       unsigned next=MC_XpToNext(w),progress=MC_XpProgress(w);
-      char xp[24];snprintf(xp,sizeof(xp),"LVL %u",(unsigned)MC_XpLevel(w));
+      char xp[24];snprintf(xp,sizeof(xp),MC_Localize("LVL %u"),(unsigned)MC_XpLevel(w));
       small(fb,240,378,xp,w->level_flash>0?0xffe0:0xffc0);
       rect(fb,282,378,350,6,0x2104);
       if(next)rect(fb,283,379,(int)(348u*(progress>next?next:progress)/next),4,w->level_flash>0?0xffe0:0x07e0);
@@ -448,8 +486,8 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
       int x=522+(int)i*17;rect(fb,x,369,13,12,i*2<w->hunger?0xfaa0:0x4208);
       if(i*2+1>=w->hunger)rect(fb,x+7,369,6,12,0x4208);
     }
-    if(w->air<10){snprintf(info,sizeof(info),"AIR %u",w->air);text(fb,490,325,info,0x7fff);}
-    if(!w->creative&&w->slots[w->slot].wear){snprintf(info,sizeof(info),"TOOL %u",w->slots[w->slot].wear);text(fb,550,347,info,0xffff);}
+    if(w->air<10){snprintf(info,sizeof(info),MC_Localize("AIR %u"),w->air);text(fb,490,325,info,0x7fff);}
+    if(!w->creative&&w->slots[w->slot].wear){snprintf(info,sizeof(info),MC_Localize("TOOL %u"),w->slots[w->slot].wear);text(fb,550,347,info,0xffff);}
     if(w->hurt_timer>0){rect(fb,0,0,800,4,0xf800);rect(fb,0,476,800,4,0xf800);}
     if(w->mob_target<MC_MOBS && w->mobs[w->mob_target].health){
       rect(fb,330,252,140,14,0x2104);rect(fb,332,254,136*w->mobs[w->mob_target].health/MC_MOB_HEALTH,10,0xe924);

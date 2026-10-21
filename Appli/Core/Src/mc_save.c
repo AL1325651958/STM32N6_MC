@@ -23,18 +23,18 @@ static void sread(MC_Stack*s,const uint8_t*p){s->item=p[0];s->count=p[1];s->wear
 static int svalid(const uint8_t*p){
   unsigned id=p[0],n=p[1],wear=get16(p+2);
   if(!n)return id==0&&wear==0;
-  if(!id||id>=MC_ITEM_COUNT||(id==MC_FARMLAND||id==MC_WHEAT_CROP||id==MC_WHEAT_MATURE||id==MC_DUST_ON||id==MC_LAMP_ON||id==MC_LEVER_ON||id==MC_BUTTON_ON)||id==MC_WATER||id==MC_BEDROCK||n>64)return 0;
+  if(!id||id>=MC_ITEM_COUNT||(id==MC_DOUBLE_SLAB||id==MC_FARMLAND||id==MC_WHEAT_CROP||id==MC_WHEAT_MATURE||id==MC_DUST_ON||id==MC_LAMP_ON||id==MC_LEVER_ON||id==MC_BUTTON_ON)||id==MC_WATER||id==MC_BEDROCK||n>64)return 0;
   int t=MC_ToolIndex(id),a=MC_ArmorIndex(id);
   if(t>=0)return n==1&&wear>0&&wear<=MC_ToolLife(id);
   if(a>=0)return n==1&&wear>0&&wear<=MC_ArmorLife(id);
   return wear==0;
 }
-static int coord(const uint8_t*p){unsigned x=get16(p),y=get16(p+2),z=get16(p+4);return !x?(!y&&!z):(x<=MC_MAP_X&&y>=2&&y<=MC_MAP_Y&&z>=1&&z<=MC_MAP_Z);}
+static int coord(const uint8_t*p,unsigned mx,unsigned mz){unsigned x=get16(p),y=get16(p+2),z=get16(p+4);return !x?(!y&&!z):(x<=mx&&y>=2&&y<=MC_MAP_Y&&z>=1&&z<=mz);}
 static int range(float f,float lo,float hi){return isfinite(f)&&f>=lo&&f<=hi;}
 static int isfuel(unsigned id){return id==MC_COAL||id==MC_WOOD||id==MC_BIRCH_WOOD||id==MC_DARK_WOOD||id==MC_PLANKS||id==MC_BIRCH_PLANKS||id==MC_DARK_PLANKS;}
 static unsigned output(unsigned id){return id==MC_IRON_ORE?MC_IRON:id==MC_SAND?MC_GLASS:id==MC_WOOD?MC_COAL:id==MC_COBBLE?MC_BRICK:id==MC_RAW_MEAT?MC_COOKED_MEAT:0;}
 void MC_SaveEncode(const MC_World*w,uint32_t generation,uint8_t*p){
-  memset(p,0,MC_SAVE_HEADER);memcpy(p,"N6MC",4);put32(p+4,4);put32(p+8,MC_MAP_X);put32(p+12,MC_MAP_Y);put32(p+16,MC_MAP_Z);put32(p+20,generation);put32(p+24,w->seed);
+  memset(p,0,MC_SAVE_HEADER);memcpy(p,"N6MC",4);put32(p+4,5);put32(p+8,MC_MAP_X);put32(p+12,MC_MAP_Y);put32(p+16,MC_MAP_Z);put32(p+20,generation);put32(p+24,w->seed);
   putfloat(p+28,w->x);putfloat(p+32,w->y);putfloat(p+36,w->z);putfloat(p+40,w->yaw);putfloat(p+44,w->pitch);memcpy(p+MC_SAVE_HEADER,w->blocks,MC_MAP_BYTES);
   uint8_t*m=p+MC_SAVE_V1_SIZE;memset(m,0,MC_SAVE_META);m[0]=1;m[1]=w->creative;m[2]=w->slot;m[3]=w->health;m[4]=w->air;m[5]=w->equipped;m[6]=w->hunger;m[7]=1;
   putfloat(m+8,w->time);putfloat(m+12,w->fall_speed);
@@ -60,17 +60,20 @@ void MC_SaveEncode(const MC_World*w,uint32_t generation,uint8_t*p){
   put32(m+M_XP,w->experience>MC_XpForLevel(MC_MAX_LEVEL)?MC_XpForLevel(MC_MAX_LEVEL):w->experience);m[M_XP+4]=(uint8_t)MC_XpLevel(w);m[M_XP+5]=1;
   put32(p+48,MC_Crc32(m,MC_SAVE_META));put32(p+52,MC_SAVE_META);put32(p+56,MC_Crc32(p+MC_SAVE_HEADER,MC_MAP_BYTES));put32(p+60,MC_Crc32(p,60));
 }
-static uint8_t saved_block(const uint8_t*p,const uint8_t*q){return p[MC_SAVE_HEADER+((get16(q+2)-1)*MC_MAP_Z+get16(q+4)-1)*MC_MAP_X+get16(q)-1];}
+static uint8_t saved_block(const uint8_t*p,const uint8_t*q,unsigned mx,unsigned mz){return p[MC_SAVE_HEADER+((get16(q+2)-1)*mz+get16(q+4)-1)*mx+get16(q)-1];}
 uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
   if(length<MC_SAVE_HEADER)return 0;
-  unsigned v=get32(p+4);
-  if(memcmp(p,"N6MC",4)||v<1||v>4||length!=(v==1?MC_SAVE_V1_SIZE:v==2?MC_SAVE_V2_SIZE:v==3?MC_SAVE_V3_SIZE:MC_SAVE_SIZE)||get32(p+8)!=MC_MAP_X||get32(p+12)!=MC_MAP_Y||get32(p+16)!=MC_MAP_Z||!get32(p+20))return 0;
-  if(get32(p+60)!=MC_Crc32(p,60)||get32(p+56)!=MC_Crc32(p+MC_SAVE_HEADER,MC_MAP_BYTES))return 0;
-  if(!range(getfloat(p+28),.28f,MC_MAP_X-.28f)||!range(getfloat(p+32),1,MC_MAP_Y+4)||!range(getfloat(p+36),.28f,MC_MAP_Z-.28f)||!range(getfloat(p+40),-100,100)||!range(getfloat(p+44),-1.4f,1.4f))return 0;
-  for(unsigned i=0;i<MC_MAP_BYTES;i++){unsigned b=p[MC_SAVE_HEADER+i];if(v==1?b>=9:v==2?b>=18:(b!=MC_AIR&&!MC_IsBlock(b)))return 0;}
-  for(unsigned i=0;i<MC_MAP_X*MC_MAP_Z;i++)if(p[MC_SAVE_HEADER+i]!=MC_BEDROCK)return 0;
+  unsigned v=get32(p+4),mx=get32(p+8),my=get32(p+12),mz=get32(p+16);
+  if(memcmp(p,"N6MC",4)||v<1||v>5||my!=MC_MAP_Y||mx!=mz||(mx!=128&&mx!=MC_MAP_X)||!get32(p+20))return 0;
+  unsigned bytes=mx*my*mz,base=MC_SAVE_HEADER+bytes;
+  unsigned metadata=v==1?0:v==2?MC_SAVE_V2_META:v==3?MC_SAVE_V3_META:MC_SAVE_META;
+  if(length!=base+metadata)return 0;
+  if(get32(p+60)!=MC_Crc32(p,60)||get32(p+56)!=MC_Crc32(p+MC_SAVE_HEADER,bytes))return 0;
+  if(!range(getfloat(p+28),.28f,mx-.28f)||!range(getfloat(p+32),1,MC_MAP_Y+4)||!range(getfloat(p+36),.28f,mz-.28f)||!range(getfloat(p+40),-100,100)||!range(getfloat(p+44),-1.4f,1.4f))return 0;
+  for(unsigned i=0;i<bytes;i++){unsigned b=p[MC_SAVE_HEADER+i];if(v==1?b>=9:v==2?b>=18:(b!=MC_AIR&&!MC_IsBlock(b)))return 0;}
+  for(unsigned i=0;i<mx*mz;i++)if(p[MC_SAVE_HEADER+i]!=MC_BEDROCK)return 0;
   if(v>=2){
-    const uint8_t*m=p+MC_SAVE_V1_SIZE;unsigned len=v==2?MC_SAVE_V2_META:v==3?MC_SAVE_V3_META:MC_SAVE_META;
+    const uint8_t*m=p+base;unsigned len=v==2?MC_SAVE_V2_META:v==3?MC_SAVE_V3_META:MC_SAVE_META;
     if(get32(p+52)!=len||get32(p+48)!=MC_Crc32(m,len))return 0;
     if(v==2){
       for(unsigned i=0;i<25;i++)if(get16(m+i*2)>999)return 0;
@@ -79,14 +82,14 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
       for(unsigned i=0;i<3;i++)if(get16(m+64+i*2)>250)return 0;
       if(!range(getfloat(m+72),0,599.99994f))return 0;
     }else{
-      if(m[0]!=1||m[1]>1||m[2]>=MC_HOTBAR||m[3]==0||m[3]>20||m[4]>10||(m[5]&&MC_ToolIndex(m[5])<0)||!range(getfloat(m+8),0,599.99994f)||!range(getfloat(m+12),0,100)||!coord(m+16))return 0;
+      if(m[0]!=1||m[1]>1||m[2]>=MC_HOTBAR||m[3]==0||m[3]>20||m[4]>10||(m[5]&&MC_ToolIndex(m[5])<0)||!range(getfloat(m+8),0,599.99994f)||!range(getfloat(m+12),0,100)||!coord(m+16,mx,mz))return 0;
       for(unsigned i=0;i<25;i++)if(get16(m+24+i*2)>999)return 0;
       for(unsigned i=0;i<3;i++)if(get16(m+74+i*2)>MC_ToolLife(MC_WOOD_PICK+i))return 0;
       for(unsigned i=0;i<MC_HOTBAR;i++)if(m[M_BAR+i]>=MC_ITEM_COUNT)return 0;
       for(unsigned i=0;i<MC_SLOTS;i++)if(!svalid(m+M_SLOTS+i*4))return 0;
       for(unsigned c=0;c<MC_CHESTS;c++){
         const uint8_t*q=m+M_COORD+c*6;
-        if(!coord(q)||(get16(q)&&saved_block(p,q)!=MC_CHEST))return 0;
+        if(!coord(q,mx,mz)||(get16(q)&&saved_block(p,q,mx,mz)!=MC_CHEST))return 0;
         for(unsigned i=0;i<MC_CHEST_SLOTS;i++){
           const uint8_t*t=m+M_CHESTS+(c*MC_CHEST_SLOTS+i)*4;
           if(!svalid(t)||(!get16(q)&&t[1]))return 0;
@@ -95,18 +98,18 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
       }
       for(unsigned i=0;i<MC_FURNACES;i++){
         const uint8_t*q=m+M_FURNACES+i*26;
-        if(!coord(q)||!svalid(q+6)||!svalid(q+10)||!svalid(q+14)||!range(getfloat(q+18),0,40)||!range(getfloat(q+22),0,4.999999f))return 0;
+        if(!coord(q,mx,mz)||!svalid(q+6)||!svalid(q+10)||!svalid(q+14)||!range(getfloat(q+18),0,40)||!range(getfloat(q+22),0,4.999999f))return 0;
         if(get16(q)){
-          if(saved_block(p,q)!=MC_FURNACE||(q[7]&&!output(q[6]))||(q[11]&&!isfuel(q[10]))||(q[15]&&q[14]!=MC_IRON&&q[14]!=MC_GLASS&&q[14]!=MC_COAL&&q[14]!=MC_BRICK&&q[14]!=MC_COOKED_MEAT))return 0;
+          if(saved_block(p,q,mx,mz)!=MC_FURNACE||(q[7]&&!output(q[6]))||(q[11]&&!isfuel(q[10]))||(q[15]&&q[14]!=MC_IRON&&q[14]!=MC_GLASS&&q[14]!=MC_COAL&&q[14]!=MC_BRICK&&q[14]!=MC_COOKED_MEAT))return 0;
           for(unsigned j=0;j<i;j++)if(!memcmp(q,m+M_FURNACES+j*26,6))return 0;
         }else if(q[7]||q[11]||q[15]||getfloat(q+18)||getfloat(q+22))return 0;
       }
       for(unsigned i=0;i<MC_GROWERS;i++){
         const uint8_t*q=m+M_GROWERS+i*10;
-        if(!coord(q)||!range(getfloat(q+6),0,120.1f)||(get16(q)&&saved_block(p,q)!=MC_SAPLING&&saved_block(p,q)!=MC_WHEAT_CROP))return 0;
+        if(!coord(q,mx,mz)||!range(getfloat(q+6),0,120.1f)||(get16(q)&&saved_block(p,q,mx,mz)!=MC_SAPLING&&saved_block(p,q,mx,mz)!=MC_WHEAT_CROP))return 0;
         if(get16(q))for(unsigned j=0;j<i;j++)if(!memcmp(q,m+M_GROWERS+j*10,6))return 0;
       }
-      if(v==4) {
+      if(v>=4) {
         for(unsigned i=0;i<MC_ARMOR_SLOTS;i++) {
           const uint8_t*q=m+M_ARMOR+i*4;
           if(!svalid(q)||(q[1]&&MC_ArmorIndex(q[0])!=(int)i))return 0;
@@ -120,7 +123,7 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
           const uint8_t*q=m+M_MOBS+i*32;float x=getfloat(q),y=getfloat(q+4),z=getfloat(q+8),vy=getfloat(q+12);
           if(q[24]>MC_MOB_HEALTH||q[25]>1||q[26]>1||!range(getfloat(q+16),0,1.5f)||!range(getfloat(q+20),0,1)||!range(getfloat(q+28),-3.15f,3.15f)||
              !range(vy,-16,16)||(!q[24] && (x||y||z||vy||getfloat(q+16)||getfloat(q+20)||q[25]))||
-             (q[24] && (!range(x,.3f,MC_MAP_X-.3f)||!range(y,1,MC_MAP_Y+2)||!range(z,.3f,MC_MAP_Z-.3f))))return 0;
+             (q[24] && (!range(x,.3f,mx-.3f)||!range(y,1,MC_MAP_Y+2)||!range(z,.3f,mz-.3f))))return 0;
         }
         if(!get32(m+M_MOB_STATE)||!range(getfloat(m+M_MOB_STATE+4),0,1000)||!range(getfloat(m+M_MOB_STATE+8),0,120)||!range(getfloat(m+M_MOB_STATE+12),0,1)||!range(getfloat(m+M_MOB_STATE+16),0,1))return 0;
       }
@@ -130,8 +133,18 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
 }
 int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
   if(!MC_SaveValidate(p,length))return 0;
-  unsigned v=get32(p+4);memcpy(w->blocks,p+MC_SAVE_HEADER,MC_MAP_BYTES);w->seed=get32(p+24);w->x=getfloat(p+28);w->y=getfloat(p+32);w->z=getfloat(p+36);w->yaw=getfloat(p+40);w->pitch=getfloat(p+44);w->vy=0;w->on_ground=0;MC_NewPlayer(w,v==1);
-  const uint8_t*m=p+MC_SAVE_V1_SIZE;
+  unsigned v=get32(p+4),mx=get32(p+8),mz=get32(p+16);
+  unsigned bytes=mx*MC_MAP_Y*mz;
+  if(mx==MC_MAP_X)memcpy(w->blocks,p+MC_SAVE_HEADER,MC_MAP_BYTES);
+  else {
+    /* Generate only terrain outside the preserved legacy square. No fresh
+       structure/container registrations may overwrite the saved inventory. */
+    MC_GenerateTerrain(w,get32(p+24));
+    for(unsigned y=0;y<MC_MAP_Y;y++)for(unsigned z=0;z<mz;z++)
+      memcpy(w->blocks+(y*MC_MAP_Z+z)*MC_MAP_X,p+MC_SAVE_HEADER+(y*mz+z)*mx,mx);
+  }
+  w->seed=get32(p+24);w->x=getfloat(p+28);w->y=getfloat(p+32);w->z=getfloat(p+36);w->yaw=getfloat(p+40);w->pitch=getfloat(p+44);w->vy=0;w->on_ground=0;MC_NewPlayer(w,v==1);
+  const uint8_t*m=p+MC_SAVE_HEADER+bytes;
   if(v==2){
     w->creative=m[59];w->slot=m[58];w->health=m[60];w->air=m[61];w->time=getfloat(m+72);memcpy(w->creative_bar,m+50,MC_HOTBAR);
     /* Preserve v2 hotbar order; excess items remain in a saved migration reserve. */
@@ -155,7 +168,7 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
     }
     w->equipped=m[62];w->notice="V2 MIGRATED  EXTRA ITEMS IN RESERVE";
   }else if(v>=3){
-      w->creative=m[1];w->slot=m[2];w->health=m[3];w->air=m[4];w->equipped=m[5];w->hunger=v==4&&m[7]==1?m[6]:20;w->time=getfloat(m+8);w->fall_speed=getfloat(m+12);
+      w->creative=m[1];w->slot=m[2];w->health=m[3];w->air=m[4];w->equipped=m[5];w->hunger=v>=4&&m[7]==1?m[6]:20;w->time=getfloat(m+8);w->fall_speed=getfloat(m+12);
     for(unsigned i=0;i<3;i++)w->spawn[i]=get16(m+16+i*2);
     for(unsigned i=0;i<25;i++)w->reserve[i]=get16(m+24+i*2);
     for(unsigned i=0;i<3;i++)w->reserve_wear[i]=get16(m+74+i*2);
@@ -167,7 +180,7 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
     }
     for(unsigned i=0;i<MC_FURNACES;i++){const uint8_t*q=m+M_FURNACES+i*26;MC_Furnace*f=&w->furnaces[i];f->x=get16(q);f->y=get16(q+2);f->z=get16(q+4);sread(&f->input,q+6);sread(&f->fuel,q+10);sread(&f->output,q+14);f->burn=getfloat(q+18);f->progress=getfloat(q+22);}
     for(unsigned i=0;i<MC_GROWERS;i++){const uint8_t*q=m+M_GROWERS+i*10;w->growers[i]=(MC_Grower){get16(q),get16(q+2),get16(q+4),getfloat(q+6)};}
-    if(v==4) {
+    if(v>=4) {
       for(unsigned i=0;i<MC_MOBS;i++) {
         const uint8_t*q=m+M_MOBS+i*32;w->mobs[i]=(MC_Mob){getfloat(q),getfloat(q+4),getfloat(q+8),getfloat(q+12),getfloat(q+16),getfloat(q+20),q[24],q[25],q[26],getfloat(q+28)};
       }
