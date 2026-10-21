@@ -81,6 +81,25 @@ int main(void)
   w.attack_cooldown=0;assert(MC_Attack(&w,400,400));w.attack_cooldown=0;
   assert(MC_Attack(&w,400,400)&&!w.mobs[0].health&&w.items[MC_RAW_MEAT]==1);
   assert(w.experience==3&&MC_XpLevel(&w)==0);
+  /* Hostile kills supply arrows for the ranged-combat loop.  If all inventory
+     slots are occupied, the same reward becomes a nearby world drop. */
+  memset(w.mobs,0,sizeof(w.mobs));w.mobs[0]=(MC_Mob){10.5f,2.01f,13.5f,0,0,0,1,1,0,0};
+  MC_SelectItem(&w,MC_SWORD);w.attack_cooldown=0;assert(MC_Attack(&w,400,240));
+  assert(!w.mobs[0].health&&w.items[MC_ARROW]==1&&w.experience==8);
+  assert(strstr(w.notice,"ARROW")!=NULL);
+  for(unsigned i=0;i<MC_SLOTS;i++)w.slots[i]=(MC_Stack){(uint8_t)(i+1),64,0};
+  MC_SyncInventory(&w);memset(w.mobs,0,sizeof(w.mobs));
+  w.mobs[0]=(MC_Mob){10.5f,2.01f,13.5f,0,0,0,1,1,0,0};w.attack_cooldown=0;
+  assert(MC_Attack(&w,400,240)&&!w.mobs[0].health);
+  int arrow_drop=0;for(unsigned i=0;i<MC_DROPS;i++)if(w.drops[i].item==MC_ARROW&&w.drops[i].count)arrow_drop++;
+  assert(arrow_drop==1&&w.experience==13);
+  memset(w.slots,0,sizeof(w.slots));MC_SyncInventory(&w);
+  /* Ranged kills use the same reward path as melee kills. */
+  memset(w.mobs,0,sizeof(w.mobs));w.mobs[0]=(MC_Mob){10.5f,2.01f,13.5f,0,0,0,5,1,0,0};
+  w.projectiles[0]=(MC_Projectile){10.5f,2.7f,12.9f,0,0,18,0,1};
+  MC_ProjectilesTick(&w,.1f);
+  assert(!w.mobs[0].health&&w.items[MC_ARROW]==1&&w.experience==18);
+  w.items[MC_ARROW]=0;MC_SyncInventory(&w);
   /* Hostiles are a night-only threat and leave when dawn arrives.  The
      night predicate is sin(time*2pi/600)<=-.38, so 435 is night and 150 is
      daylight. */

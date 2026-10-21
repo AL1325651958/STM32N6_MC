@@ -103,6 +103,20 @@ int MC_PickMob(const MC_World *w,float x,float y,float reach,float *distance)
   return found;
 }
 
+static void mob_killed(MC_World *w,unsigned type,float x,float y,float z)
+{
+  if(type) {
+    if(!MC_Give(w,MC_RAW_MEAT,1))MC_DropSpawn(w,MC_RAW_MEAT,1,x,y+.45f,z);
+    MC_AddExperience(w,3);
+    w->notice="ANIMAL DOWN  RAW MEAT";
+  } else {
+    int stored=MC_Give(w,MC_ARROW,1);
+    if(!stored)MC_DropSpawn(w,MC_ARROW,1,x,y+.45f,z);
+    MC_AddExperience(w,5);
+    w->notice=stored?"NIGHT STALKER DOWN  ARROW":"NIGHT STALKER DOWN";
+  }
+}
+
 int MC_Attack(MC_World *w,float x,float y)
 {
   if(w->creative||w->bag||w->attack_cooldown>0)return 0;
@@ -114,9 +128,7 @@ int MC_Attack(MC_World *w,float x,float y)
   if(ti>=0){MC_Stack *tool=&w->slots[w->slot];if(tool->wear&&! --tool->wear)memset(tool,0,sizeof(*tool));MC_SyncInventory(w);}
   if(!mob->health){
     unsigned type=mob->type;float x=mob->x,y=mob->y,z=mob->z;memset(mob,0,sizeof(*mob));w->mob_target=255;
-    if(type && !MC_Give(w,MC_RAW_MEAT,1))MC_DropSpawn(w,MC_RAW_MEAT,1,x,y+.45f,z);
-    MC_AddExperience(w,type?3:5);
-    w->notice=type?"ANIMAL DOWN  RAW MEAT":"NIGHT STALKER DOWN";
+    mob_killed(w,type,x,y,z);
   } else w->notice=mob->type?"ANIMAL HIT":"NIGHT STALKER HIT";
   return 1;
 }
@@ -168,9 +180,7 @@ static void arrow_kill_mob(MC_World *w,MC_Mob *m)
 {
   unsigned type=m->type;float x=m->x,y=m->y,z=m->z;
   memset(m,0,sizeof(*m));w->mob_target=255;
-  if(type && !MC_Give(w,MC_RAW_MEAT,1))MC_DropSpawn(w,MC_RAW_MEAT,1,x,y+.45f,z);
-  MC_AddExperience(w,type?3:5);
-  w->notice=type?"ANIMAL DOWN  RAW MEAT":"NIGHT STALKER DOWN";
+  mob_killed(w,type,x,y,z);
 }
 
 void MC_ProjectilesTick(MC_World *w,float dt)
