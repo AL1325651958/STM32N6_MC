@@ -426,7 +426,7 @@ static int trace(const MC_World *w,float dx,float dy,float dz,float reach,Hit *h
   for(float t=0;t<=reach;) {
     if(!inside(x,y,z)) return 0;
     uint8_t b=w->blocks[index_of(x,y,z)];
-    if(shaped(b)) {
+    if(b!=MC_AIR && shaped(b)) {
       const float p[3]={px-x,py-y,pz-z},d[3]={dx,dy,dz};float distance;
       int hx,hy,hz;
       if(shape_hit(b,p,d,t,fminf(reach,fminf(tx,fminf(ty,tz))),&distance,&hx,&hy,&hz)) {
@@ -558,12 +558,37 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
     for(int z=(int)w->z-6;z<=(int)w->z+6 && nl<8;z++)
       for(int x=(int)w->x-6;x<=(int)w->x+6 && nl<8;x++)
         if(MC_Get(w,x,y,z)==MC_TORCH || MC_Get(w,x,y,z)==MC_LAMP_ON) {lights[nl][0]=x;lights[nl][1]=y;lights[nl++][2]=z;}
-  for(unsigned y=0;y<height;++y) for(unsigned x=0;x<width;++x) {
+  /* Water texture has only 256 possible texels at a fixed world time.
+     Fill lazily so a dry frame performs no water sine evaluations. */
+  int8_t water_noise[256];int water_ready=0;
+  /* Lighting depends on block coordinates, not the individual face pixel.
+     A frame-local direct-mapped cache remains correct after any world edit. */
+  uint32_t light_key[256];float light_value[256];
+  for(unsigned i=0;i<256;i++)light_key[i]=UINT32_MAX;
+  for(unsigned y=0;y<height;++y) {
+    unsigned row_drop=0,row_projectile=0,row_mob=0;
+    for(unsigned mask=drop_mask;mask;mask&=mask-1) {
+      unsigned i=(unsigned)__builtin_ctz(mask);
+      if((int)y>=drop_rect[i][1] && (int)y<=drop_rect[i][3])row_drop|=1u<<i;
+    }
+    for(unsigned mask=projectile_mask;mask;mask&=mask-1) {
+      unsigned i=(unsigned)__builtin_ctz(mask);
+      if((int)y>=projectile_rect[i][1] && (int)y<=projectile_rect[i][3])row_projectile|=1u<<i;
+    }
+    for(unsigned mask=mob_mask;mask;mask&=mask-1) {
+      unsigned i=(unsigned)__builtin_ctz(mask);
+      if((int)y>=mob_rect[i][1] && (int)y<=mob_rect[i][3])row_mob|=1u<<i;
+    }
+    for(unsigned x=0;x<width;++x) {
     float u=(x+.5f-width*.5f)/focal,v=(height*.5f-y-.5f)/focal;
     float dx=syaw*cp+u*cyaw-v*sp*syaw,dy=sp+v*cp,dz=cyaw*cp-u*syaw-v*sp*cyaw;
     float horizon=clamp(1-fabsf(dy)*1.5f,0,1);
     int skyR=(int)((73+64*horizon)*daylight),skyG=(int)((151+48*horizon)*daylight),skyB=(int)((218+20*horizon)*(.3f+.7f*daylight));
     unsigned r=skyR,g=skyG,b=skyB;
+    Hit h;int world_hit=trace(w,dx,dy,dz,40,&h);
+    /* Opaque terrain replaces the sky. Keep the cheap fog sky color, but
+       compute celestial discs/clouds/stars only for rays that reach sky. */
+    if(!world_hit) {
     float norm=1/sqrtf(dx*dx+dy*dy+dz*dz);
     float dot=(dx*sunx+dy*suny+dz*sunz)*norm*sun_norm;
     if(dot>.994f && sun>0) {r=255;g=249;b=199;}
@@ -573,7 +598,7 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
       int cz=(int)floorf((w->z+dz/dy*65)/16);
       if((hash(cx,cz,123)&15)<4) {r=(unsigned)(218*daylight);g=(unsigned)(228*daylight);b=(unsigned)(238*daylight);}
     } else if(dy>0 && daylight<.3f && (hash((unsigned)(int)(dx*norm*600),(unsigned)(int)(dz*norm*600),17)&2047)<5) {r=180;g=194;b=220;}
-    Hit h;int world_hit=trace(w,dx,dy,dz,40,&h);
+    }
     if(world_hit) {
       float px=w->x+dx*h.distance,py=w->y+1.62f+dy*h.distance,pz=w->z+dz*h.distance;
       float a=h.nx?pz:px,c=h.ny?pz:py;
@@ -606,7 +631,14 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
           break;
         case MC_LEAVES:r=56;g=119;b=40;n*=2;break;
         case MC_BEDROCK:r=53;g=56;b=62;break;
-        case MC_WATER:r=40;g=113;b=186;n=(int)(sinf(tu*.8f+tv*.6f+w->time*2)*11);break;
+        case MC_WATER:
+          r=40;g=113;b=186;
+          if(!water_ready) {
+            for(unsigned wy=0;wy<16;wy++)for(unsigned wx=0;wx<16;wx++)
+              water_noise[wy*16+wx]=(int8_t)(sinf(wx*.8f+wy*.6f+w->time*2)*11);
+            water_ready=1;
+          }
+          n=water_noise[tv*16+tu];break;
         case MC_COBBLE:if((tu+((tv/5)&1)*4)%7==0 || tv%5==0)n=-45;break;
         case MC_PLANKS:r=179;g=137;b=79;if(tv%4==0 || (tu+(tv/4)*7)%16==0)n=-32;break;
         case MC_BIRCH_PLANKS:r=204;g=181;b=126;if(tv%4==0 || (tu+(tv/4)*7)%16==0)n=-30;break;
@@ -669,9 +701,17 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
       /* Underground surfaces stay dark; nearby torches provide warm local light. */
       if(h.y<14)ambient*=.62f;
       float glow=0;
-      for(int l=0;l<nl;l++) {
-        float lx=h.x-lights[l][0],ly=h.y-lights[l][1],lz=h.z-lights[l][2];
-        glow=fmaxf(glow,clamp(1-(lx*lx+ly*ly+lz*lz)/42,0,1));
+      if(nl) {
+        uint32_t key=(uint32_t)((h.y*MC_MAP_Z+h.z)*MC_MAP_X+h.x);
+        unsigned slot=(key*2654435761u)>>24;
+        if(light_key[slot]==key)glow=light_value[slot];
+        else {
+          for(int l=0;l<nl;l++) {
+            float lx=h.x-lights[l][0],ly=h.y-lights[l][1],lz=h.z-lights[l][2];
+            glow=fmaxf(glow,clamp(1-(lx*lx+ly*ly+lz*lz)/42,0,1));
+          }
+          light_key[slot]=key;light_value[slot]=glow;
+        }
       }
       ambient=fmaxf(ambient,glow*.95f);
       if(h.block==MC_TORCH || h.block==MC_LAMP_ON)ambient=1;
@@ -686,14 +726,19 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
         if(w->mining>0 && ((tu+tv*3)%((unsigned)(12-w->mining*8))==0)){r/=3;g/=3;b/=3;}
       }
     }
-    for(unsigned i=0;i<MC_DROPS;i++)if((drop_mask&(1u<<i)) && (int)x>=drop_rect[i][0] && (int)x<=drop_rect[i][2] && (int)y>=drop_rect[i][1] && (int)y<=drop_rect[i][3] &&
+    for(unsigned mask=row_drop;mask;mask&=mask-1) {
+      unsigned i=(unsigned)__builtin_ctz(mask);
+      if((int)x>=drop_rect[i][0] && (int)x<=drop_rect[i][2] &&
         (!world_hit || drop_depth[i]<h.distance)) {
       uint16_t c=MC_ItemColor(w->drops[i].item);r=((c>>11)&31)*255/31;g=((c>>5)&63)*255/63;b=(c&31)*255/31;
       int edge=(int)x==drop_rect[i][0] || (int)y==drop_rect[i][1] || (int)x==drop_rect[i][2] || (int)y==drop_rect[i][3];
       if(edge){r=r*2/3;g=g*2/3;b=b*2/3;}
       break;
+      }
     }
-    for(unsigned i=0;i<MC_PROJECTILES;i++)if((projectile_mask&(1u<<i)) && (int)x>=projectile_rect[i][0] && (int)x<=projectile_rect[i][2] && (int)y>=projectile_rect[i][1] && (int)y<=projectile_rect[i][3] &&
+    for(unsigned mask=row_projectile;mask;mask&=mask-1) {
+      unsigned i=(unsigned)__builtin_ctz(mask);
+      if((int)x>=projectile_rect[i][0] && (int)x<=projectile_rect[i][2] &&
         (!world_hit || projectile_depth[i]<h.distance)) {
       float ax=projectile_ax[i],ay=projectile_ay[i],bx=projectile_bx[i],by=projectile_by[i];
       float vx=bx-ax,vy=by-ay,den=vx*vx+vy*vy,t=den>1e-6f?((((float)x+.5f-ax)*vx+((float)y+.5f-ay)*vy)/den):0;
@@ -705,8 +750,12 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
         break;
       }
     }
+    }
     unsigned candidates=0;
-    for(unsigned i=0;i<MC_MOBS;i++)if((mob_mask&(1u<<i)) && (int)x>=mob_rect[i][0] && (int)x<=mob_rect[i][2] && (int)y>=mob_rect[i][1] && (int)y<=mob_rect[i][3])candidates|=1u<<i;
+    for(unsigned mask=row_mob;mask;mask&=mask-1) {
+      unsigned i=(unsigned)__builtin_ctz(mask);
+      if((int)x>=mob_rect[i][0] && (int)x<=mob_rect[i][2])candidates|=1u<<i;
+    }
     if(candidates) {
       int id,axis,sign;float distance;
       if(MC_MobRay(w,dx,dy,dz,world_hit?h.distance:40,candidates,&id,&distance,&axis,&sign)>=0) {
@@ -742,6 +791,7 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
     }
     if(underwater){r=r*2/3;g=g*3/4;b=b/2+95;}
     pixels[y*width+x]=rgb(r,g,b);
+    }
   }
 }
 uint32_t MC_Crc32(const void *data,unsigned length)

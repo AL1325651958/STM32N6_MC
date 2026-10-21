@@ -64,7 +64,7 @@ python tools/test_minicraft.py --sd G:/
 python tools/snapshot_minicraft.py
 ```
 
-主机 GCC 以 `-Wall -Wextra -Werror` 验证几何、移动、采集、掉落、背包、合成、容器、熔炉、生长、战斗和存档；ARM 构建验证链接与签名。快照脚本在构建后生成精简源码 ZIP、固件副本、哈希与验证记录，保存到 `out/verified-v12/`。预览工具 `tools/minicraft_preview.c` 共用固件渲染器，可生成场景、界面和农业预览，包括按手持物品变化的攻击、射击、喂食、建造和进食提示。
+主机 GCC 以 `-Wall -Wextra -Werror` 验证几何、移动、采集、掉落、背包、合成、容器、熔炉、生长、战斗和存档；ARM 构建验证链接与签名。快照脚本在构建后生成精简源码 ZIP、固件副本、哈希与验证记录，保存到 `out/verified-v13/`。预览工具 `tools/minicraft_preview.c` 共用固件渲染器，可生成场景、界面和农业预览，包括按手持物品变化的攻击、射击、喂食、建造和进食提示。
 
 用户此前旧版板上约 15 FPS；**当前 v4 尚未烧录实测**。主机预览不能证明板上性能；触屏多指、LCD、真实 SD 迁移、异常断电和长时间运行仍需板验。
 
@@ -77,3 +77,10 @@ python tools/snapshot_minicraft.py
 木围栏由立柱和上下横杆组成，石楼梯支持四个放置朝向。两者的碰撞、射线选取、放置和渲染使用实际部件几何；背包和创造目录只显示基础石楼梯，挖掘方向状态后统一掉落基础石楼梯。配方为 `4 PLANKS + 2 STICKS -> 3 FENCES` 和 `6 COBBLE -> 4 STONE STAIRS`。
 
 完整清单和下一步见 [玩法路线图](docs/MINICRAFT_GAMEPLAY_ROADMAP.md)。第三方来源与许可见 [THIRD_PARTY.md](THIRD_PARTY.md)。
+
+## 渲染性能优化（v13）
+
+- 空气射线步进跳过特殊形状判定；地形遮住天空时跳过日月/云/星计算。实体先按屏幕行剔除，仅遍历有效实体位图。
+- 水面纹理每帧按需计算 256 个纹理值；附近灯光以方块坐标缓存，每帧重建，保留即时照明变化。小地图在边界检查后直接扫描地图列。
+- 保持 160×96 世界分辨率和 40 格渲染射线参数。主机基准固定四类场景、每类 32 帧、交替运行三轮，以逐帧 CRC 对比旧版画面。耗时仅用于主机算法对比，不代表板上 FPS。
+- 复现：`python tools/bench_minicraft.py --baseline 9011b91`；报告在 `out/minicraft/perf/comparison.json`。带性能报告归档：`python tools/snapshot_minicraft.py --benchmark-baseline 9011b91`。比较旧版源码需要保留 Git 历史。

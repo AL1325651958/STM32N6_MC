@@ -273,8 +273,11 @@ static uint16_t map_color(uint8_t b)
 static uint8_t map_surface(const MC_World *w,int x,int z)
 {
   if(x<0||z<0||x>=MC_MAP_X||z>=MC_MAP_Z)return MC_AIR;
+  /* Coordinates are already checked: walk the PSRAM column directly,
+     avoiding tens of thousands of cross-file MC_Get calls per HUD frame. */
+  unsigned column=(unsigned)z*MC_MAP_X+(unsigned)x;
   for(int y=MC_MAP_Y-1;y>0;y--) {
-    uint8_t b=MC_Get(w,x,y,z);
+    uint8_t b=w->blocks[(unsigned)y*MC_MAP_X*MC_MAP_Z+column];
     if(b!=MC_AIR)return b;
   }
   return MC_AIR;

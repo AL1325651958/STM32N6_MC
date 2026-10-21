@@ -390,3 +390,5 @@ tools/minicraft_sources.txt
 tools/minicraft_test.c
 tools/test_minicraft.py
 tools/snapshot_minicraft.py
+tools/bench_minicraft.py
+tools/minicraft_bench.c
