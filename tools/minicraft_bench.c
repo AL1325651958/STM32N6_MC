@@ -1,5 +1,6 @@
 #include "minicraft.h"
 #include "mc_ui.h"
+#include "mc_view.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,10 +20,19 @@ static double seconds_now(void)
 
 /* Same camera sequence in both binaries. CRC every rendered frame, outside
    the timed interval; include HUD/minimap to measure the complete CPU path. */
+static void render_scene(MC_View *view,const MC_World *world)
+{
+#ifdef MC_BENCH_VIEW_CACHE
+  MC_ViewUpdate(view,world);
+#else
+  MC_Render(world,view->pixels,MC_VIEW_W,MC_VIEW_H);
+#endif
+}
 int main(void) {
   MC_World w={.blocks=calloc(1,MC_MAP_BYTES)};
-  uint16_t *view=malloc(MC_VIEW_W*MC_VIEW_H*2),*fb=malloc(800*480*2);
-  if(!w.blocks||!view||!fb)return 1;
+  MC_View *scene_view=calloc(1,sizeof(*scene_view));uint16_t *fb=malloc(800*480*2);
+  if(!w.blocks||!scene_view||!fb)return 1;
+  uint16_t *view=scene_view->pixels;
   const char *names[]={"terrain","water","cave_lights","entities"};
   for(unsigned scene=0;scene<4;scene++) {
     /* Stable terrain and camera make this a rendering benchmark even when
@@ -53,7 +63,7 @@ int main(void) {
     for(unsigned frame=0;frame<32;frame++) {
       w.yaw=yaw+frame*.018f;w.time+=.067f;
       double start=seconds_now();
-      MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
+      render_scene(scene_view,&w);
       for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];
       MC_UIDraw(fb,&w,0,15,67,"BENCHMARK",1,0,0);
       seconds+=seconds_now()-start;
@@ -109,5 +119,37 @@ int main(void) {
     for(unsigned group=0;group<32;group++)printf(" %08lx",(unsigned long)checks[group]);
     putchar('\n');
   }
-  free(fb);free(view);free(w.blocks);return 0;
+  const char *inventory[]={"inventory_static","inventory_chest_edits","inventory_furnace_entities"};
+  for(unsigned scene=0;scene<3;scene++) {
+    memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+    for(int z=4;z<25;z++)for(int x=4;x<25;x++)MC_Set(&w,x,1,z,MC_STONE);
+    w.x=10.5f;w.y=2.01f;w.z=8.5f;w.yaw=w.pitch=0;w.bag=1;MC_Notify(&w,NULL);
+    MC_Give(&w,MC_PLANKS,24);MC_Give(&w,MC_TORCH,8);MC_Give(&w,MC_STONE_PICK,1);
+    if(scene==1) {
+      MC_Set(&w,10,2,13,MC_CHEST);w.open_chest=0;w.chest_blocks[0][0]=(MC_Stack){MC_APPLE,4,0};
+    }
+    if(scene==2) {
+      MC_Set(&w,10,2,13,MC_FURNACE);w.open_furnace=0;
+      w.furnaces[0]=(MC_Furnace){11,3,14,{MC_IRON_ORE,8,0},{MC_COAL,4,0},{MC_IRON,1,0},60,0};
+      w.drops[0]=(MC_Drop){10.5f,2.5f,11.5f,0,0,0,MC_APPLE,1};
+      w.mobs[0]=(MC_Mob){11.5f,2.01f,15,0,0,0,8,1,0,0};
+    }
+    MC_ViewInvalidate(scene_view);double seconds=0;uint32_t hash=0,checks[32];
+    for(unsigned frame=0;frame<32;frame++) {
+      w.selected_slot=(uint8_t)(frame%MC_SLOTS);
+      if(scene==1 && (frame==8||frame==16))MC_Set(&w,11,2,12,frame==8?MC_TORCH:MC_AIR);
+      if(scene==2) {
+        w.furnaces[0].progress=(frame%25)*.2f;w.furnaces[0].burn=60-frame;
+        w.drops[0].x=10.5f+(frame/8)*.2f;w.mobs[0].hurt=frame%8<4?.3f:0;
+      }
+      double start=seconds_now();render_scene(scene_view,&w);
+      for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];
+      MC_UIDraw(fb,&w,0,15,67,"BENCHMARK",1,0,0);seconds+=seconds_now()-start;
+      checks[frame]=MC_Crc32(fb,800*480*2);hash=(hash<<1)|(hash>>31);hash^=checks[frame];
+    }
+    printf("%s %.3f %08lx",inventory[scene],seconds*1000/32,(unsigned long)hash);
+    for(unsigned frame=0;frame<32;frame++)printf(" %08lx",(unsigned long)checks[frame]);
+    putchar('\n');
+  }
+  free(fb);free(scene_view);free(w.blocks);return 0;
 }

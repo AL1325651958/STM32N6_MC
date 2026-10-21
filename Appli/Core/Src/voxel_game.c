@@ -2,6 +2,7 @@
 #include "minicraft.h"
 #include "mc_save.h"
 #include "mc_ui.h"
+#include "mc_view.h"
 #include "main.h"
 #include "ltdc.h"
 #include "cacheaxi.h"
@@ -17,7 +18,7 @@
 extern uint8_t lcd_bg_buffer[800 * 480 * 4];
 __attribute__((section(".game_ram"), aligned(32))) static uint8_t world_mem[MC_MAP_BYTES];
 __attribute__((section(".game_ram"), aligned(32))) static uint8_t save_blob[MC_SAVE_SIZE+32];
-static uint16_t view[MC_VIEW_W*MC_VIEW_H];
+static MC_View view;
 static MC_World world;
 static uint32_t generation;
 static int active_slot=-1,sd_ready,save_locked,dirty;
@@ -94,10 +95,10 @@ static void display(unsigned back,unsigned selected,unsigned fps,int touch,float
   uint16_t *fb=(uint16_t *)(void *)(lcd_bg_buffer+back*FB_BYTES);
   if(main_menu)MC_MenuDraw(fb,bank_state,creating,world_bank,create_seed,create_creative,menu_message);
   else {
-    MC_Render(&world,view,MC_VIEW_W,MC_VIEW_H);
+    MC_ViewUpdate(&view,&world);
     for(unsigned y=0;y<MC_VIEW_H;y++) {
       uint16_t *row=fb+y*5*800;
-      for(unsigned x=0;x<MC_VIEW_W;x++) for(unsigned k=0;k<5;k++) row[x*5+k]=view[y*MC_VIEW_W+x];
+      for(unsigned x=0;x<MC_VIEW_W;x++) for(unsigned k=0;k<5;k++) row[x*5+k]=view.pixels[y*MC_VIEW_W+x];
       for(unsigned k=1;k<5;k++) memcpy(row+k*800,row,1600);
     }
     MC_UIDraw(fb,&world,selected,fps,max_frame_ms,status,touch,f,s);

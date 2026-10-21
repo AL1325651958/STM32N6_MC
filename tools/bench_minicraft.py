@@ -21,7 +21,8 @@ def main():
         (out/('baseline_'+name)).write_bytes(subprocess.check_output(['git','show',revision+':Appli/Core/Src/'+name],cwd=ROOT))
     for variant in ('baseline','optimized'):
         sources=[str(out/('baseline_'+name)) if variant=='baseline' else 'Appli/Core/Src/'+name for name in ('minicraft.c','mc_ui.c','mc_play.c')]
-        subprocess.run([gcc,'-std=c11','-O2','-Wall','-Wextra','-Werror','-I','Appli/Core/Inc','tools/minicraft_bench.c',*sources,'Appli/Core/Src/mc_mobs.c','-lm','-o',str(out/(variant+'.exe'))],cwd=ROOT,check=True)
+        defines=['-DMC_BENCH_VIEW_CACHE'] if variant=='optimized' else []
+        subprocess.run([gcc,'-std=c11','-O2','-Wall','-Wextra','-Werror',*defines,'-I','Appli/Core/Inc','tools/minicraft_bench.c',*sources,'Appli/Core/Src/mc_mobs.c','Appli/Core/Src/mc_view.c','-lm','-o',str(out/(variant+'.exe'))],cwd=ROOT,check=True)
     timings={};hashes={}
     for trial in range(3):
         for variant in (('baseline','optimized') if trial%2==0 else ('optimized','baseline')):
@@ -31,7 +32,7 @@ def main():
                 assert len(frames)==32
                 timings.setdefault(scene,{}).setdefault(variant,[]).append(float(ms))
                 hashes.setdefault(scene,{}).setdefault(variant,set()).add((crc,tuple(frames)))
-    report={'baseline_commit':revision,'frames_per_scene':32,'trials':3,'host_only':True,'scenes':{}}
+    report={'baseline_commit':revision,'frames_per_scene':32,'trials':3,'host_only':True,'optimized_inventory_view_cache':True,'scenes':{}}
     for scene,variants in timings.items():
         assert hashes[scene]['baseline']==hashes[scene]['optimized'] and len(hashes[scene]['baseline'])==1, (scene,hashes[scene])
         old=statistics.median(variants['baseline']);new=statistics.median(variants['optimized'])

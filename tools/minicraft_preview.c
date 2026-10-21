@@ -1,6 +1,7 @@
 #include "minicraft.h"
 #include "mc_save.h"
 #include "mc_ui.h"
+#include "mc_view.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +13,7 @@ int main(int argc,char **argv)
   if(argc!=2) {fputs("Usage: minicraft_preview OUTPUT_DIRECTORY\n",stderr);return 1;}
   MC_World w={.blocks=malloc(MC_MAP_BYTES)};
   uint8_t *save=malloc(MC_SAVE_SIZE);
-  uint16_t *view=malloc(MC_VIEW_W*MC_VIEW_H*2),*fb=malloc(800*480*2);
+  MC_View *view=calloc(1,sizeof(*view));uint16_t *fb=malloc(800*480*2);
   if(!w.blocks||!save||!view||!fb) return 1;
   MC_Generate(&w,0x20261020);
   char path[1024];
@@ -23,7 +24,7 @@ int main(int argc,char **argv)
     "tool_interact","sneak_build","tool_chest_open","door_closed","door_open","lever_off","lever_on","slab_steps","delete_world","worlds_delete",
     "arrow_door_closed","arrow_door_open","arrow_slab_gap","cave_cache","cave_cache_loot",
     "hud_meters","empty_hand","armor_storage","armor_equip","new_world_view","bed_safe_respawn",
-    "notice_short","notice_expired","notice_broken_bow","notice_inventory"};
+    "notice_short","notice_expired","notice_broken_bow","notice_inventory","inventory_cached_selection","furnace_cached_progress"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -221,8 +222,23 @@ int main(int argc,char **argv)
         assert(!MC_Craft(&w,9)&&!strcmp(w.notice,"NEED MORE MATERIALS"));
       }
     }
-    MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
-    for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];
+    if(k==59) {
+      MC_Generate(&w,0x20261020);w.bag=1;MC_Notify(&w,NULL);
+      MC_Give(&w,MC_PLANKS,24);MC_Give(&w,MC_STONE_PICK,1);MC_Give(&w,MC_BREAD,3);w.slots[1].wear=17;
+      assert(MC_ViewUpdate(view,&w));MC_UIBagTap(&w,80,115);
+      assert(!MC_ViewUpdate(view,&w)&&w.selected_slot==1);
+    }
+    if(k==60) {
+      memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+      for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++)MC_Set(&w,x,1,z,MC_GRASS);
+      w.x=10.5f;w.y=2.01f;w.z=10.5f;w.yaw=0;w.pitch=-.2f;w.bag=1;w.open_furnace=0;MC_Notify(&w,NULL);
+      MC_Set(&w,10,2,13,MC_FURNACE);w.furnaces[0]=(MC_Furnace){11,3,14,{MC_IRON_ORE,8,0},{MC_COAL,4,0},{MC_IRON,2,0},20,1};
+      assert(MC_ViewUpdate(view,&w));
+      for(unsigned tick=0;tick<20;tick++){MC_SystemsTick(&w,.1f);assert(!MC_ViewUpdate(view,&w));}
+      assert(w.furnaces[0].progress>2.9f&&w.furnaces[0].burn<18.1f);
+    }
+    MC_ViewUpdate(view,&w);
+    for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view->pixels[y/5*MC_VIEW_W+x/5];
     MC_UIDraw(fb,&w,MC_GRASS,0,0,"NEW WORLD  SD READY",1,0,0);
     if(k==21 || k==22) {const uint8_t banks[2]={1,0};MC_MenuDraw(fb,banks,k==22,1,20261021,0,"EXISTING WORLDS ARE PRESERVED");}
     if(k==42 || k==43) {const uint8_t banks[2]={1,2};MC_MenuDraw(fb,banks,k==42?2:0,1,20261021,0,"CHECK WORLD NUMBER BEFORE DELETING");}
