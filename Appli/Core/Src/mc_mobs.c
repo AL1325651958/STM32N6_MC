@@ -8,11 +8,23 @@ static uint32_t next_random(MC_World *w)
   x^=x<<13;x^=x>>17;x^=x<<5;w->mob_rng=x;return x;
 }
 
+/* One bounded column, evaluated only for spawn candidates or live hostiles
+   at the 10 Hz entity cadence. Glass admits daylight, opaque roofs do not. */
+static int sky_visible(const MC_World *w,int x,int y,int z)
+{
+  for(int yy=y;yy<MC_MAP_Y;yy++) {
+    unsigned b=MC_Get(w,x,yy,z);
+    if(b!=MC_AIR && b!=MC_GLASS && b!=MC_TORCH)return 0;
+  }
+  return 1;
+}
+
 int MC_DarkAt(const MC_World *w,int x,int y,int z)
 {
-  if(sinf(w->time*(6.2831853f/600))>-.38f || y<1 || y>=MC_MAP_Y-2)return 0;
+  if(x<1 || z<1 || x>=MC_MAP_X-1 || z>=MC_MAP_Z-1 || y<1 || y>=MC_MAP_Y-2)return 0;
+  if(sinf(w->time*(6.2831853f/600))>-.38f && sky_visible(w,x,y+1,z))return 0;
   for(int yy=y-3;yy<=y+3;yy++)for(int zz=z-4;zz<=z+4;zz++)for(int xx=x-4;xx<=x+4;xx++)
-    if(MC_Get(w,xx,yy,zz)==MC_TORCH)return 0;
+    if(MC_Get(w,xx,yy,zz)==MC_TORCH || MC_Get(w,xx,yy,zz)==MC_LAMP_ON)return 0;
   return 1;
 }
 
@@ -37,7 +49,7 @@ int MC_PassiveSpawn(MC_World *w,int x,int y,int z)
   if(w->creative||w->bag||sinf(w->time*(6.2831853f/600))<=-.38f||
      x<1||z<1||x>=MC_MAP_X-1||z>=MC_MAP_Z-1)return 0;
   uint8_t floor=MC_Get(w,x,y,z);
-  if(floor!=MC_GRASS||MC_Get(w,x,y+1,z)!=MC_AIR||MC_Get(w,x,y+2,z)!=MC_AIR)return 0;
+  if(floor!=MC_GRASS||MC_Get(w,x,y+1,z)!=MC_AIR||MC_Get(w,x,y+2,z)!=MC_AIR||!sky_visible(w,x,y+1,z))return 0;
   float px=x+.5f,pz=z+.5f,dx=px-w->x,dz=pz-w->z,dist=dx*dx+dz*dz;
   if(dist<49||dist>324||fabsf(y+1-w->y)>6||!MC_BodyClear(w,px,y+1.01f,pz))return 0;
   unsigned count=0;
@@ -271,6 +283,17 @@ void MC_Hurt(MC_World *w,unsigned damage)
 
 static void move_mob(MC_World *w,MC_Mob *m,float vx,float vz,float dt)
 {
+  /* Jump only onto a reachable one-block ledge. Check both the vertical
+     takeoff space and the landing volume, so low roofs and tall walls stay
+     barriers. Gravity and collision still advance in 20 ms substeps. */
+  float speed=sqrtf(vx*vx+vz*vz);
+  if(!m->type && m->on_ground && speed>.01f &&
+     !MC_BodyClear(w,m->x+vx*.15f,m->y,m->z+vz*.15f)) {
+    float lx=m->x+vx/speed*.8f,lz=m->z+vz/speed*.8f;
+    if(MC_IsSolid(MC_Get(w,(int)floorf(lx),(int)floorf(m->y+.05f),(int)floorf(lz))) &&
+       MC_BodyClear(w,m->x,m->y+.5f,m->z) && MC_BodyClear(w,m->x,m->y+1.05f,m->z) &&
+       MC_BodyClear(w,lx,m->y+1.05f,lz)) {m->vy=6.6f;m->on_ground=0;}
+  }
   while(dt>0) {
     float h=fminf(dt,.02f);dt-=h;float nx=m->x+vx*h,nz=m->z+vz*h;
     if(MC_BodyClear(w,nx,m->y,m->z))m->x=nx;
@@ -298,14 +321,7 @@ void MC_MobsTick(MC_World *w,float dt)
   if(!(dt>0)||w->bag)return;
   dt=fminf(dt,.1f);w->attack_cooldown=fmaxf(0,w->attack_cooldown-dt);w->attack_flash=fmaxf(0,w->attack_flash-dt);w->breed_cooldown=fmaxf(0,w->breed_cooldown-dt);
   if(w->creative){memset(w->mobs,0,sizeof(w->mobs));w->mob_target=255;w->spawn_clock=w->mob_clock=0;return;}
-  /* Hostile mobs belong to the night cycle.  Clear them at dawn so a safe
-     daytime loop is possible without growing another persistent entity flag. */
   int night=sinf(w->time*(6.2831853f/600))<=-.38f;
-  if(!night) for(unsigned i=0;i<MC_MOBS;i++) if(w->mobs[i].health&&!w->mobs[i].type) {
-    memset(&w->mobs[i],0,sizeof(w->mobs[i]));
-    w->mob_fed[i]=0;w->mob_fed_age[i]=0;
-    if(w->mob_target==i)w->mob_target=255;
-  }
   w->spawn_clock+=dt;w->mob_clock+=dt;
   if(w->spawn_clock>=4) {
     w->spawn_clock=0;unsigned r=next_random(w);
@@ -313,13 +329,20 @@ void MC_MobsTick(MC_World *w,float dt)
       float angle=((r>>4)&255)*(6.2831853f/256),radius=9+((r>>12)&7);
       int x=(int)(w->x+cosf(angle)*radius),z=(int)(w->z+sinf(angle)*radius);
       for(int y=(int)w->y+3;y>(int)w->y-5&&y>0;y--)
-        if(night?MC_MobSpawn(w,x,y,z):MC_PassiveSpawn(w,x,y,z))break;
+        if(MC_MobSpawn(w,x,y,z) || (!night && MC_PassiveSpawn(w,x,y,z)))break;
     }
   }
   if(w->mob_clock<.1f)return;
   dt=fminf(w->mob_clock,.2f);w->mob_clock=0;
   for(unsigned i=0;i<MC_MOBS;i++) {
     MC_Mob *m=&w->mobs[i];if(!m->health){w->mob_fed[i]=0;w->mob_fed_age[i]=0;continue;}
+    /* Dawn clears only exposed hostiles. Sheltered cave enemies persist;
+       artificial lighting prevents new spawns but never deletes live mobs. */
+    if(!m->type && !night && sky_visible(w,(int)floorf(m->x),(int)floorf(m->y+1.6f),(int)floorf(m->z))) {
+      memset(m,0,sizeof(*m));w->mob_fed[i]=0;w->mob_fed_age[i]=0;
+      if(w->mob_target==i)w->mob_target=255;
+      continue;
+    }
     if(w->mob_fed[i] && (w->mob_fed_age[i]+=dt)>20){w->mob_fed[i]=0;w->mob_fed_age[i]=0;}
     m->hurt=fmaxf(0,m->hurt-dt);m->attack=fmaxf(0,m->attack-dt);
     float dx=w->x-m->x,dz=w->z-m->z,dist=sqrtf(dx*dx+dz*dz);

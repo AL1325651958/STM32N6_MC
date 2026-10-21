@@ -30,6 +30,34 @@ int main(void)
   for(unsigned i=1;i<MC_MOBS;i++)w.mobs[i]=(MC_Mob){40+(float)i*2,2,40,0,0,0,12,1,0,0};
   assert(!MC_MobSpawn(&w,23,1,10));memset(w.mobs+1,0,sizeof(w.mobs)-sizeof(w.mobs[0]));
   MC_Set(&w,25,1,10,MC_TORCH);assert(!MC_DarkAt(&w,25,1,10));MC_Set(&w,25,1,10,MC_GRASS);
+  /* Daylight caves are dangerous, while exposed ground and glass roofs admit
+     sunlight. Both light sources suppress spawning without deleting mobs. */
+  arena(&w);w.time=90;
+  MC_Set(&w,25,5,10,MC_STONE);
+  assert(MC_DarkAt(&w,25,1,10)&&MC_MobSpawn(&w,25,1,10));
+  assert(!MC_PassiveSpawn(&w,25,1,10));
+  MC_MobsTick(&w,.1f);assert(w.mobs[0].health);
+  MC_Set(&w,24,3,10,MC_LAMP_ON);assert(!MC_DarkAt(&w,25,1,10));
+  MC_MobsTick(&w,.1f);assert(w.mobs[0].health);
+  memset(w.mobs,0,sizeof(w.mobs));assert(!MC_MobSpawn(&w,25,1,10));
+  MC_Set(&w,24,3,10,MC_LAMP);assert(MC_DarkAt(&w,25,1,10));
+  MC_Set(&w,24,3,10,MC_TORCH);assert(!MC_MobSpawn(&w,25,1,10));
+  MC_Set(&w,24,3,10,MC_AIR);MC_Set(&w,25,5,10,MC_GLASS);
+  assert(!MC_DarkAt(&w,25,1,10));
+  assert(!MC_DarkAt(&w,-1,1,10)&&!MC_DarkAt(&w,MC_MAP_X,1,10));
+  /* Exercise the real periodic spawn dispatch during daytime, not just the
+     explicit spawn API. A fixed RNG seed selects one safe candidate. */
+  arena(&w);w.x=w.z=32.5f;w.time=90;w.mob_rng=4;w.spawn_clock=3.95f;
+  for(int z=12;z<54;z++)for(int x=12;x<54;x++)MC_Set(&w,x,5,z,MC_STONE);
+  MC_MobsTick(&w,.1f);assert(w.mobs[0].health&&!w.mobs[0].type);
+  /* Sheltered hostiles survive v5 save/load and disappear only once exposed
+     at daytime. Clearing never awards a kill or item drop. */
+  uint8_t *cave_save=malloc(MC_SAVE_SIZE);assert(cave_save);
+  MC_SaveEncode(&w,7,cave_save);assert(MC_SaveDecode(&w,cave_save,MC_SAVE_SIZE));free(cave_save);
+  MC_MobsTick(&w,.1f);assert(w.mobs[0].health);
+  MC_Set(&w,(int)floorf(w.mobs[0].x),5,(int)floorf(w.mobs[0].z),MC_AIR);
+  w.mob_target=0;MC_MobsTick(&w,.1f);assert(!w.mobs[0].health&&w.mob_target==255&&!w.items[MC_ARROW]);
+  arena(&w);
   /* Passive animals only spawn in daylight on grass and use the same fixed
      mob slots as hostile night stalkers. */
   memset(w.mobs,0,sizeof(w.mobs));w.time=90;
@@ -117,6 +145,21 @@ int main(void)
   arena(&w);w.mobs[0]=(MC_Mob){10.5f,5,16.5f,0,0,0,12,0,0,0};
   for(int i=0;i<35;i++)MC_MobsTick(&w,.1f);
   assert(w.mobs[0].health&&fabsf(w.mobs[0].y-2)<.01f&&w.mobs[0].on_ground);
+  /* A pursuing enemy jumps onto and across a one-cell ledge. Two-cell walls
+     and a low ceiling prevent jumping; no horizontal teleport is used. */
+  arena(&w);w.mobs[0]=(MC_Mob){10.5f,2.01f,14.5f,0,0,0,12,1,0,0};
+  for(int x=8;x<14;x++)MC_Set(&w,x,2,13,MC_STONE);
+  float peak=2;
+  for(int i=0;i<65;i++){MC_MobsTick(&w,.1f);if(w.mobs[0].y>peak)peak=w.mobs[0].y;assert(MC_BodyClear(&w,w.mobs[0].x,w.mobs[0].y,w.mobs[0].z));}
+  assert(peak>3&&w.mobs[0].z<12.7f);
+  arena(&w);w.mobs[0]=(MC_Mob){10.5f,2.01f,14.5f,0,0,0,12,1,0,0};
+  for(int x=8;x<14;x++)for(int y=2;y<4;y++)MC_Set(&w,x,y,13,MC_STONE);
+  for(int i=0;i<40;i++)MC_MobsTick(&w,.1f);
+  assert(w.mobs[0].z>=14.27f&&w.mobs[0].y<2.02f&&w.health==20);
+  arena(&w);w.mobs[0]=(MC_Mob){10.5f,2.01f,14.5f,0,0,0,12,1,0,0};
+  for(int x=8;x<14;x++) {MC_Set(&w,x,2,13,MC_STONE);for(int z=12;z<17;z++)MC_Set(&w,x,4,z,MC_STONE);}
+  for(int i=0;i<40;i++)MC_MobsTick(&w,.1f);
+  assert(w.mobs[0].z>=14.27f&&w.mobs[0].y<2.02f&&w.health==20);
   arena(&w);w.mobs[0]=(MC_Mob){10.5f,2.01f,14.5f,0,0,0,12,1,1,0};
   for(int y=2;y<5;y++)for(int x=8;x<14;x++)MC_Set(&w,x,y,12,MC_STONE);
   for(int i=0;i<35;i++)MC_MobsTick(&w,.1f);
@@ -134,5 +177,5 @@ int main(void)
   arena(&w);w.mobs[2]=(MC_Mob){30.5f,5.25f,40.5f,-.5f,.7f,.2f,9,1,1,.72f};w.mob_rng=17;
   MC_SaveEncode(&w,3,save);assert(MC_SaveValidate(save,MC_SAVE_SIZE)==3);assert(MC_SaveDecode(&restored,save,MC_SAVE_SIZE));
   assert(w.mobs[2].x==restored.mobs[2].x&&w.mobs[2].health==restored.mobs[2].health&&restored.mobs[2].type==1&&fabsf(restored.mobs[2].heading-.72f)<.001f&&restored.mob_rng==17);
-  free(restored.blocks);free(save);free(w.blocks);puts("minicraft mobs, combat, v4 persistence: OK");return 0;
+  free(restored.blocks);free(save);free(w.blocks);puts("minicraft mobs / cave lighting / ledge jumping / v5 persistence: OK");return 0;
 }

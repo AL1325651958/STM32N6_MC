@@ -18,7 +18,7 @@ int main(int argc,char **argv)
   char path[1024];
   const char *variants[]={"preview","night","inventory","mining","chest","furnace","creative","geometry","farming","combat","ruins",
     "action_attack","action_shoot","action_feed","action_place","action_use",
-    "crop_dry","crop_dark","crop_growing","crop_ready","action_eat","main_menu","create_world","slab_merge"};
+    "crop_dry","crop_dark","crop_growing","crop_ready","action_eat","main_menu","create_world","slab_merge","cave_threat","cave_lit"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -86,6 +86,20 @@ int main(int argc,char **argv)
       w.x=12.5f;w.y=2;w.z=7.2f;w.yaw=0;w.pitch=-.18f;MC_Give(&w,MC_SLAB,8);
       w.notice="LOWER HALF  UPPER HALF  TWO SLABS MERGED";
     }
+    if(k==24 || k==25) {
+      memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+      for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++)MC_Set(&w,x,1,z,MC_STONE);
+      for(int z=9;z<=22;z++)for(int x=8;x<=17;x++) {
+        MC_Set(&w,x,5,z,MC_STONE);
+        if(x==8 || x==17 || z==22)for(int y=2;y<5;y++)MC_Set(&w,x,y,z,MC_STONE);
+      }
+      MC_Set(&w,10,3,22,MC_IRON_ORE);MC_Set(&w,14,3,22,MC_COAL_ORE);
+      w.x=12.5f;w.y=2.01f;w.z=6.5f;w.yaw=0;w.pitch=0;w.time=90;
+      if(k==25)MC_Set(&w,11,2,16,MC_TORCH);
+      assert(MC_MobSpawn(&w,12,1,16)==(k==24));
+      MC_Give(&w,k==24?MC_SWORD:MC_TORCH,k==24?1:8);
+      w.notice=k==24?"DARK CAVES REMAIN DANGEROUS IN DAYLIGHT":"TORCHES AND POWERED LAMPS PREVENT SPAWNS";
+    }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];
     MC_UIDraw(fb,&w,MC_GRASS,0,0,"NEW WORLD  SD READY",1,0,0);
@@ -101,6 +115,6 @@ int main(int argc,char **argv)
   FILE *f=fopen(path,"wb");if(!f)return 1;
   if(fwrite(save,1,MC_SAVE_SIZE,f)!=MC_SAVE_SIZE)return 1;
   fclose(f);
-  printf("Twenty interface/gameplay previews and %u-byte example save generated at %s\n",(unsigned)MC_SAVE_SIZE,argv[1]);
+  printf("%u interface/gameplay previews and %u-byte example save generated at %s\n",(unsigned)(sizeof(variants)/sizeof(variants[0])),(unsigned)MC_SAVE_SIZE,argv[1]);
   free(fb);free(view);free(save);free(w.blocks);return 0;
 }
