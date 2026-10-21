@@ -15,7 +15,8 @@ static const uint8_t font[][5]={
  {0x7f,2,0x0c,2,0x7f},{0x7f,4,8,0x10,0x7f},{0x3e,0x41,0x41,0x41,0x3e},{0x7f,9,9,9,6},
  {0x3e,0x41,0x51,0x21,0x5e},{0x7f,9,0x19,0x29,0x46},{0x26,0x49,0x49,0x49,0x32},{1,1,0x7f,1,1},
  {0x3f,0x40,0x40,0x40,0x3f},{0x1f,0x20,0x40,0x20,0x1f},{0x3f,0x40,0x38,0x40,0x3f},{0x63,0x14,8,0x14,0x63},
- {7,8,0x70,8,7},{0x61,0x51,0x49,0x45,0x43}
+ {7,8,0x70,8,7},{0x61,0x51,0x49,0x45,0x43},
+ {0x63,0x13,0x08,0x64,0x63} /* percent */
 };
 static void rect(uint16_t *fb,int x,int y,int w,int h,uint16_t c)
 {
@@ -33,7 +34,7 @@ static void stroke(uint16_t *fb,int x0,int y0,int x1,int y1,int width,uint16_t c
 static void text(uint16_t *fb,int x,int y,const char *s,uint16_t c)
 {
   for(;*s;s++,x+=12) {
-    int k=*s>='0' && *s<='9'?*s-'0':*s>='A' && *s<='Z'?*s-'A'+10:-1;
+    int k=*s>='0' && *s<='9'?*s-'0':*s>='A' && *s<='Z'?*s-'A'+10:*s=='%'?36:-1;
     if(k>=0) { for(int col=0;col<5;col++) for(int row=0;row<7;row++) if(font[k][col]&(1<<row)) rect(fb,x+col*2,y+row*2,2,2,c); }
     else if(*s=='-') rect(fb,x,y+6,8,2,c);
   }
@@ -59,7 +60,7 @@ int MC_UIRole(unsigned x,unsigned y)
 static void small(uint16_t *fb,int x,int y,const char *s,uint16_t c)
 {
   for(;*s;s++,x+=6) {
-    int k=*s>='0'&&*s<='9'?*s-'0':*s>='A'&&*s<='Z'?*s-'A'+10:-1;
+    int k=*s>='0'&&*s<='9'?*s-'0':*s>='A'&&*s<='Z'?*s-'A'+10:*s=='%'?36:-1;
     if(k>=0)for(int col=0;col<5;col++)for(int row=0;row<7;row++)
       if(font[k][col]&(1<<row))rect(fb,x+col,y+row,1,1,c);
     if(*s=='-')rect(fb,x,y+3,4,1,c);
@@ -267,6 +268,31 @@ static void mini_map(uint16_t *fb,const MC_World *w)
   small(fb,696,185,"BASE",0xffe0);small(fb,738,185,"YOU",0xffff);
   rect(fb,686+9,199,7,4,0xffe0);small(fb,696,197,"BED",0xffff);
 }
+static void crop_hint(uint16_t *fb,const MC_World *w)
+{
+  if(!w->target_valid)return;
+  const MC_Hit *h=&w->target;
+  if(h->block!=MC_WHEAT_CROP && h->block!=MC_WHEAT_MATURE)return;
+  const char *hint="READY  HOLD TO HARVEST";
+  uint16_t color=0x07e0;char growing[32];
+  if(h->block==MC_WHEAT_CROP) {
+    unsigned needs=MC_CropGrowthNeeds(w,h->x,h->y,h->z);
+    if(needs&MC_CROP_NEEDS_SOIL)hint="NEEDS FARMLAND BELOW";
+    else if(needs&MC_CROP_NEEDS_SPACE)hint="NEEDS SPACE ABOVE";
+    else if(needs&MC_CROP_NEEDS_WATER)hint="NEEDS WATER WITHIN 4 BLOCKS";
+    else if(needs&MC_CROP_NEEDS_LIGHT)hint="NEEDS SUNLIGHT OR TORCH";
+    else {
+      unsigned percent=0;
+      for(unsigned i=0;i<MC_GROWERS;i++) {
+        const MC_Grower *g=&w->growers[i];
+        if(g->x==h->x+1 && g->y==h->y+1 && g->z==h->z+1){percent=(unsigned)(fminf(75,g->age)*100/75);break;}
+      }
+      snprintf(growing,sizeof(growing),"WHEAT GROWING  %u%%",percent);hint=growing;
+    }
+    if(needs)color=0xffc0;
+  }
+  panel(fb,280,300,240,26);small(fb,290,309,hint,color);
+}
 static const char *scene_action_hint(unsigned item)
 {
   if(item==MC_BOW)return "TAP SHOOT";
@@ -377,6 +403,7 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
       if(w->level_flash>0)small(fb,500,378,"LEVEL UP",0xffe0);
     }
     if(w->mining>0){rect(fb,300,274,200,8,0x2104);rect(fb,302,276,(int)(196*fminf(1,w->mining)),4,0xffe0);}
+    crop_hint(fb,w);
     for(unsigned i=0;i<10;i++){int x=246+(int)i*22;rect(fb,x,369,16,12,i*2<w->health?0xe924:0x4208);if(i*2+1>=w->health)rect(fb,x+8,369,8,12,0x4208);}
     small(fb,492,347,"FOOD",0xffc0);
     for(unsigned i=0;i<10;i++) {

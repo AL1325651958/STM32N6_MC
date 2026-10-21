@@ -134,8 +134,35 @@ int main(void) {
  scene(&w);MC_Set(&w,10,3,13,MC_DIRT);assert(MC_Give(&w,MC_SHOVEL,1));select_item(&w,MC_SHOVEL);
  assert(MC_SceneTap(&w,400,240)&&MC_Get(&w,10,3,13)==MC_FARMLAND);
  assert(MC_Give(&w,MC_WHEAT_SEEDS,1));select_item(&w,MC_WHEAT_SEEDS);assert(MC_Use(&w));assert(MC_Get(&w,10,4,13)==MC_WHEAT_CROP);
- tick(&w,751);assert(MC_Get(&w,10,4,13)==MC_WHEAT_MATURE);assert(w.growers[0].x==0);
- w.pitch=.25f;mine(&w,6);assert(MC_Get(&w,10,4,13)==MC_FARMLAND&&w.items[MC_WHEAT]>=1&&w.items[MC_WHEAT_SEEDS]>=1);
+ /* Dry fields never advance. Wrong-height and five-block water are ignored;
+    a diagonal source within four blocks irrigates the same soil layer. */
+ tick(&w,760);assert(MC_Get(&w,10,4,13)==MC_WHEAT_CROP&&w.growers[0].age==0);
+ assert(MC_CropGrowthNeeds(&w,10,4,13)==MC_CROP_NEEDS_WATER);
+ MC_Set(&w,15,2,13,MC_STONE);MC_Set(&w,15,3,13,MC_WATER);
+ MC_Set(&w,14,2,17,MC_WATER);
+ assert(MC_CropGrowthNeeds(&w,10,4,13)==MC_CROP_NEEDS_WATER);
+ MC_Set(&w,15,3,13,MC_AIR);MC_Set(&w,14,2,17,MC_STONE);MC_Set(&w,14,3,17,MC_WATER);
+ assert(!MC_CropGrowthNeeds(&w,10,4,13));tick(&w,200);
+ float crop_age=w.growers[0].age;assert(crop_age>=19&&crop_age<=21);
+ MC_Set(&w,14,3,17,MC_AIR);tick(&w,100);assert(w.growers[0].age==crop_age);
+ MC_Set(&w,14,3,17,MC_WATER);w.time=435;tick(&w,100);
+ assert(w.growers[0].age==crop_age&&MC_CropGrowthNeeds(&w,10,4,13)==MC_CROP_NEEDS_LIGHT);
+ w.time=90;MC_Set(&w,10,6,13,MC_STONE);tick(&w,100);assert(w.growers[0].age==crop_age);
+ MC_Set(&w,10,6,13,MC_GLASS);assert(!MC_CropGrowthNeeds(&w,10,4,13));
+ MC_Set(&w,10,5,13,MC_STONE);assert(MC_CropGrowthNeeds(&w,10,4,13)&MC_CROP_NEEDS_SPACE);
+ tick(&w,100);assert(w.growers[0].age==crop_age);MC_Set(&w,10,5,13,MC_AIR);
+ MC_Set(&w,10,3,13,MC_DIRT);tick(&w,100);assert(w.growers[0].age==crop_age);
+ assert(MC_CropGrowthNeeds(&w,10,4,13)&MC_CROP_NEEDS_SOIL);MC_Set(&w,10,3,13,MC_FARMLAND);
+ w.time=435;MC_Set(&w,12,4,13,MC_LAMP);assert(MC_CropGrowthNeeds(&w,10,4,13)&MC_CROP_NEEDS_LIGHT);
+ MC_Set(&w,12,4,13,MC_LAMP_ON);assert(!MC_CropGrowthNeeds(&w,10,4,13));
+ MC_Set(&w,12,4,13,MC_TORCH);assert(!MC_CropGrowthNeeds(&w,10,4,13));
+ tick(&w,560);assert(MC_Get(&w,10,4,13)==MC_WHEAT_MATURE);assert(w.growers[0].x==0);
+ assert(MC_Give(&w,MC_WHEAT_SEEDS,1));select_item(&w,MC_WHEAT_SEEDS);
+ w.pitch=.25f;assert(!MC_SceneTap(&w,400,240));mine(&w,6);
+ assert(MC_Get(&w,10,4,13)==MC_AIR&&MC_Get(&w,10,3,13)==MC_FARMLAND&&w.items[MC_WHEAT]>=1&&w.items[MC_WHEAT_SEEDS]>=1);
+ w.pitch=0;select_item(&w,MC_WHEAT_SEEDS);assert(MC_SceneTap(&w,400,240));
+ assert(MC_Get(&w,10,4,13)==MC_WHEAT_CROP&&w.growers[0].y==5);
+ tick(&w,760);assert(MC_Get(&w,10,4,13)==MC_WHEAT_MATURE);
  /* Bed night skip, safe respawn and survival food/oxygen/death. */
  scene(&w);MC_Set(&w,10,3,13,MC_BED);w.pitch=-.15f;w.time=435;assert(MC_Use(&w)&&w.time==90&&w.spawn[2]==14);w.time=150;assert(MC_Use(&w)&&w.time==150);
  MC_Respawn(&w);assert(w.x>9&&w.x<15&&w.z>10&&w.z<16);
@@ -208,6 +235,18 @@ int main(void) {
    for(int yy=0;yy<8;yy++)memcpy(&action_pixels[a][yy*100],&fb[(288+yy)*800+690],100*sizeof(*fb));
  }
  for(unsigned a=1;a<5;a++)assert(memcmp(action_pixels[0],action_pixels[a],sizeof(action_pixels[0]))!=0);
+ /* The crop hint responds to irrigation without another action button. */
+ scene(&w);MC_Set(&w,10,3,13,MC_FARMLAND);MC_Set(&w,10,4,13,MC_WHEAT_CROP);w.pitch=.25f;
+ w.growers[0]=(MC_Grower){11,5,14,30};w.target_valid=MC_Pick(&w,400,240,&w.target);
+ assert(w.target_valid&&w.target.block==MC_WHEAT_CROP);
+ memset(fb,0,800*480*sizeof(*fb));MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);
+ uint16_t dry_hint[220*8];
+ for(int yy=0;yy<8;yy++)memcpy(&dry_hint[yy*220],&fb[(309+yy)*800+290],220*sizeof(*fb));
+ MC_Set(&w,14,3,13,MC_WATER);
+ memset(fb,0,800*480*sizeof(*fb));MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);
+ int hint_changed=0;
+ for(int yy=0;yy<8;yy++)if(memcmp(&dry_hint[yy*220],&fb[(309+yy)*800+290],220*sizeof(*fb)))hint_changed=1;
+ assert(hint_changed);
  for(int k=0;k<6;k++){w.bag=k>0;MC_SetMode(&w,k==5);w.open_chest=k==2?0:255;w.open_furnace=k==3?0:255;MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);}
  for(int k=0;k<64;k++)assert(fb[800*480+k]==0xa55a);
  free(fb);free(w.blocks);puts("minicraft slots / crafting / containers / furnace / growth / survival / UI: OK");return 0;

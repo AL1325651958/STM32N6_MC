@@ -51,6 +51,7 @@ int main(int argc,char **argv) {
  MC_Set(&a,33,40,30,MC_FURNACE);a.furnaces[1]=(MC_Furnace){34,41,31,{0},{MC_BIRCH_WOOD,1,0},{0},0,0};
  MC_Set(&a,35,40,30,MC_SAPLING);a.growers[0]=(MC_Grower){36,41,31,78.5f};
  MC_Set(&a,50,40,30,MC_FARMLAND);MC_Set(&a,50,41,30,MC_WHEAT_CROP);a.growers[1]=(MC_Grower){51,42,31,32.5f};
+ a.crop_clock=.7f;b.crop_clock=.9f;
  MC_Set(&a,36,40,30,MC_BED);a.spawn[0]=37;a.spawn[1]=41;a.spawn[2]=31;
  MC_Set(&a,40,40,30,MC_DOOR);MC_Set(&a,41,40,30,MC_DOOR_OPEN);
  roundtrip(&a,&b,save);assert(b.seed==a.seed&&b.x==a.x&&!memcmp(a.blocks,b.blocks,MC_MAP_BYTES));
@@ -64,6 +65,16 @@ int main(int argc,char **argv) {
  assert(b.reserve[MC_WOOD_PICK]==2&&b.reserve_wear[0]==17);
  assert(b.furnaces[0].progress==2.5f&&b.furnaces[0].burn==21.5f&&b.furnaces[1].fuel.item==MC_BIRCH_WOOD&&b.growers[0].age==78.5f);
  assert(MC_Get(&b,50,40,30)==MC_FARMLAND&&MC_Get(&b,50,41,30)==MC_WHEAT_CROP&&b.growers[1].age==32.5f);
+ assert(b.crop_clock==0);
+ /* A loaded dry crop keeps its saved progress, then resumes when irrigated. */
+ for(int z=26;z<=34;z++)for(int x=46;x<=54;x++)if(MC_Get(&b,x,40,z)==MC_WATER)MC_Set(&b,x,40,z,MC_AIR);
+ for(int i=0;i<20;i++)MC_SystemsTick(&b,.1f);
+ assert(b.growers[1].age==32.5f);
+ MC_Set(&b,54,39,30,MC_STONE);MC_Set(&b,54,40,30,MC_WATER);b.time=90;
+ for(int y=42;y<MC_MAP_Y;y++)MC_Set(&b,50,y,30,MC_AIR);
+ for(int i=0;i<20;i++)MC_SystemsTick(&b,.1f);
+ assert(b.growers[1].age>34&&b.growers[1].age<35);
+ assert(MC_SaveDecode(&b,save,MC_SAVE_SIZE)&&b.crop_clock==0&&b.growers[1].age==32.5f);
  /* Old v4 metadata has no hunger marker and therefore loads with full hunger. */
  memcpy(copy,save,MC_SAVE_SIZE);uint8_t *meta=save+MC_SAVE_V1_SIZE;meta[6]=0;meta[7]=0;meta[MC_SAVE_META-95]=0;crc(save,MC_SAVE_META);
  assert(MC_SaveValidate(save,MC_SAVE_SIZE)==4);assert(MC_SaveDecode(&b,save,MC_SAVE_SIZE)&&b.hunger==20);

@@ -236,7 +236,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   w->mob_target=255;w->mob_clock=w->spawn_clock=w->attack_cooldown=w->attack_flash=w->shoot_cooldown=0;
   w->gravity_clock=0;w->gravity_cursor=0;
   w->fluid_clock=0;w->fluid_cursor=0;
-  w->automation_clock=0;
+  w->automation_clock=0;w->crop_clock=0;
   w->redstone_clock=0;memset(w->redstone_button_pos,0,sizeof(w->redstone_button_pos));memset(w->redstone_button_timer,0,sizeof(w->redstone_button_timer));
   memset(w->mob_fed,0,sizeof(w->mob_fed));memset(w->mob_fed_age,0,sizeof(w->mob_fed_age));w->breed_cooldown=0;
   MC_SyncInventory(w);
@@ -448,6 +448,11 @@ int MC_SceneTap(MC_World *w,float x,float y) {
     return MC_UseAt(w,x,y);
   }
   if(MC_ToolIndex(held)>=0){MC_Attack(w,x,y);return 0;}
+  /* Seeds may be kept in hand through planting, harvesting and replanting. */
+  if(held==MC_WHEAT_SEEDS) {
+    MC_Hit hit;
+    if(MC_Pick(w,x,y,&hit) && (hit.block==MC_WHEAT_CROP || hit.block==MC_WHEAT_MATURE))return 0;
+  }
   if(MC_UseAt(w,x,y))return 1;
   return held!=0;
 }
@@ -566,8 +571,8 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
     if(!MC_Give(w,MC_WHEAT,1) && !MC_DropSpawn(w,MC_WHEAT,1,px,py,pz)){w->notice="BAG FULL";w->mining=0;return;}
     unsigned seeds=1u+(unsigned)((h.x*17+h.z*31)&1u);
     if(!MC_Give(w,MC_WHEAT_SEEDS,seeds))MC_DropSpawn(w,MC_WHEAT_SEEDS,seeds,px,py,pz);
-    MC_Set(w,h.x,h.y,h.z,MC_FARMLAND);w->mining=0;w->target_valid=0;
-    for(unsigned i=0;i<MC_GROWERS;i++)if(w->growers[i].x==h.x+1 && w->growers[i].y==h.y+2 && w->growers[i].z==h.z+1)memset(&w->growers[i],0,sizeof(MC_Grower));
+    MC_Set(w,h.x,h.y,h.z,MC_AIR);w->mining=0;w->target_valid=0;
+    for(unsigned i=0;i<MC_GROWERS;i++)if(w->growers[i].x==h.x+1 && w->growers[i].y==h.y+1 && w->growers[i].z==h.z+1)memset(&w->growers[i],0,sizeof(MC_Grower));
     MC_SyncInventory(w);w->notice="WHEAT HARVESTED";return;
   }
   unsigned drop=h.block==MC_GRASS||h.block==MC_FARMLAND?MC_DIRT:h.block==MC_STONE?MC_COBBLE:h.block==MC_COAL_ORE?MC_COAL:h.block;
@@ -668,6 +673,31 @@ static void flowing_water(MC_World *w,float dt)
     }
   }
 }
+/* Crop coordinates are the plant cell, one block above its farmland.
+   Each check has a fixed 9x9 irrigation area and bounded lighting search.
+   Local torch/lamp light is deliberately simplified, as in mob spawning. */
+unsigned MC_CropGrowthNeeds(const MC_World *w,int x,int y,int z) {
+  unsigned needs=0;
+  if(MC_Get(w,x,y-1,z)!=MC_FARMLAND)needs|=MC_CROP_NEEDS_SOIL;
+  if(MC_Get(w,x,y+1,z)!=MC_AIR)needs|=MC_CROP_NEEDS_SPACE;
+  int water=0,light=0;
+  for(int dz=-4;dz<=4 && !water;dz++)for(int dx=-4;dx<=4;dx++)
+    if(MC_Get(w,x+dx,y-1,z+dz)==MC_WATER){water=1;break;}
+  if(!water)needs|=MC_CROP_NEEDS_WATER;
+  if(sinf(w->time*(6.2831853f/600))>-.38f) {
+    light=1;
+    for(int yy=y+1;yy<MC_MAP_Y;yy++) {
+      unsigned b=MC_Get(w,x,yy,z);
+      if(b!=MC_AIR && b!=MC_GLASS && b!=MC_TORCH){light=0;break;}
+    }
+  }
+  for(int dy=-2;dy<=2 && !light;dy++)for(int dz=-4;dz<=4 && !light;dz++)for(int dx=-4;dx<=4;dx++) {
+    unsigned b=MC_Get(w,x+dx,y+dy,z+dz);
+    if(b==MC_TORCH || b==MC_LAMP_ON){light=1;break;}
+  }
+  if(!light)needs|=MC_CROP_NEEDS_LIGHT;
+  return needs;
+}
 void MC_SystemsTick(MC_World *w,float dt) {
   if(!(dt>0))return;
   dt=fminf(dt,.1f);
@@ -735,19 +765,25 @@ void MC_SystemsTick(MC_World *w,float dt) {
     }
     if(!f->input.count)f->progress=0;
   }
-  /* Fixed budget: 16 timers, growth clearance checked once when mature. */
+  w->crop_clock+=dt;
+  float crop_elapsed=w->crop_clock>=1?w->crop_clock:0;
+  if(crop_elapsed)w->crop_clock=0;
+  /* Up to 16 crop checks once per second. Dry/dark/blocked crops retain age;
+     tree timers keep their established cadence and clearance behavior. */
   for(unsigned i=0;i<MC_GROWERS;i++) {
-    MC_Grower *g=&w->growers[i];if(!g->x)continue;g->age+=dt;
+    MC_Grower *g=&w->growers[i];if(!g->x)continue;
     int x=g->x-1,y=g->y-1,z=g->z-1;
     uint8_t current=MC_Get(w,x,y,z);
     if(current==MC_WHEAT_CROP) {
+      if(!crop_elapsed || MC_CropGrowthNeeds(w,x,y,z))continue;
+      g->age+=crop_elapsed;
       if(g->age<75)continue;
-      if(MC_Get(w,x,y-1,z)!=MC_FARMLAND || MC_Get(w,x,y+1,z)!=MC_AIR){g->age=70;continue;}
       MC_Set(w,x,y,z,MC_WHEAT_MATURE);memset(g,0,sizeof(*g));continue;
     }
+    if(current!=MC_SAPLING){memset(g,0,sizeof(*g));continue;}
+    g->age+=dt;
     if(g->age<120)continue;
     int space=1;
-    if(current!=MC_SAPLING){memset(g,0,sizeof(*g));continue;}
     if(x<3 || x>=MC_MAP_X-3 || z<3 || z>=MC_MAP_Z-3 || y>MC_MAP_Y-8)space=0;
     for(int dy=1;dy<=5 && space;dy++)for(int dz=-2;dz<=2;dz++)for(int dx=-2;dx<=2;dx++) {
       uint8_t b=MC_Get(w,x+dx,y+dy,z+dz);if(b!=MC_AIR && b!=MC_LEAVES)space=0;

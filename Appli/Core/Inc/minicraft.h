@@ -49,6 +49,8 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
 #define MC_PROJECTILES 8
 #define MC_ARMOR_SLOTS 4
 #define MC_MAX_LEVEL 30
+enum { MC_CROP_NEEDS_WATER=1, MC_CROP_NEEDS_LIGHT=2,
+       MC_CROP_NEEDS_SOIL=4, MC_CROP_NEEDS_SPACE=8 };
 typedef struct { uint8_t item,count; uint16_t wear; } MC_Stack;
 typedef struct { uint16_t x,y,z; MC_Stack input,fuel,output; float burn,progress; } MC_Furnace;
 typedef struct { uint16_t x,y,z; float age; } MC_Grower;
@@ -101,6 +103,8 @@ typedef struct {
   /* Runtime-only cadence for adjacent chest/furnace automation.  The link is
      derived from persistent block coordinates, so no v4 fields are needed. */
   float automation_clock;
+  /* Runtime-only one-second crop checks; growers and age remain in v4 slots. */
+  float crop_clock;
   /* Runtime-only redstone scheduler; map bytes keep lever state, while
      button timers and the propagation clock are discarded on save/load. */
   float redstone_clock;
@@ -134,6 +138,7 @@ void MC_MobsTick(MC_World *w,float dt);
 int MC_MobSpawn(MC_World *w,int x,int y,int z);
 int MC_PassiveSpawn(MC_World *w,int x,int y,int z);
 int MC_DarkAt(const MC_World *w,int x,int y,int z);
+unsigned MC_CropGrowthNeeds(const MC_World *w,int x,int y,int z);
 void MC_Hurt(MC_World *w,unsigned damage);
 void MC_NewPlayer(MC_World *w, int legacy);
 void MC_PlayTick(MC_World *w, float dt, int holding, float x, float y);
