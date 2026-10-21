@@ -401,7 +401,8 @@ static void mini_map(uint16_t *fb,const MC_World *w)
         unsigned a=w->blocks[(unsigned)y*MC_MAP_X*MC_MAP_Z+column];
         unsigned b=w->blocks[(unsigned)(y+1)*MC_MAP_X*MC_MAP_Z+column];
         unsigned roof=w->blocks[(unsigned)(y+2)*MC_MAP_X*MC_MAP_Z+column];
-        if(MC_IsSolid((uint8_t)below)&&a==MC_AIR&&b==MC_AIR&&MC_IsSolid((uint8_t)roof)) {cache.caves[i]=1;break;}
+        if(MC_IsSolid((uint8_t)below)&&a==MC_AIR&&b==MC_AIR&&MC_IsSolid((uint8_t)roof) &&
+           roof!=MC_LEAVES && roof!=MC_GLASS) {cache.caves[i]=1;break;}
       }
     }
     cache.world=w;cache.blocks=w->blocks;cache.serial=w->scene_serial;cache.revision=w->map_revision;cache.x=px;cache.y=py;cache.z=pz;cache.valid=1;

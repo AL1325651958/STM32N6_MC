@@ -60,6 +60,12 @@ int main(void)
   }
   MC_UpdateExploration(&w);draw(&w,fb);
   assert(fb[142*800+741]==0x07ff);
+  MC_Set(&w,11,12,11,MC_LEAVES);draw(&w,other);
+  assert(other[142*800+741]!=0x07ff);
+  MC_Set(&w,11,12,11,MC_GLASS);draw(&w,other);
+  assert(other[142*800+741]!=0x07ff);
+  MC_Set(&w,11,12,11,MC_STONE);draw(&w,other);
+  assert(other[142*800+741]==0x07ff);
   unsigned cave_index=11u*MC_MAP_X+11u;w.explored[cave_index>>3]&=(uint8_t)~(1u<<(cave_index&7));
   draw(&w,other);assert(other[142*800+741]!=0x07ff);
 
