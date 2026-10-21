@@ -223,8 +223,6 @@ static void held_item(uint16_t *fb,const MC_World *w)
   icon_shadow(fb,ix,iy,iw,ih,id);
   icon_rect(fb,ix,iy,iw,ih,id);
 }
-static const char *world_phase(const MC_World *w)
-{ return sinf(w->time*(6.2831853f/600))<=-.38f?"NIGHT":"DAY"; }
 /* A compact top-down locator keeps the nearby terrain and the player's base
    readable without adding another touch control.  The map is deliberately
    derived from the current world so it costs no save bytes and never goes
@@ -363,11 +361,9 @@ static void stack(uint16_t *fb,int x,int y,int width,int height,const MC_Stack *
 }
 void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,unsigned max_ms,const char *status,int touch_ready,float move,float strafe)
 {
-  (void)selected;char info[96];
-  panel(fb,10,8,578,62);
-  snprintf(info,sizeof(info),"X %d Y %d Z %d FPS %u MAX %uMS",(int)w->x,(int)w->y,(int)w->z,fps,max_ms);
-  text(fb,20,18,info,0xffff);text(fb,20,43,touch_ready?status:"TOUCH NOT FOUND",touch_ready?0xffc0:0xf800);
-  small(fb,500,44,world_phase(w),world_phase(w)[0]=='N'?0xfca0:0xffe0);
+  /* Keep the shared drawing API; runtime diagnostics no longer cover the scene. */
+  (void)selected;(void)fps;(void)max_ms;(void)status;(void)touch_ready;
+  char info[96];
   panel(fb,600,8,90,54);text(fb,614,28,w->bag?"CLOSE":"BAG",0xffff);
   panel(fb,700,8,90,54);text(fb,718,28,"SAVE",0xffff);
   if(w->bag) {

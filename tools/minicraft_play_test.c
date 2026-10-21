@@ -294,6 +294,11 @@ int main(void) {
  for(int yy=0;yy<8;yy++)if(memcmp(&dry_hint[yy*220],&fb[(309+yy)*800+290],220*sizeof(*fb)))hint_changed=1;
  assert(hint_changed);
  for(int k=0;k<6;k++){w.bag=k>0;MC_SetMode(&w,k==5);w.open_chest=k==2?0:255;w.open_furnace=k==3?0:255;MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);}
+ /* Removing the log overlay must leave the upper-left scene untouched,
+    regardless of the former diagnostic values or touch-ready status. */
+ for(unsigned i=0;i<800*480;i++)fb[i]=0x4a69;
+ w.bag=0;MC_UIDraw(fb,&w,0,5,999,"DIAGNOSTIC TEXT",0,0,0);
+ for(int y=8;y<70;y++)for(int x=10;x<588;x++)assert(fb[y*800+x]==0x4a69);
  const uint8_t banks[2]={1,0};
  MC_MenuDraw(fb,banks,0,0,20261021,0,"TEST");
  MC_MenuDraw(fb,banks,1,1,20261021,1,"TEST");

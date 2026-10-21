@@ -64,7 +64,7 @@ python tools/test_minicraft.py --sd G:/
 python tools/snapshot_minicraft.py
 ```
 
-主机 GCC 以 `-Wall -Wextra -Werror` 验证几何、移动、采集、掉落、背包、合成、容器、熔炉、生长、战斗和存档；ARM 构建验证链接与签名。快照脚本在构建后生成精简源码 ZIP、固件副本、哈希与验证记录，保存到 `out/verified-v14/`。预览工具 `tools/minicraft_preview.c` 共用固件渲染器，可生成场景、界面和农业预览，包括按手持物品变化的攻击、射击、喂食、建造和进食提示。
+主机 GCC 以 `-Wall -Wextra -Werror` 验证几何、移动、采集、掉落、背包、合成、容器、熔炉、生长、战斗和存档；ARM 构建验证链接与签名。快照脚本在构建后生成精简源码 ZIP、固件副本、哈希与验证记录，保存到 `out/verified-v16/`。预览工具 `tools/minicraft_preview.c` 共用固件渲染器，可生成场景、界面和农业预览，包括按手持物品变化的攻击、射击、喂食、建造和进食提示。
 
 用户此前旧版板上约 15 FPS；**当前 v4 尚未烧录实测**。主机预览不能证明板上性能；触屏多指、LCD、真实 SD 迁移、异常断电和长时间运行仍需板验。
 
@@ -86,3 +86,5 @@ python tools/snapshot_minicraft.py
 - 复现：`python tools/bench_minicraft.py --baseline 9011b91`；报告在 `out/minicraft/perf/comparison.json`。带性能报告归档：`python tools/snapshot_minicraft.py --benchmark-baseline 9011b91`。比较旧版源码需要保留 Git 历史。
 
 红石更新在地图未改变且玩家未跨格时复用电路结果；方块编辑、按钮释放、跨格移动、生成和读档会使结果失效。缓存仅为运行时状态，v4 存档格式保持不变。基准工具另测静止、编辑和移动三类世界更新场景，每个采样组模拟 64 次更新并比较地图 CRC；可用 `--baseline d9b8cea` 单独比较 v13 与 v14。
+
+游戏画面已移除左上角 Log 栏（坐标、FPS、最长帧耗时、SD 常驻状态与昼夜文字），保留背包/保存按钮、小地图和操作反馈。性能对比工具与历史快照仍保留在工程中，界面不显示诊断数据。

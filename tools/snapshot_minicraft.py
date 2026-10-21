@@ -17,7 +17,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/minicraft"
-ARCHIVE_ROOT = ROOT / "out/verified-v14"
+ARCHIVE_ROOT = ROOT / "out/verified-v16"
 
 
 def digest(data):
@@ -56,7 +56,7 @@ def main():
     (OUT / "snapshot-preview-build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
     if result.returncode:
         raise SystemExit(f"preview build failed; see {OUT / 'snapshot-preview-build.log'}\n{result.stdout}{result.stderr}")
-    preview_dir = OUT / "ui-v14"
+    preview_dir = OUT / "ui-v16"
     preview_dir.mkdir(parents=True, exist_ok=True)
     result = subprocess.run([str(preview_exe), str(preview_dir)], cwd=ROOT,
                             text=True, capture_output=True, encoding="utf-8")
@@ -85,7 +85,7 @@ def main():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archive_root = ARCHIVE_ROOT / stamp
     archive_root.mkdir(parents=True, exist_ok=False)
-    source_zip = archive_root / "MiniCraft-v14-source.zip"
+    source_zip = archive_root / "MiniCraft-v16-source.zip"
     source_hashes = {}
     with zipfile.ZipFile(source_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for rel in sources:
