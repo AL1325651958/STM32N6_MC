@@ -25,6 +25,18 @@ int main(void) {
  assert(MC_Get(&w,4,5,4)==MC_AIR&&MC_Get(&w,4,4,4)==MC_SAND);
  MC_Set(&w,5,5,5,MC_SAND);MC_Set(&w,5,4,5,MC_STONE);tick(&w,40);
  assert(MC_Get(&w,5,5,5)==MC_SAND);
+ /* Water falls and spreads only within the bounded fluid scheduler. */
+ scene(&w);w.fluid_cursor=7u*15u+7u;MC_Set(&w,10,6,10,MC_WATER);tick(&w,3);
+ assert(MC_Get(&w,10,5,10)==MC_WATER&&MC_Get(&w,10,6,10)==MC_AIR);
+ MC_Set(&w,10,2,10,MC_STONE);MC_Set(&w,10,3,10,MC_WATER);MC_Set(&w,11,2,10,MC_STONE);
+ /* Remove the earlier falling sample so the bounded cursor reaches the
+    supported source cell on this short deterministic test window. */
+ MC_Set(&w,10,5,10,MC_AIR);MC_Set(&w,10,4,10,MC_AIR);
+ w.fluid_cursor=7u*15u+7u;tick(&w,3);
+ assert(MC_Get(&w,11,3,10)==MC_WATER);
+ MC_Set(&w,12,3,10,MC_STONE);MC_Set(&w,11,3,10,MC_AIR);MC_Set(&w,11,2,10,MC_AIR);
+ w.fluid_cursor=7u*15u+7u;tick(&w,3);
+ assert(MC_Get(&w,11,3,10)==MC_AIR);
  scene(&w);
  /* Deferred legacy tools retain wear when a full inventory gains space. */
  full(&w);w.reserve[MC_WOOD_PICK]=1;w.reserve_wear[0]=17;tick(&w,1);assert(w.reserve[MC_WOOD_PICK]==1);

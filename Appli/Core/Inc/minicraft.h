@@ -89,6 +89,10 @@ typedef struct {
   /* Runtime-only bounded scheduler for nearby falling sand. */
   float gravity_clock;
   uint16_t gravity_cursor;
+  /* Runtime-only bounded water scheduler; fluid state is derived from map
+     bytes and therefore remains absent from the fixed v4 save layout. */
+  float fluid_clock;
+  uint16_t fluid_cursor;
   /* Runtime-only redstone scheduler; map bytes keep lever state, while
      button timers and the propagation clock are discarded on save/load. */
   float redstone_clock;

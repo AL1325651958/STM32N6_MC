@@ -235,6 +235,7 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   memset(w->mobs,0,sizeof(w->mobs));memset(w->drops,0,sizeof(w->drops));memset(w->projectiles,0,sizeof(w->projectiles));w->mob_rng=w->seed^0x9e3779b9u;if(!w->mob_rng)w->mob_rng=1;
   w->mob_target=255;w->mob_clock=w->spawn_clock=w->attack_cooldown=w->attack_flash=w->shoot_cooldown=0;
   w->gravity_clock=0;w->gravity_cursor=0;
+  w->fluid_clock=0;w->fluid_cursor=0;
   w->redstone_clock=0;memset(w->redstone_button_pos,0,sizeof(w->redstone_button_pos));memset(w->redstone_button_timer,0,sizeof(w->redstone_button_timer));
   memset(w->mob_fed,0,sizeof(w->mob_fed));memset(w->mob_fed_age,0,sizeof(w->mob_fed_age));w->breed_cooldown=0;
   MC_SyncInventory(w);
@@ -500,6 +501,43 @@ static void falling_sand(MC_World *w,float dt)
     }
   }
 }
+/* Move a bounded number of nearby water cells.  Water has no inventory item
+   or saved level metadata, so the map byte itself is the complete state.  A
+   cell first falls into air below; when supported, it may spread to one of
+   four horizontal air cells that also have a solid floor.  The radius,
+   vertical window and per-tick budget keep worst-case work predictable on the
+   15 FPS target and prevent a whole-world ocean scan. */
+static void flowing_water(MC_World *w,float dt)
+{
+  w->fluid_clock+=dt;
+  if(w->fluid_clock<.25f)return;
+  w->fluid_clock=fmodf(w->fluid_clock,.25f);
+  int bx=(int)floorf(w->x)-7,bz=(int)floorf(w->z)-7;
+  int y0=(int)floorf(w->y)-6,y1=(int)floorf(w->y)+10;
+  if(y0<1)y0=1;
+  if(y1>=MC_MAP_Y-1)y1=MC_MAP_Y-2;
+  static const int dirs[4][2]={{1,0},{-1,0},{0,1},{0,-1}};
+  /* 16 cells over a 15x15 window; newly written cells are visited on later
+     rounds, which turns a large spill into a smooth, bounded update. */
+  for(unsigned n=0;n<16;n++) {
+    unsigned cell=w->fluid_cursor++%225u;
+    int x=bx+(int)(cell%15u),z=bz+(int)(cell/15u);
+    for(int y=y1;y>=y0;y--) {
+      if(MC_Get(w,x,y,z)!=MC_WATER)continue;
+      if(MC_Get(w,x,y-1,z)==MC_AIR) {
+        MC_Set(w,x,y,z,MC_AIR);MC_Set(w,x,y-1,z,MC_WATER);break;
+      }
+      if(!MC_IsSolid(MC_Get(w,x,y-1,z)))break;
+      unsigned start=(w->fluid_cursor+n)&3u;
+      for(unsigned d=0;d<4;d++) {
+        const int *dir=dirs[(start+d)&3u];int nx=x+dir[0],nz=z+dir[1];
+        if(MC_Get(w,nx,y,nz)!=MC_AIR || !MC_IsSolid(MC_Get(w,nx,y-1,nz)))continue;
+        MC_Set(w,nx,y,nz,MC_WATER);break;
+      }
+      break;
+    }
+  }
+}
 void MC_SystemsTick(MC_World *w,float dt) {
   if(!(dt>0))return;
   dt=fminf(dt,.1f);
@@ -517,6 +555,7 @@ void MC_SystemsTick(MC_World *w,float dt) {
   if(redstone_dirty)MC_RedstoneRefresh(w);
   MC_ProjectilesTick(w,dt);
   falling_sand(w,dt);
+  flowing_water(w,dt);
   for(unsigned i=0;i<MC_DROPS;i++) {
     MC_Drop *d=&w->drops[i];if(!d->count)continue;
     d->age+=dt;d->spin+=dt*3.2f;
