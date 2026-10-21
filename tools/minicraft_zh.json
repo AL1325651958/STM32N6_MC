@@ -1,4 +1,6 @@
 {
+  "DELETE FAILED %s CODE %u": "删除失败 %s 错误 %u",
+  "SD": "SD",
   "AIR": "空气",
   "GRASS": "草方块",
   "DIRT": "泥土",
@@ -292,5 +294,13 @@
   "EMPTY SLOT": "空槽",
   "COUNT %u": "数量 %u",
   "DURABILITY %u/%u": "耐久 %u/%u",
-  "SELECT THEN EQUIP": "选中后点护甲格"
+  "SELECT THEN EQUIP": "选中后点护甲格",
+  "ADD INPUT": "请添加原料",
+  "INVALID SMELTING INPUT": "原料不可加工",
+  "OUTPUT BLOCKED": "请清空成品槽",
+  "NEED FUEL": "需要燃料",
+  "READY TO SMELT": "可以开始加工",
+  "SMELTING": "正在加工",
+  "OUTPUT READY": "成品可以取出",
+  "RESULT %s": "成品 %s"
 }

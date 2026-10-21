@@ -771,22 +771,37 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
     projectile_rect[i][2]=(int)clamp(ceilf(maxx),0,width);projectile_rect[i][3]=(int)clamp(ceilf(maxy),0,height);
     projectile_depth[i]=depth;projectile_ax[i]=sx;projectile_ay[i]=sy;projectile_bx[i]=ex;projectile_by[i]=ey;projectile_mask|=1u<<i;
   }
-  /* Bound dynamic light work: collect at most eight nearby torches once per frame. */
-  static struct {const MC_World *world;const uint8_t *blocks;uint32_t serial,revision;int x,y,z,valid,n,lights[8][3];} lc;
+  /* Six registered furnaces, collected once; zero reserves inactive slots. */
+  uint32_t burning_furnaces[MC_FURNACES]={0};
+  for(unsigned i=0;i<MC_FURNACES;i++) {
+    const MC_Furnace *f=&w->furnaces[i];
+    if(f->x && f->burn>0 && MC_Get(w,f->x-1,f->y-1,f->z-1)==MC_FURNACE)
+      burning_furnaces[i]=((uint32_t)(f->y-1)*MC_MAP_Z+f->z-1)*MC_MAP_X+f->x;
+  }
+  /* Bound local light work to eight sources, including burning furnaces. */
+  static struct {const MC_World *world;const uint8_t *blocks;uint32_t serial,revision,furnaces[MC_FURNACES];int x,y,z,valid,n,lights[8][3];} lc;
   int lx0=(int)w->x,ly0=(int)w->y,lz0=(int)w->z;
   if(!lc.valid || lc.world!=w || lc.blocks!=w->blocks || lc.serial!=w->scene_serial ||
-     lc.revision!=w->map_revision || lc.x!=lx0 || lc.y!=ly0 || lc.z!=lz0) {
+     lc.revision!=w->map_revision || lc.x!=lx0 || lc.y!=ly0 || lc.z!=lz0 || memcmp(lc.furnaces,burning_furnaces,sizeof(burning_furnaces))) {
     lc.n=0;
     for(int y=ly0-4;y<=ly0+4 && lc.n<8;y++)for(int z=lz0-6;z<=lz0+6 && lc.n<8;z++)for(int x=lx0-6;x<=lx0+6 && lc.n<8;x++) {
       uint8_t block=MC_Get(w,x,y,z);
       if(block==MC_TORCH || block==MC_LAMP_ON){lc.lights[lc.n][0]=x;lc.lights[lc.n][1]=y;lc.lights[lc.n++][2]=z;}
     }
+    for(unsigned i=0;i<MC_FURNACES && lc.n<8;i++)if(burning_furnaces[i]) {
+      const MC_Furnace *f=&w->furnaces[i];int x=f->x-1,y=f->y-1,z=f->z-1;
+      if(abs(x-lx0)<=6 && abs(y-ly0)<=4 && abs(z-lz0)<=6) {
+        lc.lights[lc.n][0]=x;lc.lights[lc.n][1]=y;lc.lights[lc.n++][2]=z;
+      }
+    }
+    memcpy(lc.furnaces,burning_furnaces,sizeof(burning_furnaces));
     lc.world=w;lc.blocks=w->blocks;lc.serial=w->scene_serial;lc.revision=w->map_revision;lc.x=lx0;lc.y=ly0;lc.z=lz0;lc.valid=1;
   }
   const int (*lights)[3]=lc.lights;int nl=lc.n;
   /* Water texture has only 256 possible texels at a fixed world time.
      Fill lazily so a dry frame performs no water sine evaluations. */
   int8_t water_noise[256];int water_ready=0;
+  uint32_t last_furnace=UINT32_MAX;int last_furnace_lit=0;
   /* Lighting depends on block coordinates, not the individual face pixel.
      A frame-local direct-mapped cache remains correct after any world edit. */
   uint32_t light_key[256];float light_value[256];
@@ -837,7 +852,7 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
         tu=(unsigned)clamp(floorf((pos[ua]-lo[ua])*16/(hi[ua]-lo[ua])),0,15);
         tv=(unsigned)clamp(floorf((pos[va]-lo[va])*16/(hi[va]-lo[va])),0,15);
       }
-      int n=(int)(hash(tu,tv,h.block)&31)-15;
+      int n=(int)(hash(tu,tv,h.block)&31)-15,furnace_lit=0;
       r=120;g=123;b=128;
       switch(h.block) {
         case MC_GRASS: if(h.ny>0 || tv>=13+(tu%3==0)) {r=83;g=153;b=43;} else {r=131;g=91;b=58;}break;
@@ -870,7 +885,18 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
         case MC_BIRCH_PLANKS:r=204;g=181;b=126;if(tv%4==0 || (tu+(tv/4)*7)%16==0)n=-30;break;
         case MC_DARK_PLANKS:r=105;g=68;b=39;if(tv%4==0 || (tu+(tv/4)*7)%16==0)n=-28;break;
         case MC_TABLE:r=147;g=100;b=51;if(h.ny && (tu%5==0 || tv%5==0))n=-50;else if(!h.ny && tu>4 && tu<11)n=-35;break;
-        case MC_FURNACE:r=102;g=107;b=111;if(!h.ny && tu>3 && tu<12 && tv>3 && tv<10){r=44;g=31;b=24;if(tv<6){r=247;g=132;b=24;}}break;
+        case MC_FURNACE:
+          {
+            uint32_t cell=(uint32_t)((h.y*MC_MAP_Z+h.z)*MC_MAP_X+h.x+1);
+            if(last_furnace!=cell) {
+              last_furnace=cell;last_furnace_lit=0;
+              for(unsigned i=0;i<MC_FURNACES;i++)if(burning_furnaces[i]==cell){last_furnace_lit=1;break;}
+            }
+            furnace_lit=last_furnace_lit;
+          }
+          r=102;g=107;b=111;
+          if(!h.ny && tu>3 && tu<12 && tv>3 && tv<10){r=44;g=31;b=24;if(furnace_lit && tv<6){r=247;g=132;b=24;}}
+          break;
         case MC_COAL_ORE:if((hash(tu/2,tv/2,13)&15)<5){r=35;g=38;b=42;}break;
         case MC_IRON_ORE:if((hash(tu/2,tv/2,19)&15)<5){r=192;g=146;b=117;}break;
         case MC_GLASS:r=139;g=206;b=218;n=(tu<2 || tv<2 || tu==tv)?38:-5;break;

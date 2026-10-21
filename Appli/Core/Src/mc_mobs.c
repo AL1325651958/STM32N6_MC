@@ -24,7 +24,10 @@ int MC_DarkAt(const MC_World *w,int x,int y,int z)
   if(x<1 || z<1 || x>=MC_MAP_X-1 || z>=MC_MAP_Z-1 || y<1 || y>=MC_MAP_Y-2)return 0;
   if(sinf(w->time*(6.2831853f/600))>-.38f && sky_visible(w,x,y+1,z))return 0;
   for(int yy=y-3;yy<=y+3;yy++)for(int zz=z-4;zz<=z+4;zz++)for(int xx=x-4;xx<=x+4;xx++)
-    if(MC_Get(w,xx,yy,zz)==MC_TORCH || MC_Get(w,xx,yy,zz)==MC_LAMP_ON)return 0;
+    {
+      uint8_t b=MC_Get(w,xx,yy,zz);
+      if(b==MC_TORCH || b==MC_LAMP_ON || (b==MC_FURNACE && MC_FurnaceBurningAt(w,xx,yy,zz)))return 0;
+    }
   return 1;
 }
 

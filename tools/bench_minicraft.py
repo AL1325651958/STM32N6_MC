@@ -3,6 +3,7 @@ Host timing is relative evidence only; it does not predict STM32 FPS.
 Usage: python tools/bench_minicraft.py --baseline 9011b91
 """
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -12,13 +13,18 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--baseline',required=True)
+    parser.add_argument('--baseline',required=True,help='Git revision, or working-tree to compare the current renderer with/without inventory cache')
     args=parser.parse_args()
     out=ROOT/'out/minicraft/perf';out.mkdir(parents=True,exist_ok=True)
     gcc=shutil.which('gcc') or 'C:/Strawberry/c/bin/gcc.exe'
-    revision=subprocess.check_output(['git','rev-parse','--verify',args.baseline+'^{commit}'],cwd=ROOT,text=True).strip()
+    worktree=args.baseline=='working-tree'
+    revision=None if worktree else subprocess.check_output(['git','rev-parse','--verify',args.baseline+'^{commit}'],cwd=ROOT,text=True).strip()
+    source_hashes={}
     for name in ('minicraft.c','mc_ui.c','mc_play.c'):
-        (out/('baseline_'+name)).write_bytes(subprocess.check_output(['git','show',revision+':Appli/Core/Src/'+name],cwd=ROOT))
+        path='Appli/Core/Src/'+name
+        data=(ROOT/path).read_bytes() if worktree else subprocess.check_output(['git','show',revision+':'+path],cwd=ROOT)
+        (out/('baseline_'+name)).write_bytes(data)
+        source_hashes[path]=hashlib.sha256(data).hexdigest()
     for variant in ('baseline','optimized'):
         sources=[str(out/('baseline_'+name)) if variant=='baseline' else 'Appli/Core/Src/'+name for name in ('minicraft.c','mc_ui.c','mc_play.c')]
         defines=['-DMC_BENCH_VIEW_CACHE'] if variant=='optimized' else []
@@ -32,7 +38,7 @@ def main():
                 assert len(frames)==32
                 timings.setdefault(scene,{}).setdefault(variant,[]).append(float(ms))
                 hashes.setdefault(scene,{}).setdefault(variant,set()).add((crc,tuple(frames)))
-    report={'baseline_commit':revision,'frames_per_scene':32,'trials':3,'host_only':True,'optimized_inventory_view_cache':True,'scenes':{}}
+    report={'baseline_commit':revision,'baseline_source':'working tree without inventory cache' if worktree else 'Git revision','baseline_source_hashes':source_hashes,'frames_per_scene':32,'trials':3,'host_only':True,'optimized_inventory_view_cache':True,'scenes':{}}
     for scene,variants in timings.items():
         assert hashes[scene]['baseline']==hashes[scene]['optimized'] and len(hashes[scene]['baseline'])==1, (scene,hashes[scene])
         old=statistics.median(variants['baseline']);new=statistics.median(variants['optimized'])

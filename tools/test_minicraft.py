@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 ROOT=Path(__file__).resolve().parents[1]
 def main():
     parser=argparse.ArgumentParser(__doc__)
@@ -28,6 +29,7 @@ def main():
         'minicraft_spawn_test':core+['Appli/Core/Src/mc_save.c'],
         'minicraft_notice_test':core+['Appli/Core/Src/mc_save.c','Appli/Core/Src/mc_ui.c'],
         'minicraft_view_test':core+['Appli/Core/Src/mc_view.c','Appli/Core/Src/mc_save.c','Appli/Core/Src/mc_ui.c'],
+        'minicraft_furnace_test':core+['Appli/Core/Src/mc_view.c','Appli/Core/Src/mc_save.c'],
     }
     for name,sources in cases.items():
         exe=out/(name+'.exe')
@@ -41,6 +43,7 @@ def main():
                 legacy=ROOT/f'out/minicraft/initial-world-v{version}.SAV'
                 if legacy.exists():extra.append(str(legacy))
         subprocess.run([str(exe),*extra],cwd=ROOT,check=True)
+    subprocess.run([sys.executable,'tools/test_minicraft_filex.py'],cwd=ROOT,check=True)
     print('All portable checks passed. Hardware touch/LCD/FPS remain on-device checks.')
 if __name__=='__main__':
     main()

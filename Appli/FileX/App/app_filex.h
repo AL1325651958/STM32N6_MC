@@ -56,6 +56,7 @@ UINT MX_FileX_Init(void);
 UINT SD_Card_Init(void);
 UINT SD_Card_DeInit(void);
 UINT SD_Card_Flush(void);
+/* Explicit deletion also clears file read-only; media write protection remains. */
 UINT SD_File_Delete(const CHAR *file_name);
 UINT SD_File_Exists(const CHAR *file_name);
 UINT SD_File_Write(const CHAR *file_name, const VOID *data, ULONG size);

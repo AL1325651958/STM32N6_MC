@@ -46,8 +46,7 @@ static int svalid(const uint8_t*p){
 }
 static int coord(const uint8_t*p,unsigned mx,unsigned mz){unsigned x=get16(p),y=get16(p+2),z=get16(p+4);return !x?(!y&&!z):(x<=mx&&y>=2&&y<=MC_MAP_Y&&z>=1&&z<=mz);}
 static int range(float f,float lo,float hi){return isfinite(f)&&f>=lo&&f<=hi;}
-static int isfuel(unsigned id){return id==MC_COAL||id==MC_WOOD||id==MC_BIRCH_WOOD||id==MC_DARK_WOOD||id==MC_PLANKS||id==MC_BIRCH_PLANKS||id==MC_DARK_PLANKS;}
-static unsigned output(unsigned id){return id==MC_IRON_ORE?MC_IRON:id==MC_SAND?MC_GLASS:id==MC_WOOD?MC_COAL:id==MC_COBBLE?MC_BRICK:id==MC_RAW_MEAT?MC_COOKED_MEAT:0;}
+
 void MC_SaveEncode(const MC_World*w,uint32_t generation,uint8_t*p){
   memset(p,0,MC_SAVE_HEADER);memcpy(p,"N6MC",4);put32(p+4,6);put32(p+8,MC_MAP_X);put32(p+12,MC_MAP_Y);put32(p+16,MC_MAP_Z);put32(p+20,generation);put32(p+24,w->seed);
   putfloat(p+28,w->x);putfloat(p+32,w->y);putfloat(p+36,w->z);putfloat(p+40,w->yaw);putfloat(p+44,w->pitch);memcpy(p+MC_SAVE_HEADER,w->blocks,MC_MAP_BYTES);
@@ -118,7 +117,7 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
         const uint8_t*q=m+M_FURNACES+i*26;
         if(!coord(q,mx,mz)||!svalid(q+6)||!svalid(q+10)||!svalid(q+14)||!range(getfloat(q+18),0,40)||!range(getfloat(q+22),0,4.999999f))return 0;
         if(get16(q)){
-          if(saved_block(p,q,mx,mz)!=MC_FURNACE||(q[7]&&!output(q[6]))||(q[11]&&!isfuel(q[10]))||(q[15]&&q[14]!=MC_IRON&&q[14]!=MC_GLASS&&q[14]!=MC_COAL&&q[14]!=MC_BRICK&&q[14]!=MC_COOKED_MEAT))return 0;
+          if(saved_block(p,q,mx,mz)!=MC_FURNACE||(q[7]&&!MC_SmeltResult(q[6]))||(q[11]&&!MC_FuelSeconds(q[10]))||(q[15]&&q[14]!=MC_IRON&&q[14]!=MC_GLASS&&q[14]!=MC_COAL&&q[14]!=MC_BRICK&&q[14]!=MC_COOKED_MEAT))return 0;
           for(unsigned j=0;j<i;j++)if(!memcmp(q,m+M_FURNACES+j*26,6))return 0;
         }else if(q[7]||q[11]||q[15]||getfloat(q+18)||getfloat(q+22))return 0;
       }

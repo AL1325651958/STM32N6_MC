@@ -172,6 +172,19 @@ UINT SD_File_Delete(const CHAR *file_name)
   if(file_name==FX_NULL)return FX_PTR_ERROR;
   if(!sd_media_opened)return FX_NOT_OPEN;
   UINT result=fx_file_delete(&sd_media,(CHAR *)file_name);
+  /* Explicit user deletion may remove a PC-set file read-only bit. Never
+     bypass media write protection or force-close a live file handle. */
+  if(result==FX_WRITE_PROTECT) {
+    UINT attributes=0;
+    UINT probe=fx_file_attributes_read(&sd_media,(CHAR *)file_name,&attributes);
+    if(probe!=FX_SUCCESS)return probe;
+    if(attributes&FX_READ_ONLY) {
+      result=fx_file_attributes_set(&sd_media,(CHAR *)file_name,attributes&~FX_READ_ONLY);
+      if(result!=FX_SUCCESS)return result;
+      result=fx_file_delete(&sd_media,(CHAR *)file_name);
+      if(result!=FX_SUCCESS)fx_file_attributes_set(&sd_media,(CHAR *)file_name,attributes);
+    }
+  }
   if(result==FX_SUCCESS)result=fx_media_flush(&sd_media);
   return result;
 }

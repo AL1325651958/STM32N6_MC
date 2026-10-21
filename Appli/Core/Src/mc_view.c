@@ -31,6 +31,11 @@ int MC_ViewUpdate(MC_View *view,const MC_World *w)
     const MC_Projectile *p=&w->projectiles[i];MC_ViewProjectile *v=&key.projectiles[i];
     v->active=1;v->x=p->x;v->y=p->y;v->z=p->z;v->vx=p->vx;v->vy=p->vy;v->vz=p->vz;
   }
+  for(unsigned i=0;i<MC_FURNACES;i++) {
+    const MC_Furnace *f=&w->furnaces[i];
+    if(f->x && f->burn>0 && MC_Get(w,f->x-1,f->y-1,f->z-1)==MC_FURNACE)
+      key.burning_furnaces[i]=((uint32_t)(f->y-1)*MC_MAP_Z+f->z-1)*MC_MAP_X+f->x;
+  }
   if(view->valid && !memcmp(&view->key,&key,sizeof(key)))return 0;
   MC_Render(w,view->pixels,MC_VIEW_W,MC_VIEW_H);
   memcpy(&view->key,&key,sizeof(key));view->valid=1;return 1;

@@ -30,6 +30,8 @@ static uint8_t bank_state[2]; /* 0 empty, 1 valid save, 2 occupied/unreadable */
 static uint32_t create_seed=20261021;
 static int create_creative;
 static const char *menu_message="SELECT A WORLD";
+static char delete_error[112];
+typedef struct {UINT code;const char *file;} DeleteStatus;
 
 /* Scan both slots without changing a world or writing to the card. Any
    unknown/corrupt/read-error slot reserves its bank against creation. */
@@ -53,23 +55,40 @@ static void scan_worlds(void)
 
 static int delete_file(void *context,const char *name)
 {
-  (void)context;UINT result=SD_File_Delete(name);
-  return result==FX_SUCCESS||result==FX_NOT_FOUND?0:-1;
+  DeleteStatus *s=context;UINT result=SD_File_Delete(name);
+  if(result==FX_SUCCESS || result==FX_NOT_FOUND)return 0;
+  s->code=result;s->file=name;return -1;
 }
-static int sync_files(void *context){(void)context;return SD_Card_Flush()==FX_SUCCESS?0:-1;}
-static int file_absent(void *context,const char *name){(void)context;return SD_File_Exists(name)==FX_NOT_FOUND;}
+static int sync_files(void *context)
+{
+  DeleteStatus *s=context;UINT result=SD_Card_Flush();
+  if(result==FX_SUCCESS)return 0;
+  if(!s->code){s->code=result;s->file="SD";}return -1;
+}
+static int file_absent(void *context,const char *name)
+{
+  DeleteStatus *s=context;UINT result=SD_File_Exists(name);
+  if(result==FX_NOT_FOUND)return 1;
+  s->code=result==FX_SUCCESS?FX_ALREADY_CREATED:result;s->file=name;return 0;
+}
 static void delete_world(void)
 {
   if(HAL_SD_GetState(&hsd2)!=HAL_SD_STATE_READY || SD_Card_Init()!=FX_SUCCESS) {
     menu_message="NO SD  CANNOT DELETE";return;
   }
-  const MC_Storage storage={0,delete_file,sync_files,file_absent};
+  DeleteStatus failure={0,"SD"};
+  const MC_Storage storage={&failure,delete_file,sync_files,file_absent};
   int deleted=MC_DeleteWorld(world_bank,&storage);
   scan_worlds();
   if(deleted && sd_ready && bank_state[world_bank]==0) {
     generation=0;active_slot=-1;dirty=0;save_locked=0;creating=0;
     menu_message="WORLD DELETED";
-  } else menu_message="DELETE FAILED  SAVE MAY REMAIN";
+  } else {
+    if(failure.code) {
+      snprintf(delete_error,sizeof(delete_error),MC_Localize("DELETE FAILED %s CODE %u"),failure.file,(unsigned)failure.code);
+      menu_message=delete_error;
+    } else menu_message="DELETE FAILED  SAVE MAY REMAIN";
+  }
 }
 
 static void clean_buffer(uint16_t *fb)

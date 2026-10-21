@@ -18,6 +18,7 @@ typedef struct {
   MC_ViewMob mobs[MC_MOBS];
   MC_ViewDrop drops[MC_DROPS];
   MC_ViewProjectile projectiles[MC_PROJECTILES];
+  uint32_t burning_furnaces[MC_FURNACES];
 } MC_ViewKey;
 typedef struct {
   /* Owned scene buffer. Consumers may read it, but must not paint UI into it. */

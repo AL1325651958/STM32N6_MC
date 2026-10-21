@@ -348,8 +348,26 @@ int MC_DropSpawn(MC_World *w,unsigned item,unsigned count,float x,float y,float 
   }
   return count==0;
 }
-static int fuel_time(unsigned item){return item==MC_COAL?40:(item==MC_WOOD||item==MC_BIRCH_WOOD||item==MC_DARK_WOOD)?15:(item==MC_PLANKS||item==MC_BIRCH_PLANKS||item==MC_DARK_PLANKS)?10:0;}
-static unsigned smelt(unsigned item){return item==MC_IRON_ORE?MC_IRON:item==MC_SAND?MC_GLASS:item==MC_COBBLE?MC_BRICK:item==MC_WOOD?MC_COAL:item==MC_RAW_MEAT?MC_COOKED_MEAT:0;}
+unsigned MC_FuelSeconds(unsigned item){return item==MC_COAL?40:(item==MC_WOOD||item==MC_BIRCH_WOOD||item==MC_DARK_WOOD)?15:(item==MC_PLANKS||item==MC_BIRCH_PLANKS||item==MC_DARK_PLANKS)?10:0;}
+unsigned MC_SmeltResult(unsigned item){return item==MC_IRON_ORE?MC_IRON:item==MC_SAND?MC_GLASS:item==MC_COBBLE?MC_BRICK:(item==MC_WOOD||item==MC_BIRCH_WOOD||item==MC_DARK_WOOD)?MC_COAL:item==MC_RAW_MEAT?MC_COOKED_MEAT:0;}
+unsigned MC_FurnaceState(const MC_Furnace *f)
+{
+  if(!f->input.count)return f->output.count?MC_FURNACE_DONE:MC_FURNACE_EMPTY;
+  unsigned out=MC_SmeltResult(f->input.item);
+  if(!out)return MC_FURNACE_INVALID;
+  if(f->output.count && (f->output.item!=out || f->output.count>=64))return MC_FURNACE_BLOCKED;
+  if(f->burn>0)return MC_FURNACE_SMELTING;
+  return f->fuel.count && MC_FuelSeconds(f->fuel.item)?MC_FURNACE_READY:MC_FURNACE_NEEDS_FUEL;
+}
+int MC_FurnaceBurningAt(const MC_World *w,int x,int y,int z)
+{
+  if(MC_Get(w,x,y,z)!=MC_FURNACE)return 0;
+  for(unsigned i=0;i<MC_FURNACES;i++) {
+    const MC_Furnace *f=&w->furnaces[i];
+    if(f->x==x+1 && f->y==y+1 && f->z==z+1 && f->burn>0)return 1;
+  }
+  return 0;
+}
 /* A chest touching a furnace becomes a small, deterministic automation link.
    It feeds one input/fuel stack when the corresponding furnace slot has room
    and receives finished output.  The scan is limited to six furnaces and six
@@ -370,7 +388,7 @@ static void automation_tick(MC_World *w,float dt)
       MC_Stack *chest=w->chest_blocks[ci];
       if(f->input.count<64) {
         for(unsigned si=0;si<MC_CHEST_SLOTS;si++) {
-          MC_Stack *s=&chest[si];unsigned out=smelt(s->item);
+          MC_Stack *s=&chest[si];unsigned out=MC_SmeltResult(s->item);
           if(!s->count||!out)continue;
           if(f->input.count && f->input.item!=s->item)continue;
           unsigned n=64-f->input.count;if(n>s->count)n=s->count;
@@ -381,7 +399,7 @@ static void automation_tick(MC_World *w,float dt)
       }
       if(f->fuel.count<64) {
         for(unsigned si=0;si<MC_CHEST_SLOTS;si++) {
-          MC_Stack *s=&chest[si];if(!s->count||!fuel_time(s->item))continue;
+          MC_Stack *s=&chest[si];if(!s->count||!MC_FuelSeconds(s->item))continue;
           if(f->fuel.count && f->fuel.item!=s->item)continue;
           unsigned n=64-f->fuel.count;if(n>s->count)n=s->count;
           if(!f->fuel.count)f->fuel=(MC_Stack){s->item,0,0};
@@ -755,7 +773,7 @@ unsigned MC_CropGrowthNeeds(const MC_World *w,int x,int y,int z) {
   }
   for(int dy=-2;dy<=2 && !light;dy++)for(int dz=-4;dz<=4 && !light;dz++)for(int dx=-4;dx<=4;dx++) {
     unsigned b=MC_Get(w,x+dx,y+dy,z+dz);
-    if(b==MC_TORCH || b==MC_LAMP_ON){light=1;break;}
+    if(b==MC_TORCH || b==MC_LAMP_ON || (b==MC_FURNACE && MC_FurnaceBurningAt(w,x+dx,y+dy,z+dz))){light=1;break;}
   }
   if(!light)needs|=MC_CROP_NEEDS_LIGHT;
   return needs;
@@ -832,10 +850,10 @@ void MC_SystemsTick(MC_World *w,float dt) {
   }
   for(unsigned i=0;i<MC_FURNACES;i++) {
     MC_Furnace *f=&w->furnaces[i];if(!f->x)continue;
-    unsigned out=smelt(f->input.item);
+    unsigned out=MC_SmeltResult(f->input.item);
     int ready=f->input.count && out && (!f->output.count || f->output.item==out) && f->output.count<64;
-    if(f->burn<=0 && ready && f->fuel.count && fuel_time(f->fuel.item)) {
-      f->burn=(float)fuel_time(f->fuel.item);f->fuel.count--;clear_empty(&f->fuel);
+    if(f->burn<=0 && ready && f->fuel.count && MC_FuelSeconds(f->fuel.item)) {
+      f->burn=(float)MC_FuelSeconds(f->fuel.item);f->fuel.count--;clear_empty(&f->fuel);
     }
     if(f->burn>0) {
       float elapsed=fminf(dt,f->burn);f->burn=fmaxf(0,f->burn-dt);
@@ -898,7 +916,7 @@ int MC_ContainerTap(MC_World *w,unsigned slot) {
       if(!add_stack(w->slots,MC_SLOTS,*dst)){MC_Notify(w,"BAG FULL");return 0;}
       memset(dst,0,sizeof(*dst));if(slot==0)f->progress=0;
     } else {
-      if((slot==0 && !smelt(src->item)) || (slot==1 && !fuel_time(src->item))){MC_Notify(w,"INVALID INPUT OR FUEL");return 0;}
+      if((slot==0 && !MC_SmeltResult(src->item)) || (slot==1 && !MC_FuelSeconds(src->item))){MC_Notify(w,"INVALID INPUT OR FUEL");return 0;}
       if(dst->count && dst->item!=src->item){MC_Notify(w,"EMPTY SLOT FIRST");return 0;}
       if(!MC_MoveStack(src,dst,w->split))return 0;
     }

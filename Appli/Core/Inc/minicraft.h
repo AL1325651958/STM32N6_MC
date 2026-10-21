@@ -58,6 +58,11 @@ enum { MC_CROP_NEEDS_WATER=1, MC_CROP_NEEDS_LIGHT=2,
        MC_CROP_NEEDS_SOIL=4, MC_CROP_NEEDS_SPACE=8 };
 typedef struct { uint8_t item,count; uint16_t wear; } MC_Stack;
 typedef struct { uint16_t x,y,z; MC_Stack input,fuel,output; float burn,progress; } MC_Furnace;
+enum { MC_FURNACE_EMPTY,MC_FURNACE_INVALID,MC_FURNACE_BLOCKED,MC_FURNACE_NEEDS_FUEL,
+       MC_FURNACE_READY,MC_FURNACE_SMELTING,MC_FURNACE_DONE };
+unsigned MC_SmeltResult(unsigned item);
+unsigned MC_FuelSeconds(unsigned item);
+unsigned MC_FurnaceState(const MC_Furnace *furnace);
 typedef struct { uint16_t x,y,z; float age; } MC_Grower;
 typedef struct { int x,y,z,nx,ny,nz; float distance; uint8_t block; } MC_Hit;
 /* type 0 is the hostile night stalker; type 1 is a passive daytime animal.
@@ -135,6 +140,7 @@ void MC_Generate(MC_World *world, uint32_t seed);
 void MC_GenerateTerrain(MC_World *world,uint32_t seed);
 void MC_NotifySave(MC_World *world,unsigned result);
 void MC_Notify(MC_World *world,const char *message);
+int MC_FurnaceBurningAt(const MC_World *world,int x,int y,int z);
 uint8_t MC_DoorBase(uint8_t block);
 int MC_IsDoor(uint8_t block);
 int MC_DoorUpper(uint8_t block);

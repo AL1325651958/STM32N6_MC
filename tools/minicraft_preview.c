@@ -24,7 +24,9 @@ int main(int argc,char **argv)
     "tool_interact","sneak_build","tool_chest_open","door_closed","door_open","lever_off","lever_on","slab_steps","delete_world","worlds_delete",
     "arrow_door_closed","arrow_door_open","arrow_slab_gap","cave_cache","cave_cache_loot",
     "hud_meters","empty_hand","armor_storage","armor_equip","new_world_view","bed_safe_respawn",
-    "notice_short","notice_expired","notice_broken_bow","notice_inventory","inventory_cached_selection","furnace_cached_progress"};
+    "notice_short","notice_expired","notice_broken_bow","notice_inventory","inventory_cached_selection","furnace_cached_progress",
+    "furnace_empty","furnace_invalid","furnace_blocked","furnace_needs_fuel","furnace_ready","furnace_smelting","furnace_done",
+    "furnace_cold","furnace_burning","delete_error"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -237,11 +239,31 @@ int main(int argc,char **argv)
       for(unsigned tick=0;tick<20;tick++){MC_SystemsTick(&w,.1f);assert(!MC_ViewUpdate(view,&w));}
       assert(w.furnaces[0].progress>2.9f&&w.furnaces[0].burn<18.1f);
     }
+    if(k>=61 && k<=69) {
+      memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+      for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++)MC_Set(&w,x,1,z,MC_COBBLE);
+      w.x=10.5f;w.y=2.01f;w.z=8.5f;w.yaw=0;w.pitch=-.32f;w.time=435;w.notice=NULL;
+      MC_Set(&w,10,2,13,MC_FURNACE);MC_Furnace *f=&w.furnaces[0];*f=(MC_Furnace){.x=11,.y=3,.z=14};
+      if(k<=67) {
+        unsigned state=k-61;w.bag=1;w.open_furnace=0;
+        if(state>=MC_FURNACE_INVALID && state<=MC_FURNACE_SMELTING)f->input=(MC_Stack){state==MC_FURNACE_INVALID?MC_DIRT:MC_IRON_ORE,3,0};
+        if(state==MC_FURNACE_BLOCKED)f->output=(MC_Stack){MC_GLASS,1,0};
+        if(state==MC_FURNACE_READY || state==MC_FURNACE_SMELTING)f->fuel=(MC_Stack){MC_COAL,2,0};
+        if(state==MC_FURNACE_SMELTING){f->burn=23;f->progress=2.7f;}
+        if(state==MC_FURNACE_DONE)f->output=(MC_Stack){MC_IRON,3,0};
+        assert(MC_FurnaceState(f)==state);
+      } else if(k==69)f->burn=23;
+    }
     MC_ViewUpdate(view,&w);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view->pixels[y/5*MC_VIEW_W+x/5];
     MC_UIDraw(fb,&w,MC_GRASS,0,0,"NEW WORLD  SD READY",1,0,0);
     if(k==21 || k==22) {const uint8_t banks[2]={1,0};MC_MenuDraw(fb,banks,k==22,1,20261021,0,"EXISTING WORLDS ARE PRESERVED");}
     if(k==42 || k==43) {const uint8_t banks[2]={1,2};MC_MenuDraw(fb,banks,k==42?2:0,1,20261021,0,"CHECK WORLD NUMBER BEFORE DELETING");}
+    if(k==70) {
+      char error[112];const uint8_t banks[2]={1,2};
+      snprintf(error,sizeof(error),MC_Localize("DELETE FAILED %s CODE %u"),"MC0.SAV",(unsigned)0x90);
+      MC_MenuDraw(fb,banks,2,0,20261021,0,error);
+    }
     snprintf(path,sizeof(path),"%s/%s.ppm",argv[1],variants[k]);
     FILE *f=fopen(path,"wb");if(!f)return 1;
     fputs("P6\n800 480\n255\n",f);

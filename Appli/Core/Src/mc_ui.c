@@ -540,12 +540,18 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
       const MC_Furnace *f=&w->furnaces[w->open_furnace];
       text(fb,438,120,"INPUT",0xffff);text(fb,552,120,"FUEL",0xffff);text(fb,666,120,"OUT",0xffff);
       stack(fb,430,150,110,90,&f->input,0,0);stack(fb,544,150,110,90,&f->fuel,0,0);stack(fb,658,150,110,90,&f->output,0,0);
-      rect(fb,438,260,320,12,0x2104);rect(fb,438,260,(int)(320*f->progress/5),12,0xffe0);
-      snprintf(info,sizeof(info),MC_Localize("FIRE %u SEC  PROCESS 5 SEC"),(unsigned)ceilf(f->burn));small(fb,438,286,info,0xffe0);
-      small(fb,438,310,"INPUT  ORE SAND LOG OR COBBLE",0xffff);
-      small(fb,438,328,"FUEL   COAL LOG OR PLANKS",0xffff);
-      small(fb,438,350,"SELECT BAG ITEM THEN TAP INPUT OR FUEL",0xffff);
-      small(fb,438,368,"TAP OUTPUT TO COLLECT",0xffff);
+      static const char *states[]={"ADD INPUT","INVALID SMELTING INPUT","OUTPUT BLOCKED","NEED FUEL","READY TO SMELT","SMELTING","OUTPUT READY"};
+      unsigned state=MC_FurnaceState(f),out=MC_SmeltResult(f->input.item);
+      uint16_t color=state==MC_FURNACE_INVALID||state==MC_FURNACE_BLOCKED?0xf9a4:state==MC_FURNACE_SMELTING||state==MC_FURNACE_DONE?0x07e0:0xffc0;
+      rect(fb,438,260,320,12,0x2104);rect(fb,438,260,(int)(320*fminf(1,fmaxf(0,f->progress/5))),12,0xffe0);
+      small(fb,438,284,states[state],color);
+      snprintf(info,sizeof(info),MC_Localize("FIRE %u SEC  PROCESS 5 SEC"),(unsigned)ceilf(fmaxf(0,f->burn)));small(fb,438,306,info,0xffe0);
+      if(!out && f->output.count)out=f->output.item;
+      if(out){snprintf(info,sizeof(info),MC_Localize("RESULT %s"),MC_Localize(MC_ItemName(out)));small(fb,438,328,info,0xffff);}
+      small(fb,438,350,"INPUT  ORE SAND LOG OR COBBLE",0xffff);
+      small(fb,438,368,"FUEL   COAL LOG OR PLANKS",0xffff);
+      small(fb,438,386,"SELECT BAG ITEM THEN TAP INPUT OR FUEL",0xffff);
+      small(fb,438,404,"TAP OUTPUT TO COLLECT",0xffff);
     } else for(unsigned i=0;i<4;i++) {
       unsigned r=w->recipe_page*4+i;int y=108+(int)i*68;if(r>=MC_RecipeCount())break;
       rect(fb,430,y,348,64,0x2945);icon(fb,440,y+13,MC_RecipeResult(r),32);
