@@ -38,7 +38,7 @@ static void sread(MC_Stack*s,const uint8_t*p){s->item=p[0];s->count=p[1];s->wear
 static int svalid(const uint8_t*p){
   unsigned id=p[0],n=p[1],wear=get16(p+2);
   if(!n)return id==0&&wear==0;
-  if(!id||id>=MC_ITEM_COUNT||(MC_DoorUpper((uint8_t)id)||id==MC_DOUBLE_SLAB||id==MC_FARMLAND||id==MC_WHEAT_CROP||id==MC_WHEAT_MATURE||id==MC_DUST_ON||id==MC_LAMP_ON||id==MC_LEVER_ON||id==MC_BUTTON_ON)||id==MC_WATER||id==MC_BEDROCK||n>64)return 0;
+  if(!id||id>=MC_ITEM_COUNT||(MC_DoorUpper((uint8_t)id)||id==MC_DOUBLE_SLAB||id==MC_LAVA||id==MC_FARMLAND||id==MC_WHEAT_CROP||id==MC_WHEAT_MATURE||id==MC_DUST_ON||id==MC_LAMP_ON||id==MC_LEVER_ON||id==MC_BUTTON_ON)||id==MC_WATER||id==MC_BEDROCK||n>64)return 0;
   int t=MC_ToolIndex(id),a=MC_ArmorIndex(id);
   if(t>=0)return n==1&&wear>0&&wear<=MC_ToolLife(id);
   if(a>=0)return n==1&&wear>0&&wear<=MC_ArmorLife(id);
@@ -90,6 +90,7 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
     uint8_t b=p[MC_SAVE_HEADER+i];
     if(v==1?b>=9:v==2?b>=18:(b!=MC_AIR&&!MC_IsBlock(b)))return 0;
     if(v<7&&b>=MC_DOOR_ROTATED_FIRST)return 0;
+    if(v<8&&b==MC_LAVA)return 0;
     if(MC_DoorUpper(b)) {
       if(v<6 || i<mx*mz || p[MC_SAVE_HEADER+i-mx*mz]!=MC_DoorBase(b))return 0;
     } else if(b>=MC_DOOR_ROTATED_FIRST&&MC_IsDoor(b)) {

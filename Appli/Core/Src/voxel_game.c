@@ -71,14 +71,26 @@ static int file_absent(void *context,const char *name)
   if(result==FX_NOT_FOUND)return 1;
   s->code=result==FX_SUCCESS?FX_ALREADY_CREATED:result;s->file=name;return 0;
 }
+static UINT remount_card(void)
+{
+  UINT result=SD_Card_DeInit();
+  return result==FX_SUCCESS?SD_Card_Init():result;
+}
 static void delete_world(void)
 {
-  if(HAL_SD_GetState(&hsd2)!=HAL_SD_STATE_READY || SD_Card_Init()!=FX_SUCCESS) {
+  if(HAL_SD_GetState(&hsd2)!=HAL_SD_STATE_READY) {
     menu_message="NO SD  CANNOT DELETE";return;
   }
   DeleteStatus failure={0,"SD"};
+  UINT mount=remount_card();
+  if(mount!=FX_SUCCESS) {
+    snprintf(delete_error,sizeof(delete_error),MC_Localize("DELETE FAILED %s CODE %u"),MC_Localize("SD MOUNT"),(unsigned)mount);
+    scan_worlds();menu_message=delete_error;return;
+  }
   const MC_Storage storage={&failure,delete_file,sync_files,file_absent};
   int deleted=MC_DeleteWorld(world_bank,&storage);
+  mount=remount_card();
+  if(mount!=FX_SUCCESS && !failure.code) {failure.code=mount;failure.file=MC_Localize("SD MOUNT");}
   scan_worlds();
   if(deleted && sd_ready && bank_state[world_bank]==0) {
     generation=0;active_slot=-1;dirty=0;save_locked=0;creating=0;

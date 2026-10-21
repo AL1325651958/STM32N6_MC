@@ -1,5 +1,6 @@
 {
   "DELETE FAILED %s CODE %u": "删除失败 %s 错误 %u",
+  "SD MOUNT": "SD卡挂载",
   "SD": "SD",
   "AIR": "空气",
   "GRASS": "草方块",

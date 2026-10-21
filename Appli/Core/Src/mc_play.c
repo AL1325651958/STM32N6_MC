@@ -749,6 +749,11 @@ static void flowing_water(MC_World *w,float dt)
         MC_Set(w,x,y,z,MC_AIR);MC_Set(w,x,y-1,z,liquid);break;
       }
       if(liquid==MC_LAVA)break;
+      static const int contact[6][3]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+      for(unsigned d=0;d<6;d++) {
+        int lx=x+contact[d][0],ly=y+contact[d][1],lz=z+contact[d][2];
+        if(MC_Get(w,lx,ly,lz)==MC_LAVA){MC_Set(w,lx,ly,lz,MC_COBBLE);break;}
+      }
       if(!MC_IsSolid(MC_Get(w,x,y-1,z)))break;
       unsigned start=(w->fluid_cursor+n)&3u;
       for(unsigned d=0;d<4;d++) {

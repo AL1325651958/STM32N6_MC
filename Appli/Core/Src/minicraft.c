@@ -146,6 +146,32 @@ static void generate_cave_cache(MC_World *w,uint32_t seed)
   }
 }
 
+/* A few seed-stable two-cell lava pockets reward deeper cave exploration.
+   Candidate count and resulting pool count are bounded; each pocket needs
+   cave air, a solid floor, headroom, and separation from water and spawn. */
+static void generate_lava_pools(MC_World *w,uint32_t seed)
+{
+  int placed[3][2],count=0;
+  for(unsigned i=0;i<2048 && count<3;i++) {
+    uint32_t h=hash(i*17u+1,i*131u+seed,seed^0x1a7a5eedu);
+    int x=8+(int)((h>>1)%240),z=8+(int)((h>>9)%240);
+    int y=4+(int)((h>>25)%8),dx=(h&1u)?1:0,dz=1-dx,x2=x+dx,z2=z+dz;
+    if(abs(x-MC_MAP_X/2)<12 && abs(z-MC_MAP_Z/2)<12)continue;
+    if(MC_Get(w,x,y,z)!=MC_AIR || MC_Get(w,x2,y,z2)!=MC_AIR ||
+       !MC_IsSolid(MC_Get(w,x,y-1,z)) || !MC_IsSolid(MC_Get(w,x2,y-1,z2)) ||
+       MC_Get(w,x,y+1,z)!=MC_AIR || MC_Get(w,x2,y+1,z2)!=MC_AIR)continue;
+    int wet=0;
+    for(int oz=-1;oz<=1&&!wet;oz++)for(int ox=-1;ox<=1;ox++)
+      if(MC_Get(w,x+ox,y,z+oz)==MC_WATER || MC_Get(w,x2+ox,y,z+oz)==MC_WATER){wet=1;break;}
+    if(wet)continue;
+    int near=0;
+    for(int j=0;j<count;j++)if(abs(x-placed[j][0])<12&&abs(z-placed[j][1])<12)near=1;
+    if(near)continue;
+    MC_Set(w,x,y,z,MC_LAVA);MC_Set(w,x2,y,z2,MC_LAVA);
+    placed[count][0]=x;placed[count][1]=z;count++;
+  }
+}
+
 uint8_t MC_Get(const MC_World *w, int x, int y, int z)
 {
   if (x < 0 || x >= MC_MAP_X || z < 0 || z >= MC_MAP_Z || y < 0) return MC_BEDROCK;
@@ -294,7 +320,7 @@ static int floor_at(const MC_World *w,float x,float feet,float z)
     int bx=(int)floorf(px),by=(int)floorf(y),bz=(int)floorf(pz);
     for(int below=0;below<2;below++) {
       uint8_t b=MC_Get(w,bx,by-below,bz);
-      if((b!=MC_LAVA&&!MC_IsSolid(b))||(below&&b!=MC_FENCE))continue;
+      if(!MC_IsSolid(b)||(below&&b!=MC_FENCE))continue;
       const MC_Part *parts;unsigned count=parts_for(b,&parts);float lo[3],hi[3];
       if(!count){bounds(b,lo,hi);count=1;}
       float p[3]={px-bx,y-by+below,pz-bz};
@@ -407,6 +433,7 @@ static void generate_world(MC_World *w,uint32_t seed,int structures)
       if(y>3 && cave>.78f && y<top-2)MC_Set(w,x,y,z,MC_AIR);
     }
   }
+  generate_lava_pools(w,seed);
   w->yaw=.7f; w->pitch=-.12f; MC_Respawn(w);
   /* Shortlist eight flat grass candidates before doing viewing-cone tests.
      Height is a minor preference, not a reason to choose a tree-lined peak. */
@@ -648,7 +675,7 @@ int MC_BlockSegment(const MC_World *w,float px,float py,float pz,float ex,float 
     /* Fence posts extend into the cell above their base. */
     for(int below=0;below<2;below++) {
       uint8_t b=MC_Get(w,x,y-below,z);
-      if((b!=MC_LAVA&&!MC_IsSolid(b))||(below&&b!=MC_FENCE))continue;
+      if(!MC_IsSolid(b)||(below&&b!=MC_FENCE))continue;
       float p[3]={px-x,py-y+below,pz-z},lo[3],hi[3];
       const MC_Part *parts;unsigned count=parts_for(b,&parts);
       if(!count){bounds(b,lo,hi);count=1;}

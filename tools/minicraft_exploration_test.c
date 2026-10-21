@@ -12,11 +12,19 @@ int main(void)
   MC_World w={.blocks=malloc(MC_MAP_BYTES)},terrain={.blocks=malloc(MC_MAP_BYTES)};
   uint8_t *save=malloc(MC_SAVE_SIZE);assert(w.blocks&&terrain.blocks&&save);
   const uint32_t seeds[]={0,1,2,77,0x20261020u,0xffffffffu,0x12345678u,20261021};
-  unsigned regions=0,caches=0;
+  unsigned regions=0,caches=0,lava_total=0;
   for(unsigned seed=0;seed<sizeof(seeds)/sizeof(seeds[0]);seed++) {
     MC_Generate(&w,seeds[seed]);MC_GenerateTerrain(&terrain,seeds[seed]);
     assert(w.x==terrain.x&&w.y==terrain.y&&w.z==terrain.z);
     assert(MC_BodyClear(&w,w.x,w.y,w.z));
+    unsigned lava=0;
+    for(unsigned at=0;at<MC_MAP_BYTES;at++)if(w.blocks[at]==MC_LAVA) {
+      unsigned y=at/(MC_MAP_X*MC_MAP_Z);assert(y>=4&&y<=11);lava++;
+    }
+    assert(lava<=6&&!(lava&1));lava_total+=lava;
+    unsigned terrain_lava=0;
+    for(unsigned at=0;at<MC_MAP_BYTES;at++)terrain_lava+=terrain.blocks[at]==MC_LAVA;
+    assert(lava==terrain_lava);
     for(unsigned c=0;c<MC_CHESTS;c++)assert(!terrain.chest_map[c][0]);
     Footprint boxes[3];unsigned count=0,surface=0,underground=0;int sx[2],sz[2];
     for(unsigned c=0;c<MC_CHESTS;c++)if(w.chest_map[c][0]) {
@@ -73,7 +81,7 @@ int main(void)
     }
     printf("exploration seed %lu: 2 separated ruins, %u connected cave cache\n",(unsigned long)seeds[seed],underground);
   }
-  assert(regions==15&&caches>=4);
+  assert(regions==15&&caches>=4&&lava_total>0);
   free(save);free(w.blocks);free(terrain.blocks);
-  puts("minicraft exploration: full-map distribution / dry cave access / loot / reserved storage / bounded edits / deterministic saves: OK");return 0;
+  puts("minicraft exploration: full-map distribution / dry cave access / loot / lava pools / reserved storage / bounded edits / deterministic saves: OK");return 0;
 }

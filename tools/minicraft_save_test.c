@@ -9,6 +9,7 @@ static void put32(uint8_t *p,uint32_t n){for(int i=0;i<4;i++)p[i]=(uint8_t)(n>>(
 static void put16(uint8_t *p,unsigned n){p[0]=(uint8_t)n;p[1]=(uint8_t)(n>>8);}
 static void putfloat(uint8_t *p,float f){uint32_t u;memcpy(&u,&f,4);put32(p,u);}
 static void crc(uint8_t *p,unsigned len){put32(p+48,MC_Crc32(p+MC_SAVE_V1_SIZE,len));put32(p+52,len);put32(p+60,MC_Crc32(p,60));}
+static void block_crc(uint8_t *p){put32(p+56,MC_Crc32(p+MC_SAVE_HEADER,MC_MAP_BYTES));put32(p+60,MC_Crc32(p,60));}
 static void roundtrip(MC_World *a,MC_World *b,uint8_t *p){MC_SaveEncode(a,4,p);assert(MC_SaveValidate(p,MC_SAVE_SIZE)==4);assert(MC_SaveDecode(b,p,MC_SAVE_SIZE));}
 static void invalid(MC_World *w,uint8_t *p,uint8_t *copy,unsigned offset,unsigned value){
  memcpy(p,copy,MC_SAVE_SIZE);p[MC_SAVE_V1_SIZE+offset]=(uint8_t)value;crc(p,MC_SAVE_META);
@@ -19,6 +20,17 @@ int main(int argc,char **argv) {
  MC_World a={.blocks=calloc(1,MC_MAP_BYTES)},b={.blocks=calloc(1,MC_MAP_BYTES)};
  uint8_t *save=calloc(1,MC_SAVE_SIZE),*copy=malloc(MC_SAVE_SIZE);assert(a.blocks&&b.blocks&&save&&copy);
  MC_Generate(&a,77);
+ /* v7 readers must reject the new lava map byte; v8 accepts the map byte but
+    never accepts a map-only fluid in a serialized inventory stack. */
+ for(unsigned i=0;i<MC_MAP_BYTES;i++)if(a.blocks[i]==MC_LAVA)a.blocks[i]=MC_AIR;
+ MC_SaveEncode(&a,5,save);put32(save+4,7);block_crc(save);
+ assert(MC_SaveValidate(save,MC_SAVE_SIZE)==5);
+ MC_Set(&a,40,30,40,MC_LAVA);MC_SaveEncode(&a,6,save);put32(save+4,7);block_crc(save);
+ assert(!MC_SaveValidate(save,MC_SAVE_SIZE));
+ MC_SaveEncode(&a,6,save);assert(MC_SaveValidate(save,MC_SAVE_SIZE)==6);
+ a.slots[31]=(MC_Stack){MC_LAVA,1,0};MC_SaveEncode(&a,7,save);
+ assert(!MC_SaveValidate(save,MC_SAVE_SIZE));memset(&a.slots[31],0,sizeof(a.slots[31]));
+ MC_Generate(&a,77);
  /* Save-button state is transient, cannot affect encoded bytes, and cannot
     survive loading an existing world. */
  MC_SaveEncode(&a,4,copy);MC_NotifySave(&a,MC_SAVE_OK);MC_SaveEncode(&a,4,save);
@@ -26,6 +38,7 @@ int main(int argc,char **argv) {
  MC_NotifySave(&b,MC_SAVE_VERIFY_FAILED);assert(MC_SaveDecode(&b,save,MC_SAVE_SIZE));
  assert(b.save_feedback==MC_SAVE_IDLE&&!b.save_feedback_time);
  MC_Generate(&a,77);assert(a.save_feedback==MC_SAVE_IDLE);
+ for(unsigned i=0;i<MC_MAP_BYTES;i++)if(a.blocks[i]==MC_LAVA)a.blocks[i]=MC_AIR;
  /* v6 persists linked door halves and rejects orphan upper panels. Legacy
     doors grow only into air, preserving any construction above them. */
  MC_Set(&a,40,40,40,MC_DOOR);MC_Set(&a,40,41,40,MC_DOOR_TOP);
@@ -40,9 +53,10 @@ int main(int argc,char **argv) {
  MC_Set(&a,50,40,30,MC_FURNACE);
  a.furnaces[0]=(MC_Furnace){51,41,31,{MC_RAW_MEAT,2,0},{MC_COAL,1,0},{MC_COOKED_MEAT,1,0},3,1};
  roundtrip(&a,&b,save);assert(b.furnaces[0].output.item==MC_COOKED_MEAT);
- MC_Generate(&a,77);
+  MC_Generate(&a,77);
+  for(unsigned i=0;i<MC_MAP_BYTES;i++)if(a.blocks[i]==MC_LAVA)a.blocks[i]=MC_AIR;
 
- uint16_t ruin_coords[2][3];
+  uint16_t ruin_coords[2][3];
  for(unsigned c=0;c<2;c++) {
    memcpy(ruin_coords[c],a.chest_map[c],sizeof(ruin_coords[c]));
    assert(ruin_coords[c][0]&&ruin_coords[c][1]&&ruin_coords[c][2]);
@@ -140,7 +154,8 @@ int main(int argc,char **argv) {
  roundtrip(&b,&a,copy);assert(a.reserve[MC_WOOD]==b.reserve[MC_WOOD]);
  /* A real legacy-dimension v4 layout migrates without relocating player,
     containers, or any byte in its original 128x64x128 terrain square. */
- MC_GenerateTerrain(&a,123);MC_NewPlayer(&a,0);a.x=a.z=10.5f;a.y=40;
+  MC_GenerateTerrain(&a,123);for(unsigned i=0;i<MC_MAP_BYTES;i++)if(a.blocks[i]==MC_LAVA)a.blocks[i]=MC_AIR;
+  MC_NewPlayer(&a,0);a.x=a.z=10.5f;a.y=40;
  MC_Set(&a,120,40,120,MC_CHEST);a.chest_map[0][0]=121;a.chest_map[0][1]=41;a.chest_map[0][2]=121;
  a.chest_blocks[0][0]=(MC_Stack){MC_WOOD,7,0};MC_SaveEncode(&a,11,save);
  const unsigned old_bytes=128u*64u*128u,old_base=64u+old_bytes,old_length=old_base+MC_SAVE_META;
@@ -175,5 +190,5 @@ int main(int argc,char **argv) {
    }
    printf("Legacy save roundtrip, terrain preserved (only free-space door tops may be added): %s\n",argv[i]);
  }
- free(copy);free(save);free(a.blocks);free(b.blocks);puts("minicraft v1/v2/v3/v4/v5/v6/v7 save / corruption / migration / persistent systems: OK");return 0;
+ free(copy);free(save);free(a.blocks);free(b.blocks);puts("minicraft v1/v2/v3/v4/v5/v6/v7/v8 save / corruption / migration / persistent systems: OK");return 0;
 }

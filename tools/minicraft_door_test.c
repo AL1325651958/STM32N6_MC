@@ -34,7 +34,7 @@ static int clear(MC_World *w,unsigned facing,float x,float z)
 static void put32(uint8_t *p,uint32_t n){for(unsigned i=0;i<4;i++)p[i]=(uint8_t)(n>>(i*8));}
 static void version(uint8_t *p,unsigned v){put32(p+4,v);put32(p+60,MC_Crc32(p,60));}
 static void roundtrip(MC_World *w,MC_World *loaded,uint8_t *save)
-{MC_SaveEncode(w,12,save);assert(save[4]==7&&MC_SaveValidate(save,MC_SAVE_SIZE)==12);assert(MC_SaveDecode(loaded,save,MC_SAVE_SIZE));}
+{MC_SaveEncode(w,12,save);assert(save[4]==MC_SAVE_VERSION&&MC_SaveValidate(save,MC_SAVE_SIZE)==12);assert(MC_SaveDecode(loaded,save,MC_SAVE_SIZE));}
 int main(void)
 {
   MC_World w={.blocks=calloc(1,MC_MAP_BYTES)},loaded={.blocks=calloc(1,MC_MAP_BYTES)};
