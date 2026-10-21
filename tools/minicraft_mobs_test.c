@@ -45,7 +45,7 @@ int main(void)
   assert(MC_UIRole(720,170)==MC_TOUCH_LOOK&&MC_UIRole(400,240)==MC_TOUCH_LOOK);
   assert(MC_Attack(&w,400,240));assert(w.mobs[0].health==MC_MOB_HEALTH-1&&w.attack_cooldown>0);
   assert(!MC_Attack(&w,400,240));w.attack_cooldown=0;
-  assert(MC_Give(&w,MC_SWORD,1));assert(MC_Attack(&w,400,240));assert(w.mobs[0].health==MC_MOB_HEALTH-7);
+  assert(MC_Give(&w,MC_SWORD,1));assert(!MC_SceneTap(&w,400,240));assert(w.mobs[0].health==MC_MOB_HEALTH-7);
   w.experience=MC_XpForLevel(5);w.level=5;w.attack_cooldown=0;
   w.mobs[0].health=MC_MOB_HEALTH;assert(MC_Attack(&w,400,240));assert(w.mobs[0].health==MC_MOB_HEALTH-7);
   w.experience=0;w.level=0;

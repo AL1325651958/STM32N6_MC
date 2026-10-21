@@ -439,6 +439,18 @@ int MC_UseAt(MC_World *w,float sx,float sy) {
   if(MC_ToolIndex(b)>=0){MC_SelectItem(w,b);return 0;}
   return MC_PlaceAt(w,sx,sy);
 }
+int MC_SceneTap(MC_World *w,float x,float y) {
+  unsigned held=w->hotbar[w->slot];
+  if(MC_MobFeed(w,x,y))return 1;
+  if(held==MC_BOW){MC_Shoot(w,x,y);return 0;}
+  if(held==MC_SHOVEL) {
+    if(MC_PickMob(w,x,y,3.5f,0)>=0){MC_Attack(w,x,y);return 0;}
+    return MC_UseAt(w,x,y);
+  }
+  if(MC_ToolIndex(held)>=0){MC_Attack(w,x,y);return 0;}
+  if(MC_UseAt(w,x,y))return 1;
+  return held!=0;
+}
 int MC_Use(MC_World *w) { return MC_UseAt(w,400,240); }
 int MC_Place(MC_World *w) { return MC_PlaceAt(w,400,240); }
 int MC_PlaceAt(MC_World *w,float sx,float sy) {

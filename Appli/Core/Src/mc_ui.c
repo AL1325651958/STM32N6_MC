@@ -270,6 +270,7 @@ static void mini_map(uint16_t *fb,const MC_World *w)
 static const char *scene_action_hint(unsigned item)
 {
   if(item==MC_BOW)return "TAP SHOOT";
+  if(item==MC_SHOVEL)return "TAP TILL";
   if(item==MC_WHEAT)return "TAP FEED";
   if(item==MC_SWORD||item==MC_AXE||item==MC_WOOD_PICK||item==MC_STONE_PICK||item==MC_IRON_PICK)return "TAP ATTACK";
   return MC_IsBlock(item)?"TAP PLACE":"TAP USE";

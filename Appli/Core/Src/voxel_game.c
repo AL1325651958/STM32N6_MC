@@ -129,22 +129,9 @@ static void update_contacts(const GT911_StateTypeDef *touch,uint32_t now,unsigne
         world.slot=(p->x-240)/50;*selected=world.hotbar[world.slot];
         if(MC_ToolIndex(*selected)>=0)MC_SelectItem(&world,*selected);
       }
-      /* A short scene tap is the contextual action: it feeds, attacks, fires,
-         places or uses the held item at the touched ray. Mining still begins
-         only after a long press, and a successful non-combat action locks out
-         that same finger until it is released. */
       if(c->role==MC_TOUCH_LOOK) {
-        unsigned held=world.hotbar[world.slot];
-        if(MC_MobFeed(&world,p->x,p->y)) { dirty=1;c->action_done=1; }
-        else if(held==MC_BOW) { if(MC_Shoot(&world,p->x,p->y))dirty=1; }
-        else if(MC_ToolIndex(held)>=0) { if(MC_Attack(&world,p->x,p->y))dirty=1; }
-        else {
-          if(MC_UseAt(&world,p->x,p->y))dirty=1;
-          /* A non-combat item owns the short tap even when its contextual
-             action is unavailable (for example, full hunger or no blocks).
-             This prevents an accidental long press from mining instead. */
-          if(held)c->action_done=1;
-        }
+        if(MC_SceneTap(&world,p->x,p->y))c->action_done=1;
+        dirty=1;
       }
     }
     if(c->role==MC_TOUCH_LOOK && !world.bag) {

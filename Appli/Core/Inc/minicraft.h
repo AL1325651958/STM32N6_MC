@@ -128,6 +128,8 @@ int MC_MobRay(const MC_World *w,float dx,float dy,float dz,float reach,unsigned 
 int MC_Attack(MC_World *w,float x,float y);
 int MC_Shoot(MC_World *w,float x,float y);
 int MC_MobFeed(MC_World *w,float x,float y);
+/* Returns nonzero when this touch must not continue into mining. */
+int MC_SceneTap(MC_World *w,float x,float y);
 void MC_MobsTick(MC_World *w,float dt);
 int MC_MobSpawn(MC_World *w,int x,int y,int z);
 int MC_PassiveSpawn(MC_World *w,int x,int y,int z);

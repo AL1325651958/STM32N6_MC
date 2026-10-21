@@ -125,7 +125,14 @@ int main(void) {
  MC_Set(&w,10,3,10,MC_FURNACE);w.furnaces[0]=(MC_Furnace){11,4,11,{MC_IRON_ORE,1,0},{MC_BIRCH_WOOD,1,0},{0},0,0};
  tick(&w,1);assert(w.furnaces[0].burn>0);tick(&w,55);assert(w.furnaces[0].output.item==MC_IRON);
  /* Farming: shovel dirt, plant seeds, grow on the low-frequency timer, harvest. */
+ scene(&w);assert(MC_Give(&w,MC_SHOVEL,1));select_item(&w,MC_SHOVEL);
+ w.mobs[0]=(MC_Mob){10.5f,2.01f,13.5f,0,0,0,MC_MOB_HEALTH,1,0,0};
+ assert(!MC_SceneTap(&w,400,240)&&w.mobs[0].health==MC_MOB_HEALTH-3);
+ memset(w.mobs,0,sizeof(w.mobs));MC_Set(&w,10,3,13,MC_STONE);
+ assert(!MC_SceneTap(&w,400,240));mine(&w,50);assert(MC_Get(&w,10,3,13)==MC_AIR);
  scene(&w);MC_Set(&w,10,3,13,MC_DIRT);assert(MC_Give(&w,MC_SHOVEL,1));select_item(&w,MC_SHOVEL);assert(MC_Use(&w));assert(MC_Get(&w,10,3,13)==MC_FARMLAND);
+ scene(&w);MC_Set(&w,10,3,13,MC_DIRT);assert(MC_Give(&w,MC_SHOVEL,1));select_item(&w,MC_SHOVEL);
+ assert(MC_SceneTap(&w,400,240)&&MC_Get(&w,10,3,13)==MC_FARMLAND);
  assert(MC_Give(&w,MC_WHEAT_SEEDS,1));select_item(&w,MC_WHEAT_SEEDS);assert(MC_Use(&w));assert(MC_Get(&w,10,4,13)==MC_WHEAT_CROP);
  tick(&w,751);assert(MC_Get(&w,10,4,13)==MC_WHEAT_MATURE);assert(w.growers[0].x==0);
  w.pitch=.25f;mine(&w,6);assert(MC_Get(&w,10,4,13)==MC_FARMLAND&&w.items[MC_WHEAT]>=1&&w.items[MC_WHEAT_SEEDS]>=1);
