@@ -320,13 +320,12 @@ static void move_mob(MC_World *w,MC_Mob *m,float vx,float vz,float dt)
   }
 }
 
-static int clear_to_player(const MC_World *w,const MC_Mob *m,float dist)
+static int clear_to_player(const MC_World *w,const MC_Mob *m)
 {
-  for(float t=.125f;t<1;t+=.125f) {
-    float x=m->x+(w->x-m->x)*t,y=m->y+1.0f+(w->y-m->y)*t,z=m->z+(w->z-m->z)*t;
-    if(MC_IsSolid(MC_Get(w,(int)floorf(x),(int)floorf(y),(int)floorf(z))))return 0;
-  }
-  return dist<1.5f;
+  /* Only called inside melee range at the entity cadence. Trace the whole
+     chest-height segment against the same parts used by arrows and picking. */
+  return !MC_BlockSegment(w,m->x,m->y+1.0f,m->z,
+                         w->x,w->y+1.0f,w->z,0);
 }
 
 void MC_MobsTick(MC_World *w,float dt)
@@ -372,7 +371,7 @@ void MC_MobsTick(MC_World *w,float dt)
     float speed=dist<12&&dist>1.15f?.82f:0;
     move_mob(w,m,dist>.01f?dx/dist*speed:0,dist>.01f?dz/dist*speed:0,dt);
     if(m->y<1||m->y>MC_MAP_Y+2){memset(m,0,sizeof(*m));continue;}
-    if(dist<1.5f&&fabsf(w->y-m->y)<1.2f&&m->attack<=0&&clear_to_player(w,m,dist)) {
+    if(dist<1.5f&&fabsf(w->y-m->y)<1.2f&&m->attack<=0&&clear_to_player(w,m)) {
       unsigned health=w->health;m->attack=1.25f;MC_Hurt(w,2);if(health<=2&&w->health==20)return;
     }
   }
