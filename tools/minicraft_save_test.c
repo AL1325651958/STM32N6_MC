@@ -26,6 +26,16 @@ int main(int argc,char **argv) {
  MC_NotifySave(&b,MC_SAVE_VERIFY_FAILED);assert(MC_SaveDecode(&b,save,MC_SAVE_SIZE));
  assert(b.save_feedback==MC_SAVE_IDLE&&!b.save_feedback_time);
  MC_Generate(&a,77);assert(a.save_feedback==MC_SAVE_IDLE);
+ /* v6 persists linked door halves and rejects orphan upper panels. Legacy
+    doors grow only into air, preserving any construction above them. */
+ MC_Set(&a,40,40,40,MC_DOOR);MC_Set(&a,40,41,40,MC_DOOR_TOP);
+ roundtrip(&a,&b,save);assert(save[4]==6&&MC_Get(&b,40,41,40)==MC_DOOR_TOP);
+ MC_Set(&a,40,40,40,MC_AIR);MC_SaveEncode(&a,4,save);assert(!MC_SaveValidate(save,MC_SAVE_SIZE));
+ MC_Set(&a,40,41,40,MC_AIR);MC_Set(&a,40,40,40,MC_DOOR_OPEN);
+ MC_Set(&a,42,40,40,MC_DOOR);MC_Set(&a,42,41,40,MC_STONE);MC_SaveEncode(&a,4,save);
+ put32(save+4,5);put32(save+60,MC_Crc32(save,60));assert(MC_SaveDecode(&b,save,MC_SAVE_SIZE));
+ assert(MC_Get(&b,40,41,40)==MC_DOOR_TOP_OPEN&&MC_Get(&b,42,41,40)==MC_STONE);
+ MC_Generate(&a,77);
  /* Finished food in a registered furnace survives a real save roundtrip. */
  MC_Set(&a,50,40,30,MC_FURNACE);
  a.furnaces[0]=(MC_Furnace){51,41,31,{MC_RAW_MEAT,2,0},{MC_COAL,1,0},{MC_COOKED_MEAT,1,0},3,1};
@@ -144,7 +154,7 @@ int main(int argc,char **argv) {
  for(unsigned y=0;y<64;y++)for(unsigned z=0;z<128;z++)
    assert(!memcmp(legacy+64+(y*128+z)*128,b.blocks+(y*MC_MAP_Z+z)*MC_MAP_X,128));
  assert(b.x==10.5f&&b.z==10.5f&&b.chest_blocks[0][0].count==7&&MC_Get(&b,200,1,200)!=MC_AIR);
- MC_SaveEncode(&b,12,copy);assert(copy[4]==5&&MC_SaveValidate(copy,MC_SAVE_SIZE)==12);
+ MC_SaveEncode(&b,12,copy);assert(copy[4]==6&&MC_SaveValidate(copy,MC_SAVE_SIZE)==12);
  put16(legacy+old_base+792,129);put32(legacy+48,MC_Crc32(legacy+old_base,MC_SAVE_META));
  put32(legacy+60,MC_Crc32(legacy,60));assert(!MC_SaveValidate(legacy,old_length));free(legacy);
  /* Real SD files are opened strictly read-only; migrate in memory only. */
@@ -155,9 +165,15 @@ int main(int argc,char **argv) {
    unsigned version=save[4];assert(MC_SaveDecode(&b,save,(unsigned)n));
    if(version==1)assert(b.creative&&b.health==20);
    MC_SaveEncode(&b,12,copy);assert(MC_SaveValidate(copy,MC_SAVE_SIZE)==12);
-   for(unsigned y=0;y<MC_MAP_Y;y++)for(unsigned z=0;z<mz;z++)
-     assert(!memcmp(save+MC_SAVE_HEADER+(y*mz+z)*mx,copy+MC_SAVE_HEADER+(y*MC_MAP_Z+z)*MC_MAP_X,mx));
-   printf("Legacy save roundtrip, identical terrain: %s\n",argv[i]);
+   for(unsigned y=0;y<MC_MAP_Y;y++)for(unsigned z=0;z<mz;z++)for(unsigned x=0;x<mx;x++) {
+     unsigned old_index=(y*mz+z)*mx+x,new_index=(y*MC_MAP_Z+z)*MC_MAP_X+x;
+     uint8_t old=save[MC_SAVE_HEADER+old_index],now=copy[MC_SAVE_HEADER+new_index];
+     if(old!=now) {
+       assert(version<6&&y>0&&old==MC_AIR&&MC_DoorUpper(now));
+       assert(save[MC_SAVE_HEADER+old_index-mx*mz]==MC_DoorBase(now));
+     }
+   }
+   printf("Legacy save roundtrip, terrain preserved (only free-space door tops may be added): %s\n",argv[i]);
  }
- free(copy);free(save);free(a.blocks);free(b.blocks);puts("minicraft v1/v2/v3/v4/v5 save / corruption / migration / persistent systems: OK");return 0;
+ free(copy);free(save);free(a.blocks);free(b.blocks);puts("minicraft v1/v2/v3/v4/v5/v6 save / corruption / migration / persistent systems: OK");return 0;
 }

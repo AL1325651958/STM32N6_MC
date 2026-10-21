@@ -108,7 +108,19 @@ void MC_Set(MC_World *w, int x, int y, int z, uint8_t b)
     }
   }
 }
-int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_TORCH && block != MC_SAPLING && block != MC_DOOR_OPEN && block != MC_WHEAT_CROP && block != MC_WHEAT_MATURE && block != MC_DUST && block != MC_DUST_ON && block != MC_LEVER && block != MC_LEVER_ON && block != MC_BUTTON && block != MC_BUTTON_ON; }
+uint8_t MC_DoorBase(uint8_t b){return b==MC_DOOR_TOP?MC_DOOR:b==MC_DOOR_TOP_OPEN?MC_DOOR_OPEN:b;}
+int MC_DoorUpper(uint8_t b){return b==MC_DOOR_TOP||b==MC_DOOR_TOP_OPEN;}
+int MC_IsDoor(uint8_t b){b=MC_DoorBase(b);return b==MC_DOOR||b==MC_DOOR_OPEN;}
+void MC_RemoveBlock(MC_World *w,int x,int y,int z)
+{
+  uint8_t b=MC_Get(w,x,y,z);
+  if(MC_IsDoor(b)) {
+    int other=y+(MC_DoorUpper(b)?-1:1);uint8_t mate=MC_Get(w,x,other,z);
+    if(MC_IsDoor(mate)&&MC_DoorUpper(mate)!=MC_DoorUpper(b)&&MC_DoorBase(mate)==MC_DoorBase(b))MC_Set(w,x,other,z,MC_AIR);
+  }
+  MC_Set(w,x,y,z,MC_AIR);
+}
+int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_TORCH && block != MC_SAPLING && block != MC_WHEAT_CROP && block != MC_WHEAT_MATURE && block != MC_DUST && block != MC_DUST_ON && block != MC_LEVER && block != MC_LEVER_ON && block != MC_BUTTON && block != MC_BUTTON_ON; }
 
 typedef struct { float lo[3], hi[3]; } MC_Part;
 
@@ -129,7 +141,10 @@ static const MC_Part fence_parts[] = {
   {{6/16.f,11/16.f,0},{10/16.f,14/16.f,1}}
 };
 static const MC_Part dust_parts[] = {{{.08f,0,.08f},{.92f,.07f,.92f}}};
-static const MC_Part lever_parts[] = {{{.25f,0,.25f},{.75f,.10f,.75f}},{{.43f,.08f,.57f},{.57f,.62f,.68f}}};
+static const MC_Part lever_parts[2][4] = {
+  {{{.25f,0,.25f},{.75f,.125f,.75f}},{{.4375f,.125f,.4375f},{.5625f,.30f,.5625f}},{{.4375f,.28f,.375f},{.5625f,.46f,.50f}},{{.4375f,.44f,.3125f},{.5625f,.625f,.4375f}}},
+  {{{.25f,0,.25f},{.75f,.125f,.75f}},{{.4375f,.125f,.4375f},{.5625f,.30f,.5625f}},{{.4375f,.28f,.50f},{.5625f,.46f,.625f}},{{.4375f,.44f,.5625f},{.5625f,.625f,.6875f}}}
+};
 static const MC_Part button_parts[] = {{{.25f,.02f,.25f},{.75f,.22f,.75f}}};
 /* Stair orientation is the direction in which the step rises. */
 static const MC_Part stair_parts[4][2] = {
@@ -144,7 +159,7 @@ static unsigned parts_for(uint8_t b, const MC_Part **parts)
   if(b==MC_TORCH) { *parts=torch_parts; return sizeof(torch_parts)/sizeof(torch_parts[0]); }
   if(b==MC_FENCE) { *parts=fence_parts; return sizeof(fence_parts)/sizeof(fence_parts[0]); }
   if(b==MC_DUST || b==MC_DUST_ON) { *parts=dust_parts; return 1; }
-  if(b==MC_LEVER || b==MC_LEVER_ON) { *parts=lever_parts; return 2; }
+  if(b==MC_LEVER || b==MC_LEVER_ON) { *parts=lever_parts[b==MC_LEVER_ON]; return 4; }
   if(b==MC_BUTTON || b==MC_BUTTON_ON) { *parts=button_parts; return 1; }
   if(b>=MC_STAIR && b<=MC_STAIR_WEST) { *parts=stair_parts[b-MC_STAIR]; return 2; }
   *parts=0; return 0;
@@ -153,6 +168,7 @@ static unsigned parts_for(uint8_t b, const MC_Part **parts)
 /* Cell-local bounds, shared by ray selection, rendering and solid collision. */
 static void bounds(uint8_t b,float lo[3],float hi[3])
 {
+  b=MC_DoorBase(b);
   lo[0]=lo[1]=lo[2]=0;hi[0]=hi[1]=hi[2]=1;
   if(b==MC_TORCH || b==MC_FENCE || b==MC_DUST || b==MC_DUST_ON || b==MC_LEVER || b==MC_LEVER_ON || b==MC_BUTTON || b==MC_BUTTON_ON || (b>=MC_STAIR && b<=MC_STAIR_WEST)) {
     const MC_Part *parts; unsigned count=parts_for(b,&parts);
@@ -167,8 +183,8 @@ static void bounds(uint8_t b,float lo[3],float hi[3])
   else if(b==MC_FARMLAND){hi[1]=15/16.f;}
   else if(b==MC_WHEAT_CROP){lo[0]=lo[2]=4/16.f;hi[0]=hi[2]=12/16.f;hi[1]=11/16.f;}
   else if(b==MC_WHEAT_MATURE){lo[0]=lo[2]=2/16.f;hi[0]=hi[2]=14/16.f;hi[1]=1.f;}
-  else if(b==MC_DOOR){lo[2]=6/16.f;hi[2]=10/16.f;}
-  else if(b==MC_DOOR_OPEN){lo[0]=6/16.f;hi[0]=10/16.f;}
+  else if(b==MC_DOOR){hi[2]=3/16.f;}
+  else if(b==MC_DOOR_OPEN){hi[0]=3/16.f;}
   else if(b==MC_SLAB){hi[1]=.5f;}
   else if(b==MC_SLAB_TOP){lo[1]=.5f;}
 }
@@ -287,6 +303,17 @@ static void generate_world(MC_World *w,uint32_t seed,int structures)
 }
 void MC_Generate(MC_World *w,uint32_t seed){generate_world(w,seed,1);}
 void MC_GenerateTerrain(MC_World *w,uint32_t seed){generate_world(w,seed,0);}
+static int step_half(MC_World *w,float x,float z)
+{
+  if(w->vy>0 || !has_floor(w,w->x,w->z))return 0;
+  int part=0,yy=(int)floorf(w->y+.1f);
+  for(int dz=-1;dz<=1;dz+=2)for(int dx=-1;dx<=1;dx+=2) {
+    uint8_t b=MC_Get(w,(int)floorf(x+dx*.28f),yy,(int)floorf(z+dz*.28f));
+    if(b==MC_SLAB || (b>=MC_STAIR&&b<=MC_STAIR_WEST))part=1;
+  }
+  if(!part || overlaps(w,w->x,w->y+.5f,w->z) || overlaps(w,x,w->y+.5f,z))return 0;
+  w->y+=.5f;w->vy=0;return 1;
+}
 void MC_Step(MC_World *w, float f, float s, float dt, int jump)
 {
   if(!(dt>0)) return;
@@ -305,7 +332,9 @@ void MC_Step(MC_World *w, float f, float s, float dt, int jump)
     float h=fminf(dt,.01f); dt-=h;
     float nx=w->x+vx*h, nz=w->z+vz*h;
     if(!overlaps(w,nx,w->y,w->z) && (!guard || has_floor(w,nx,w->z))) w->x=nx;
+    else if(!wet && !guard && step_half(w,nx,w->z))w->x=nx;
     if(!overlaps(w,w->x,w->y,nz) && (!guard || has_floor(w,w->x,nz))) w->z=nz;
+    else if(!wet && !guard && step_half(w,w->x,nz))w->z=nz;
     w->vy-=(wet?4.0f:18.0f)*h;if(wet && w->vy < -2)w->vy=-2; float ny=w->y+w->vy*h;
     if(overlaps(w,w->x,ny,w->z)) {
       w->on_ground=w->vy<0;
@@ -320,7 +349,7 @@ void MC_Step(MC_World *w, float f, float s, float dt, int jump)
 
 typedef MC_Hit Hit;
 static int shaped(uint8_t b)
-{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST || b==MC_DOOR || b==MC_DOOR_OPEN || b==MC_SLAB || b==MC_SLAB_TOP || b==MC_FARMLAND || b==MC_WHEAT_CROP || b==MC_WHEAT_MATURE || b==MC_FENCE || (b>=MC_DUST && b<=MC_BUTTON_ON) || (b>=MC_STAIR && b<=MC_STAIR_WEST);}
+{return b==MC_TORCH || b==MC_SAPLING || b==MC_BED || b==MC_CHEST || MC_IsDoor(b) || b==MC_SLAB || b==MC_SLAB_TOP || b==MC_FARMLAND || b==MC_WHEAT_CROP || b==MC_WHEAT_MATURE || b==MC_FENCE || (b>=MC_DUST && b<=MC_BUTTON_ON) || (b>=MC_STAIR && b<=MC_STAIR_WEST);}
 
 /* Intersect only special objects; ordinary cubes retain the cheap DDA path. */
 static int box_hit(const float lo[3],const float hi[3],const float p[3],const float d[3],
@@ -417,6 +446,7 @@ static int shape_hit(uint8_t b,const float p[3],const float d[3],float start,flo
         }
       }
       if(best<=end) {*distance=best;*nx=bx;*ny=by;*nz=bz;return 1;}
+      return 0;
     }
   }
   float lo[3],hi[3];bounds(b,lo,hi);
@@ -482,7 +512,7 @@ int MC_EditAt(MC_World *w,int place,uint8_t selected,float sx,float sy)
   if(!MC_Pick(w,sx,sy,&hit))return 0;
   int x=hit.x,y=hit.y,z=hit.z,nx=hit.nx,ny=hit.ny,nz=hit.nz;
   if(place) {
-    if(!MC_IsBlock(selected) || selected==MC_BEDROCK || selected==MC_WATER || selected==MC_DOOR_OPEN || selected==MC_DOUBLE_SLAB || !(nx||ny||nz)) return 0;
+    if(MC_DoorUpper(selected) || !MC_IsBlock(selected) || selected==MC_BEDROCK || selected==MC_WATER || selected==MC_DOOR_OPEN || selected==MC_DOUBLE_SLAB || !(nx||ny||nz)) return 0;
     if((selected==MC_SLAB || selected==MC_SLAB_TOP) &&
        ((hit.block==MC_SLAB && ny>0) || (hit.block==MC_SLAB_TOP && ny<0))) {
       if(body_intersects(MC_DOUBLE_SLAB,x,y,z,w->x,w->y,w->z))return 0;
@@ -495,12 +525,17 @@ int MC_EditAt(MC_World *w,int place,uint8_t selected,float sx,float sy)
       MC_Set(w,x,y,z,MC_DOUBLE_SLAB);return 1;
     }
     if(!inside(x,y,z) || y==0 || (old!=MC_AIR && old!=MC_WATER)) return 0;
-    if(selected==MC_DOOR && !MC_IsSolid(MC_Get(w,x,y-1,z))) return 0;
+    if(selected==MC_DOOR) {
+      uint8_t above=MC_Get(w,x,y+1,z);
+      if(y>=MC_MAP_Y-1 || !MC_IsSolid(MC_Get(w,x,y-1,z)) || (above!=MC_AIR&&above!=MC_WATER) ||
+         body_intersects(selected,x,y,z,w->x,w->y,w->z) || body_intersects(selected,x,y+1,z,w->x,w->y,w->z))return 0;
+      MC_Set(w,x,y+1,z,MC_DOOR_TOP);
+    }
     if(MC_IsSolid(selected) && body_intersects(selected,x,y,z,w->x,w->y,w->z)) return 0;
     MC_Set(w,x,y,z,selected);
   } else {
     if(!inside(x,y,z) || y==0 || MC_Get(w,x,y,z)==MC_BEDROCK) return 0;
-    MC_Set(w,x,y,z,MC_AIR);
+    MC_RemoveBlock(w,x,y,z);
   }
   return 1;
 }
@@ -575,11 +610,18 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
     projectile_depth[i]=depth;projectile_ax[i]=sx;projectile_ay[i]=sy;projectile_bx[i]=ex;projectile_by[i]=ey;projectile_mask|=1u<<i;
   }
   /* Bound dynamic light work: collect at most eight nearby torches once per frame. */
-  int lights[8][3],nl=0;
-  for(int y=(int)w->y-4;y<=(int)w->y+4 && nl<8;y++)
-    for(int z=(int)w->z-6;z<=(int)w->z+6 && nl<8;z++)
-      for(int x=(int)w->x-6;x<=(int)w->x+6 && nl<8;x++)
-        if(MC_Get(w,x,y,z)==MC_TORCH || MC_Get(w,x,y,z)==MC_LAMP_ON) {lights[nl][0]=x;lights[nl][1]=y;lights[nl++][2]=z;}
+  static struct {const MC_World *world;const uint8_t *blocks;uint32_t serial,revision;int x,y,z,valid,n,lights[8][3];} lc;
+  int lx0=(int)w->x,ly0=(int)w->y,lz0=(int)w->z;
+  if(!lc.valid || lc.world!=w || lc.blocks!=w->blocks || lc.serial!=w->scene_serial ||
+     lc.revision!=w->map_revision || lc.x!=lx0 || lc.y!=ly0 || lc.z!=lz0) {
+    lc.n=0;
+    for(int y=ly0-4;y<=ly0+4 && lc.n<8;y++)for(int z=lz0-6;z<=lz0+6 && lc.n<8;z++)for(int x=lx0-6;x<=lx0+6 && lc.n<8;x++) {
+      uint8_t block=MC_Get(w,x,y,z);
+      if(block==MC_TORCH || block==MC_LAMP_ON){lc.lights[lc.n][0]=x;lc.lights[lc.n][1]=y;lc.lights[lc.n++][2]=z;}
+    }
+    lc.world=w;lc.blocks=w->blocks;lc.serial=w->scene_serial;lc.revision=w->map_revision;lc.x=lx0;lc.y=ly0;lc.z=lz0;lc.valid=1;
+  }
+  const int (*lights)[3]=lc.lights;int nl=lc.n;
   /* Water texture has only 256 possible texels at a fixed world time.
      Fill lazily so a dry frame performs no water sine evaluations. */
   int8_t water_noise[256];int water_ready=0;
@@ -681,7 +723,8 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
           r=255;g=204;b=54;break;
         case MC_LEVER:
         case MC_LEVER_ON:
-          r=118;g=82;b=45;if(h.block==MC_LEVER_ON){r=218;g=153;b=60;}break;
+          if(py-h.y<.126f){r=126;g=132;b=138;}
+          else {r=118;g=82;b=45;if(h.block==MC_LEVER_ON){r=188;g=133;b=60;}}break;
         case MC_BUTTON:
         case MC_BUTTON_ON:
           r=h.block==MC_BUTTON_ON?214:152;g=h.block==MC_BUTTON_ON?90:96;b=55;break;
@@ -694,14 +737,17 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
         case MC_WHEAT_MATURE:r=197;g=161;b=48;n*=2;if(h.ny<0){r=101;g=83;b=31;}break;
         case MC_DOOR:
         case MC_DOOR_OPEN:
+        case MC_DOOR_TOP:
+        case MC_DOOR_TOP_OPEN:
           r=153;g=101;b=48;
           if((tu%4)==0 || tv==0 || tv==15){r=105;g=65;b=32;}
-          if(tv>6 && tv<10 && ((h.block==MC_DOOR && tu>10) || (h.block==MC_DOOR_OPEN && tu<5))){r=220;g=177;b=67;}
+          if(!MC_DoorUpper(h.block)&&tv>6 && tv<10 && ((MC_DoorBase(h.block)==MC_DOOR && tu>10) || (MC_DoorBase(h.block)==MC_DOOR_OPEN && tu<5))){r=220;g=177;b=67;}
           break;
         case MC_SLAB:
         case MC_SLAB_TOP:
         case MC_DOUBLE_SLAB:
           r=139;g=143;b=149;
+          if(h.ny>0){r=171;g=175;b=181;}
           if((tu+((tv/5)&1)*4)%7==0 || tv%5==0){r=94;g=99;b=106;}
           break;
         case MC_FENCE:
@@ -744,8 +790,12 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
       g=(unsigned)clamp((g+n)*shade*(1-fog)+skyG*fog,0,255);
       b=(unsigned)clamp((b+n)*shade*(1-fog)+skyB*fog,0,255);
       if(tu==0 || tv==0){r=r*9/10;g=g*9/10;b=b*9/10;}
-      if(w->target_valid && h.x==w->target.x && h.y==w->target.y && h.z==w->target.z) {
-        if(tu==0 || tu==15 || tv==0 || tv==15){r=246;g=237;b=180;}
+      if(w->target_valid && h.x==w->target.x && h.z==w->target.z &&
+         (h.y==w->target.y || (MC_IsDoor(h.block)&&MC_IsDoor(w->target.block)&&
+          h.y-MC_DoorUpper(h.block)==w->target.y-MC_DoorUpper(w->target.block)))) {
+        int edge=tu==0 || tu==15 || tv==0 || tv==15;
+        if(MC_IsDoor(h.block))edge=tu==0 || tu==15 || (MC_DoorUpper(h.block)?tv==15:tv==0);
+        if(edge){r=246;g=237;b=180;}
         if(w->mining>0 && ((tu+tv*3)%((unsigned)(12-w->mining*8))==0)){r/=3;g/=3;b/=3;}
       }
     }

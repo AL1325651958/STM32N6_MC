@@ -37,6 +37,7 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
        MC_BIRCH_WOOD, MC_BIRCH_PLANKS, MC_DARK_WOOD, MC_DARK_PLANKS,
        MC_BREAD, MC_COOKED_MEAT,
        MC_DOUBLE_SLAB, /* map-only: two stone slabs, existing IDs unchanged */
+       MC_DOOR_TOP, MC_DOOR_TOP_OPEN,
        MC_ITEM_COUNT };
 #define MC_HOTBAR 8
 #define MC_SLOTS 32
@@ -121,6 +122,7 @@ typedef struct {
   uint8_t mob_target;
   /* Temporary button feedback, never part of the save format. */
   uint8_t save_feedback;
+  uint32_t scene_serial;
   float save_feedback_time;
   const char *notice;
 } MC_World;
@@ -130,6 +132,10 @@ void MC_Set(MC_World *world, int x, int y, int z, uint8_t block);
 void MC_Generate(MC_World *world, uint32_t seed);
 void MC_GenerateTerrain(MC_World *world,uint32_t seed);
 void MC_NotifySave(MC_World *world,unsigned result);
+uint8_t MC_DoorBase(uint8_t block);
+int MC_IsDoor(uint8_t block);
+int MC_DoorUpper(uint8_t block);
+void MC_RemoveBlock(MC_World *world,int x,int y,int z);
 void MC_Respawn(MC_World *world);
 int MC_IsSolid(uint8_t block);
 int MC_Edit(MC_World *world, int place, uint8_t selected);

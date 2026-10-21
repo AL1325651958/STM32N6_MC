@@ -4,6 +4,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
+static double seconds_now(void)
+{
+#ifdef _WIN32
+  LARGE_INTEGER value,frequency;QueryPerformanceCounter(&value);QueryPerformanceFrequency(&frequency);
+  return (double)value.QuadPart/(double)frequency.QuadPart;
+#else
+  struct timespec t;timespec_get(&t,TIME_UTC);return t.tv_sec+t.tv_nsec*1e-9;
+#endif
+}
 
 /* Same camera sequence in both binaries. CRC every rendered frame, outside
    the timed interval; include HUD/minimap to measure the complete CPU path. */
@@ -37,11 +49,11 @@ int main(void) {
     double seconds=0;uint32_t hash=0,frame_crc[32];
     for(unsigned frame=0;frame<32;frame++) {
       w.yaw=yaw+frame*.018f;w.time+=.067f;
-      clock_t start=clock();
+      double start=seconds_now();
       MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
       for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];
       MC_UIDraw(fb,&w,0,15,67,"BENCHMARK",1,0,0);
-      seconds+=(double)(clock()-start)/CLOCKS_PER_SEC;
+      seconds+=seconds_now()-start;
       hash=(hash<<1)|(hash>>31);frame_crc[frame]=MC_Crc32(fb,800*480*2);hash^=frame_crc[frame];
     }
     printf("%s %.3f %08lx",names[scene],seconds*1000/32,(unsigned long)hash);
@@ -58,13 +70,13 @@ int main(void) {
     MC_Set(&w,64,2,65,MC_LEVER_ON);MC_Set(&w,65,2,65,MC_DUST);MC_Set(&w,66,2,65,MC_LAMP);
     double seconds=0;uint32_t hash=0,frame_crc[32];
     for(unsigned group=0;group<32;group++) {
-      clock_t start=clock();
+      double start=seconds_now();
       for(unsigned tick=0;tick<64;tick++) {
         if(scenario==1 && tick%16==0)MC_Set(&w,64,2,65,tick%32?MC_LEVER_ON:MC_LEVER);
         if(scenario==2)w.x=64.5f+((group*64+tick)/4%2);
         MC_SystemsTick(&w,.1f);
       }
-      seconds+=(double)(clock()-start)/CLOCKS_PER_SEC;
+      seconds+=seconds_now()-start;
       frame_crc[group]=MC_Crc32(w.blocks,MC_MAP_BYTES);
       hash=(hash<<1)|(hash>>31);hash^=frame_crc[group];
     }

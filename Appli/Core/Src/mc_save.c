@@ -23,7 +23,7 @@ static void sread(MC_Stack*s,const uint8_t*p){s->item=p[0];s->count=p[1];s->wear
 static int svalid(const uint8_t*p){
   unsigned id=p[0],n=p[1],wear=get16(p+2);
   if(!n)return id==0&&wear==0;
-  if(!id||id>=MC_ITEM_COUNT||(id==MC_DOUBLE_SLAB||id==MC_FARMLAND||id==MC_WHEAT_CROP||id==MC_WHEAT_MATURE||id==MC_DUST_ON||id==MC_LAMP_ON||id==MC_LEVER_ON||id==MC_BUTTON_ON)||id==MC_WATER||id==MC_BEDROCK||n>64)return 0;
+  if(!id||id>=MC_ITEM_COUNT||(MC_DoorUpper((uint8_t)id)||id==MC_DOUBLE_SLAB||id==MC_FARMLAND||id==MC_WHEAT_CROP||id==MC_WHEAT_MATURE||id==MC_DUST_ON||id==MC_LAMP_ON||id==MC_LEVER_ON||id==MC_BUTTON_ON)||id==MC_WATER||id==MC_BEDROCK||n>64)return 0;
   int t=MC_ToolIndex(id),a=MC_ArmorIndex(id);
   if(t>=0)return n==1&&wear>0&&wear<=MC_ToolLife(id);
   if(a>=0)return n==1&&wear>0&&wear<=MC_ArmorLife(id);
@@ -34,7 +34,7 @@ static int range(float f,float lo,float hi){return isfinite(f)&&f>=lo&&f<=hi;}
 static int isfuel(unsigned id){return id==MC_COAL||id==MC_WOOD||id==MC_BIRCH_WOOD||id==MC_DARK_WOOD||id==MC_PLANKS||id==MC_BIRCH_PLANKS||id==MC_DARK_PLANKS;}
 static unsigned output(unsigned id){return id==MC_IRON_ORE?MC_IRON:id==MC_SAND?MC_GLASS:id==MC_WOOD?MC_COAL:id==MC_COBBLE?MC_BRICK:id==MC_RAW_MEAT?MC_COOKED_MEAT:0;}
 void MC_SaveEncode(const MC_World*w,uint32_t generation,uint8_t*p){
-  memset(p,0,MC_SAVE_HEADER);memcpy(p,"N6MC",4);put32(p+4,5);put32(p+8,MC_MAP_X);put32(p+12,MC_MAP_Y);put32(p+16,MC_MAP_Z);put32(p+20,generation);put32(p+24,w->seed);
+  memset(p,0,MC_SAVE_HEADER);memcpy(p,"N6MC",4);put32(p+4,6);put32(p+8,MC_MAP_X);put32(p+12,MC_MAP_Y);put32(p+16,MC_MAP_Z);put32(p+20,generation);put32(p+24,w->seed);
   putfloat(p+28,w->x);putfloat(p+32,w->y);putfloat(p+36,w->z);putfloat(p+40,w->yaw);putfloat(p+44,w->pitch);memcpy(p+MC_SAVE_HEADER,w->blocks,MC_MAP_BYTES);
   uint8_t*m=p+MC_SAVE_V1_SIZE;memset(m,0,MC_SAVE_META);m[0]=1;m[1]=w->creative;m[2]=w->slot;m[3]=w->health;m[4]=w->air;m[5]=w->equipped;m[6]=w->hunger;m[7]=1;
   putfloat(m+8,w->time);putfloat(m+12,w->fall_speed);
@@ -64,7 +64,7 @@ static uint8_t saved_block(const uint8_t*p,const uint8_t*q,unsigned mx,unsigned 
 uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
   if(length<MC_SAVE_HEADER)return 0;
   unsigned v=get32(p+4),mx=get32(p+8),my=get32(p+12),mz=get32(p+16);
-  if(memcmp(p,"N6MC",4)||v<1||v>5||my!=MC_MAP_Y||mx!=mz||(mx!=128&&mx!=MC_MAP_X)||!get32(p+20))return 0;
+  if(memcmp(p,"N6MC",4)||v<1||v>6||my!=MC_MAP_Y||mx!=mz||(mx!=128&&mx!=MC_MAP_X)||!get32(p+20))return 0;
   unsigned bytes=mx*my*mz,base=MC_SAVE_HEADER+bytes;
   unsigned metadata=v==1?0:v==2?MC_SAVE_V2_META:v==3?MC_SAVE_V3_META:MC_SAVE_META;
   if(length!=base+metadata)return 0;
@@ -72,6 +72,9 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
   if(!range(getfloat(p+28),.28f,mx-.28f)||!range(getfloat(p+32),1,MC_MAP_Y+4)||!range(getfloat(p+36),.28f,mz-.28f)||!range(getfloat(p+40),-100,100)||!range(getfloat(p+44),-1.4f,1.4f))return 0;
   for(unsigned i=0;i<bytes;i++){unsigned b=p[MC_SAVE_HEADER+i];if(v==1?b>=9:v==2?b>=18:(b!=MC_AIR&&!MC_IsBlock(b)))return 0;}
   for(unsigned i=0;i<mx*mz;i++)if(p[MC_SAVE_HEADER+i]!=MC_BEDROCK)return 0;
+  for(unsigned i=0;i<bytes;i++)if(MC_DoorUpper(p[MC_SAVE_HEADER+i])) {
+    if(v<6 || i<mx*mz || p[MC_SAVE_HEADER+i-mx*mz]!=MC_DoorBase(p[MC_SAVE_HEADER+i]))return 0;
+  }
   if(v>=2){
     const uint8_t*m=p+base;unsigned len=v==2?MC_SAVE_V2_META:v==3?MC_SAVE_V3_META:MC_SAVE_META;
     if(get32(p+52)!=len||get32(p+48)!=MC_Crc32(m,len))return 0;
@@ -142,6 +145,10 @@ int MC_SaveDecode(MC_World*w,const uint8_t*p,unsigned length){
     MC_GenerateTerrain(w,get32(p+24));
     for(unsigned y=0;y<MC_MAP_Y;y++)for(unsigned z=0;z<mz;z++)
       memcpy(w->blocks+(y*MC_MAP_Z+z)*MC_MAP_X,p+MC_SAVE_HEADER+(y*mz+z)*mx,mx);
+  }
+  if(v<6)for(unsigned y=1;y<MC_MAP_Y-1;y++)for(unsigned z=0;z<MC_MAP_Z;z++)for(unsigned x=0;x<MC_MAP_X;x++) {
+    uint8_t b=MC_Get(w,x,y,z);
+    if((b==MC_DOOR||b==MC_DOOR_OPEN)&&MC_Get(w,x,y+1,z)==MC_AIR)MC_Set(w,x,y+1,z,b==MC_DOOR?MC_DOOR_TOP:MC_DOOR_TOP_OPEN);
   }
   w->seed=get32(p+24);w->x=getfloat(p+28);w->y=getfloat(p+32);w->z=getfloat(p+36);w->yaw=getfloat(p+40);w->pitch=getfloat(p+44);w->vy=0;w->on_ground=0;MC_NewPlayer(w,v==1);
   const uint8_t*m=p+MC_SAVE_HEADER+bytes;

@@ -104,19 +104,40 @@ int main(void)
   w.sneak=1;
   for(int i=0;i<40;i++)MC_Step(&w,1,0,.067f,0);
   assert(w.z<12.25f&&w.y>2.55f);w.sneak=0;
-  /* Doors use a thin closed slab, rotate in place when opened, and remain
-     backward-compatible because the map stores the two block IDs directly. */
-  flat(&w);MC_Set(&w,10,2,13,MC_DOOR);
+  /* Doors occupy two cells, hinge at the cell edge and keep actual panel
+     collision when open. Upper-half use and removal affect the complete door. */
+  flat(&w);MC_Set(&w,10,2,14,MC_STONE);
   w.x=10.5f;w.y=2.01f;w.z=10.5f;w.yaw=0;w.pitch=-.3f;w.on_ground=1;
-  assert(MC_IsSolid(MC_DOOR)&&!MC_IsSolid(MC_DOOR_OPEN));
-  assert(MC_Raycast(&w,&x,&y,&z,&nx,&ny,&nz,5)&&x==10&&y==2&&z==13);
-  for(int i=0;i<30;i++)MC_Step(&w,1,0,.1f,0);
-  assert(w.z>13.04f&&w.z<13.10f); /* Stop at the actual thin door plane. */
-  w.z=10.5f;assert(MC_OpenTarget(&w)&&MC_Get(&w,10,2,13)==MC_DOOR_OPEN);
-  assert(MC_Raycast(&w,&x,&y,&z,&nx,&ny,&nz,5)&&z==13);
-  w.z=10.5f;for(int i=0;i<30;i++)MC_Step(&w,1,0,.1f,0);assert(w.z>13.2f);
-  w.z=10.5f;assert(MC_OpenTarget(&w)&&MC_Get(&w,10,2,13)==MC_DOOR);
-  assert(!MC_Edit(&w,1,MC_DOOR_OPEN));
+  assert(MC_Edit(&w,1,MC_DOOR)&&MC_Get(&w,10,2,13)==MC_DOOR&&MC_Get(&w,10,3,13)==MC_DOOR_TOP);
+  assert(MC_IsSolid(MC_DOOR)&&MC_IsSolid(MC_DOOR_OPEN));
+  w.pitch=0;assert(MC_Pick(&w,400,240,&small)&&small.block==MC_DOOR_TOP);
+  assert(MC_OpenTarget(&w)&&MC_Get(&w,10,2,13)==MC_DOOR_OPEN&&MC_Get(&w,10,3,13)==MC_DOOR_TOP_OPEN);
+  assert(MC_BodyClear(&w,10.5f,2.01f,13.5f)&&!MC_BodyClear(&w,10.1f,2.01f,13.5f));
+  assert(!MC_Raycast(&w,&x,&y,&z,&nx,&ny,&nz,3));
+  w.x=10.1f;assert(MC_OpenTarget(&w)&&MC_Get(&w,10,3,13)==MC_DOOR_TOP);
+  w.x=10.5f;for(int i=0;i<30;i++)MC_Step(&w,1,0,.1f,0);
+  assert(w.z>12.67f&&w.z<12.74f);
+  MC_Set(&w,10,2,13,MC_DOOR_OPEN);MC_Set(&w,10,3,13,MC_DOOR_TOP_OPEN);
+  w.x=10.5f;w.z=13.1f;w.yaw=-1.5707963f;
+  assert(MC_OpenTarget(&w)&&MC_Get(&w,10,2,13)==MC_DOOR_OPEN&&MC_Get(&w,10,3,13)==MC_DOOR_TOP_OPEN);
+  MC_RemoveBlock(&w,10,3,13);assert(MC_Get(&w,10,2,13)==MC_AIR&&MC_Get(&w,10,3,13)==MC_AIR);
+  flat(&w);MC_Set(&w,10,2,14,MC_STONE);MC_Set(&w,10,3,13,MC_STONE);w.yaw=0;w.pitch=-.3f;
+  assert(!MC_Edit(&w,1,MC_DOOR)&&MC_Get(&w,10,2,13)==MC_AIR);
+  assert(!MC_Edit(&w,1,MC_DOOR_TOP)&&!MC_Edit(&w,1,MC_DOOR_OPEN));
+  /* Half slabs and stair treads are walked up without a jump. Full cubes
+     and low ceilings remain barriers. */
+  flat(&w);w.on_ground=1;MC_Set(&w,10,2,12,MC_SLAB);
+  float step_peak=2;for(int i=0;i<20;i++){MC_Step(&w,1,0,.05f,0);if(w.y>step_peak)step_peak=w.y;}
+  assert(w.z>12.5f&&step_peak>2.45f&&step_peak<2.55f);
+  flat(&w);w.on_ground=1;MC_Set(&w,10,2,12,MC_STAIR_SOUTH);
+  step_peak=2;for(int i=0;i<20;i++){MC_Step(&w,1,0,.05f,0);if(w.y>step_peak)step_peak=w.y;}
+  assert(w.z>12.5f&&step_peak>2.95f&&step_peak<3.05f);
+  flat(&w);w.x=10.25f;w.pitch=0;MC_Set(&w,10,3,13,MC_STAIR);MC_Set(&w,10,3,15,MC_STONE);
+  assert(MC_Pick(&w,400,240,&small)&&small.z==15);
+  MC_Set(&w,10,3,13,MC_SLAB);assert(MC_Pick(&w,400,240,&small)&&small.z==15);
+  w.x=10.1f;w.y=2.03f;MC_Set(&w,10,3,13,MC_FENCE);assert(MC_Pick(&w,400,240,&small)&&small.z==15);
+  flat(&w);w.on_ground=1;MC_Set(&w,10,2,12,MC_SLAB);for(int z0=10;z0<14;z0++)MC_Set(&w,10,4,z0,MC_STONE);
+  for(int i=0;i<20;i++){MC_Step(&w,1,0,.05f,0);}assert(w.z<11.74f&&w.y<2.02f);
   flat(&w);MC_Set(&w,10,2,10,MC_CHEST);w.y=4;
   for(int i=0;i<80;i++)MC_Step(&w,0,0,.016f,0);
   assert(fabsf(w.y-2.875f)<.01f);
@@ -176,5 +197,17 @@ int main(void)
   for(int i=0;i<10;i++) MC_Step(&w,1,0,.1f,0);
   assert(w.x>=.28f);
   assert(MC_Crc32("123456789",9)==0xcbf43926);
+  /* Cached lights must match a forced rebuild after edits and scene changes. */
+  flat(&w);MC_NewPlayer(&w,0);w.time=435;w.pitch=0;w.yaw=0;MC_Set(&w,10,3,13,MC_STONE);
+  uint16_t *frame=malloc(MC_VIEW_W*MC_VIEW_H*2);assert(frame);
+  MC_Render(&w,frame,MC_VIEW_W,MC_VIEW_H);uint32_t dark=MC_Crc32(frame,MC_VIEW_W*MC_VIEW_H*2);
+  MC_Set(&w,11,3,12,MC_TORCH);MC_Render(&w,frame,MC_VIEW_W,MC_VIEW_H);uint32_t lit=MC_Crc32(frame,MC_VIEW_W*MC_VIEW_H*2);assert(dark!=lit);
+  w.scene_serial++;MC_Render(&w,frame,MC_VIEW_W,MC_VIEW_H);assert(lit==MC_Crc32(frame,MC_VIEW_W*MC_VIEW_H*2));
+  MC_Set(&w,11,3,12,MC_AIR);MC_Render(&w,frame,MC_VIEW_W,MC_VIEW_H);assert(dark==MC_Crc32(frame,MC_VIEW_W*MC_VIEW_H*2));
+  flat(&w);MC_NewPlayer(&w,0);MC_Set(&w,10,2,13,MC_DOOR);MC_Set(&w,10,3,13,MC_DOOR_TOP);
+  w.target_valid=1;w.target=(MC_Hit){.x=10,.y=2,.z=13,.block=MC_DOOR};MC_Render(&w,frame,MC_VIEW_W,MC_VIEW_H);
+  uint32_t door_outline=MC_Crc32(frame,MC_VIEW_W*MC_VIEW_H*2);
+  w.target.y=3;w.target.block=MC_DOOR_TOP;MC_Render(&w,frame,MC_VIEW_W,MC_VIEW_H);assert(door_outline==MC_Crc32(frame,MC_VIEW_W*MC_VIEW_H*2));
+  w.target_valid=0;MC_Render(&w,frame,MC_VIEW_W,MC_VIEW_H);assert(door_outline!=MC_Crc32(frame,MC_VIEW_W*MC_VIEW_H*2));free(frame);
   free(allocation);puts("minicraft core tests: OK");return 0;
 }

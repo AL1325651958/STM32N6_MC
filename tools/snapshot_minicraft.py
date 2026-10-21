@@ -17,7 +17,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/minicraft"
-ARCHIVE_ROOT = ROOT / "out/verified-v23"
+ARCHIVE_ROOT = ROOT / "out/verified-v24"
 
 
 def digest(data):
@@ -38,7 +38,7 @@ def main():
     parser.add_argument("--benchmark-baseline", help="Git revision for optional host render comparison")
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
-    font_audit = OUT / "font-audit-v23"
+    font_audit = OUT / "font-audit-v24"
     run([sys.executable, "tools/make_minicraft_zh.py", "--font", str(OUT / "fonts/NotoSansSC.ttf"),
          "--pixel-font", str(OUT / "fonts/ark-pixel-12px-monospaced-zh_hans.ttf"),
          "--check", "--audit-dir", str(font_audit)], "snapshot-font.log")
@@ -64,7 +64,7 @@ def main():
     (OUT / "snapshot-preview-build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
     if result.returncode:
         raise SystemExit(f"preview build failed; see {OUT / 'snapshot-preview-build.log'}\n{result.stdout}{result.stderr}")
-    preview_dir = OUT / "ui-v23"
+    preview_dir = OUT / "ui-v24"
     preview_dir.mkdir(parents=True, exist_ok=True)
     result = subprocess.run([str(preview_exe), str(preview_dir)], cwd=ROOT,
                             text=True, capture_output=True, encoding="utf-8")
@@ -93,7 +93,7 @@ def main():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archive_root = ARCHIVE_ROOT / stamp
     archive_root.mkdir(parents=True, exist_ok=False)
-    source_zip = archive_root / "MiniCraft-v23-source.zip"
+    source_zip = archive_root / "MiniCraft-v24-source.zip"
     source_hashes = {}
     with zipfile.ZipFile(source_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for rel in sources:
@@ -113,7 +113,7 @@ def main():
         "MiniCraft_N6-Trusted.bin": signed,
         "MiniCraft_N6.bin": raw,
         "MiniCraft_N6.elf": elf.read_bytes(),
-        "initial-world-v5.SAV": (preview_dir / "initial-world-v5.SAV").read_bytes(),
+        "initial-world-v6.SAV": (preview_dir / "initial-world-v6.SAV").read_bytes(),
         "tests.log": tests.encode("utf-8"),
         "build.log": (OUT / "snapshot-build.log").read_bytes() if not args.skip_build else (OUT / "compile.log").read_bytes() + (OUT / "link.log").read_bytes(),
         "geometry.png": (preview_dir / "geometry.png").read_bytes(),
@@ -148,7 +148,7 @@ def main():
         (archive_root / name).write_bytes(data)
     validation = {
         "recorded_utc": stamp,
-        "version": 5,
+        "version": 6,
         "world_dimensions": [256, 64, 256],
         "save_bytes": 4195904,
         "firmware_bytes": len(raw),
@@ -168,7 +168,7 @@ def main():
         "source_hashes_verified": True,
         "geometry": "Torch stem 4/16 wide × 10/16 high; stepped flame widths 4/16, 3/16, 2/16 reaching 14/16 total height; chest 14/16; bed 9/16; sapling crossed planes.",
         "geometry_revision": 4,
-        "hardware": "Not flashed in this task. User-reported ~15 FPS refers to an earlier version; v23 native Chinese glyph LCD readability, touch, performance and actual SD read/write need board verification.",
+        "hardware": "Not flashed in this task. User-reported ~15 FPS refers to an earlier version; v24 door geometry, lever/slab interaction, on-board FPS, touch, LCD and SD migration need board verification.",
         "artifacts": {},
     }
     for name in [source_zip.name, *artifacts]:

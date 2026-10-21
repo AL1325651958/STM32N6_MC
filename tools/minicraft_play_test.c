@@ -13,6 +13,7 @@ static void scene(MC_World *w) {
 static void mine(MC_World *w,int frames){for(int i=0;i<frames;i++)MC_PlayTick(w,.1f,1,400,240);}
 static void tick(MC_World *w,int frames){for(int i=0;i<frames;i++)MC_SystemsTick(w,.1f);}
 static unsigned find(MC_World *w,unsigned item){for(unsigned i=0;i<MC_SLOTS;i++)if(w->slots[i].item==item&&w->slots[i].count)return i;assert(0);return 0;}
+static uint32_t map_crc(const uint16_t *fb){uint32_t crc=0;for(int y=97;y<184;y++)crc=(crc<<1|crc>>31)^MC_Crc32(fb+y*800+694,87*2);return crc;}
 static void select_item(MC_World *w,unsigned item){unsigned i=find(w,item);if(i>=8){MC_MoveStack(&w->slots[i],&w->slots[7],0);i=7;}w->slot=(uint8_t)i;MC_SyncInventory(w);}
 static void full(MC_World *w){for(unsigned i=0;i<MC_SLOTS;i++)w->slots[i]=(MC_Stack){MC_DIRT,64,0};MC_SyncInventory(w);}
 int main(void) {
@@ -99,6 +100,8 @@ int main(void) {
  scene(&w);assert(MC_Give(&w,MC_AXE,1));MC_Set(&w,10,3,13,MC_WOOD);mine(&w,6);assert(w.items[MC_WOOD]==1);
  scene(&w);assert(MC_Give(&w,MC_AXE,1));w.pitch=-.3f;MC_Set(&w,10,2,13,MC_DOOR);mine(&w,4);
  assert(MC_Get(&w,10,2,13)==MC_AIR&&w.items[MC_DOOR]==1);
+ scene(&w);assert(MC_Give(&w,MC_AXE,1));MC_Set(&w,10,2,13,MC_DOOR);MC_Set(&w,10,3,13,MC_DOOR_TOP);
+ mine(&w,5);assert(MC_Get(&w,10,2,13)==MC_AIR&&MC_Get(&w,10,3,13)==MC_AIR&&w.items[MC_DOOR]==1);
  /* Placement consumes exactly the selected physical stack. */
  scene(&w);assert(MC_Give(&w,MC_DIRT,65));w.slot=1;MC_Set(&w,10,3,13,MC_STONE);assert(MC_Place(&w));
  assert(w.slots[0].count==64&&!w.slots[1].count&&MC_Get(&w,10,3,12)==MC_DIRT);
@@ -410,6 +413,10 @@ int main(void) {
  uint32_t new_metrics_crc=0;
  for(int y=8;y<38;y++)new_metrics_crc^=MC_Crc32(&fb[y*800+10],578*2);
  assert(metrics_crc!=new_metrics_crc);
+ scene(&w);memset(fb,0,800*480*2);MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);uint32_t map_before=map_crc(fb);
+ MC_Set(&w,12,60,10,MC_LEAVES);memset(fb,0,800*480*2);MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);uint32_t map_after=map_crc(fb);assert(map_before!=map_after);
+ w.scene_serial++;memset(fb,0,800*480*2);MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);assert(map_after==map_crc(fb));
+ scene(&w);memset(fb,0,800*480*2);MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);assert(map_before==map_crc(fb));
 
  /* Saving feedback changes only the existing button, in the world and bag.
     The old log area remains transparent for every success/error result. */

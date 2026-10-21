@@ -65,7 +65,12 @@ void MC_UIText(uint16_t *fb,int x,int y,const char *s,uint16_t color,int compact
     if(cp>=128) {
       const MC_Hanzi *g=hanzi(cp);int edge=compact?12:16;
       if(g) {
-        for(int yy=0;yy<edge;yy++)for(int xx=0;xx<edge;xx++)
+        if(x>=0 && y>=0 && x+edge<=800 && y+edge<=480) {
+          for(int yy=0;yy<edge;yy++) {
+            unsigned bits=compact?g->small[yy]:g->large[yy];uint16_t *row=fb+(y+yy)*800+x;
+            while(bits){unsigned bit=(unsigned)__builtin_ctz(bits);row[edge-1-bit]=color;bits&=bits-1;}
+          }
+        } else for(int yy=0;yy<edge;yy++)for(int xx=0;xx<edge;xx++)
           if((compact?g->small[yy]:g->large[yy])&(1u<<(edge-1-xx)))rect(fb,x+xx,y+yy,1,1,color);
       } else{rect(fb,x,y,edge,1,color);rect(fb,x,y+edge-1,edge,1,color);}
       x+=edge;
@@ -207,7 +212,7 @@ static void icon(uint16_t *fb,int x,int y,unsigned id,int size)
 { icon_rect(fb,x,y,size,size,id); }
 static int catalog_visible(unsigned id)
 {
-  return !(id==MC_DOUBLE_SLAB || id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE || id==MC_DUST_ON || id==MC_LAMP_ON || id==MC_LEVER_ON || id==MC_BUTTON_ON || (id>=MC_STAIR_EAST && id<=MC_STAIR_WEST));
+  return !(MC_DoorUpper((uint8_t)id) || id==MC_DOUBLE_SLAB || id==MC_WATER || id==MC_BEDROCK || id==MC_DOOR_OPEN || id==MC_SLAB_TOP || id==MC_FARMLAND || id==MC_WHEAT_CROP || id==MC_WHEAT_MATURE || id==MC_DUST_ON || id==MC_LAMP_ON || id==MC_LEVER_ON || id==MC_BUTTON_ON || (id>=MC_STAIR_EAST && id<=MC_STAIR_WEST));
 }
 static unsigned catalog_count(void)
 {
@@ -334,12 +339,19 @@ static uint8_t map_surface(const MC_World *w,int x,int z)
 }
 static void mini_map(uint16_t *fb,const MC_World *w)
 {
+  static struct {const MC_World *world;const uint8_t *blocks;uint32_t serial,revision;int x,z;uint16_t colors[29*29];int valid;} cache;
   const int ox=686,oy=74,ow=104,oh=126,cx=738,cy=139,cell=3,radius=14;
   panel(fb,ox,oy,ow,oh);text(fb,722,80,"MAP",0xffe0);
   rect(fb,ox+7,oy+23,87,87,0x1082);
   int px=(int)floorf(w->x),pz=(int)floorf(w->z);
+  if(!cache.valid || cache.world!=w || cache.blocks!=w->blocks || cache.serial!=w->scene_serial ||
+     cache.revision!=w->map_revision || cache.x!=px || cache.z!=pz) {
+    for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++)
+      cache.colors[(dz+radius)*29+dx+radius]=map_color(map_surface(w,px+dx,pz+dz));
+    cache.world=w;cache.blocks=w->blocks;cache.serial=w->scene_serial;cache.revision=w->map_revision;cache.x=px;cache.z=pz;cache.valid=1;
+  }
   for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++) {
-    int wx=px+dx,wz=pz+dz;uint16_t c=map_color(map_surface(w,wx,wz));
+    uint16_t c=cache.colors[(dz+radius)*29+dx+radius];
     rect(fb,cx+dx*cell-1,cy+dz*cell-1,cell,cell,c);
   }
   /* Bed spawn and chest locations are persistent landmarks. */
@@ -388,7 +400,7 @@ static const char *block_action_hint(const MC_World *w)
   if(w->sneak || !w->target_valid)return NULL;
   unsigned b=w->target.block;
   if(b==MC_CHEST || b==MC_FURNACE || b==MC_TABLE)return "TAP OPEN";
-  if(b==MC_DOOR || b==MC_DOOR_OPEN)return "TAP TOGGLE";
+  if(MC_IsDoor((uint8_t)b))return "TAP TOGGLE";
   if(b==MC_LEVER || b==MC_LEVER_ON || b==MC_BUTTON || b==MC_BUTTON_ON)return "TAP ACTIVATE";
   if(b==MC_BED)return "TAP REST";
   return NULL;
