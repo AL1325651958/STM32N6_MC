@@ -21,6 +21,15 @@ static void rect(uint16_t *fb,int x,int y,int w,int h,uint16_t c)
 {
   for(int yy=y;yy<y+h;yy++) for(int xx=x;xx<x+w;xx++) if((unsigned)xx<800 && (unsigned)yy<480) fb[yy*800+xx]=c;
 }
+static void stroke(uint16_t *fb,int x0,int y0,int x1,int y1,int width,uint16_t c)
+{
+  int dx=x1-x0,dy=y1-y0,steps=abs(dx)>abs(dy)?abs(dx):abs(dy);
+  if(!steps){rect(fb,x0-width/2,y0-width/2,width,width,c);return;}
+  for(int i=0;i<=steps;i++) {
+    int x=x0+(dx*i)/steps,y=y0+(dy*i)/steps;
+    rect(fb,x-width/2,y-width/2,width,width,c);
+  }
+}
 static void text(uint16_t *fb,int x,int y,const char *s,uint16_t c)
 {
   for(;*s;s++,x+=12) {
@@ -104,6 +113,18 @@ static void icon_rect(uint16_t *fb,int x,int y,int width,int height,unsigned id)
     if(index)rect(fb,x+px,y+py,1,1,sprite->colors[index]);
   }
 }
+static void icon_shadow(uint16_t *fb,int x,int y,int width,int height,unsigned id)
+{
+  if(!id||id>=MC_ITEM_COUNT||width<=0||height<=0)return;
+  const MC_Icon *sprite=&mc_icons[id];
+  for(int py=0;py<height;py++)for(int px=0;px<width;px++) {
+    unsigned sx=(unsigned)px*MC_ICON_EDGE/(unsigned)width;
+    unsigned sy=(unsigned)py*MC_ICON_EDGE/(unsigned)height;
+    unsigned p=sy*MC_ICON_EDGE+sx;
+    unsigned index=(sprite->pixels[p>>1]>>(p&1?0:4))&15;
+    if(index)rect(fb,x+px+2,y+py+3,1,1,0x2104);
+  }
+}
 static void icon(uint16_t *fb,int x,int y,unsigned id,int size)
 { icon_rect(fb,x,y,size,size,id); }
 static unsigned catalog_item(unsigned index)
@@ -121,44 +142,46 @@ static void held_item(uint16_t *fb,const MC_World *w)
 {
   unsigned id=w->hotbar[w->slot];
   if(!id || id>=MC_ITEM_COUNT)return;
-  int swing=w->attack_flash>0?(int)(sinf(w->attack_flash*34.0f)*18.0f):0;
+  int swing=w->attack_flash>0?(int)(sinf((.18f-w->attack_flash)*18.0f)*18.0f):0;
   /* Handheld geometry follows the silhouette instead of scaling every icon
      to the same square.  This keeps torches and saplings slender while
      swords and tools remain readable at the 800x480 HUD resolution. */
-  int iw=70,ih=70,ix=590+swing,iy=293;
+  int iw=70,ih=70,ix=590+swing,iy=293,gx=642+swing,gy=346;
   switch(id) {
-    case MC_TORCH: iw=34;ih=66;ix=630+swing;iy=274;break;
-    case MC_SAPLING: iw=46;ih=66;ix=616+swing;iy=276;break;
-    case MC_WHEAT_SEEDS: iw=42;ih=34;ix=622+swing;iy=304;break;
-    case MC_WHEAT: iw=42;ih=76;ix=622+swing;iy=266;break;
-    case MC_STICK: iw=30;ih=72;ix=632+swing;iy=270;break;
-    case MC_APPLE: iw=48;ih=48;ix=626+swing;iy=294;break;
-    case MC_RAW_MEAT: iw=48;ih=44;ix=626+swing;iy=296;break;
-    case MC_SWORD: iw=50;ih=94;ix=618+swing;iy=255;break;
-    case MC_BOW: iw=82;ih=84;ix=588+swing;iy=270;break;
-    case MC_ARROW: iw=26;ih=76;ix=638+swing;iy=270;break;
+    case MC_TORCH: iw=26;ih=72;ix=639+swing;iy=270;gx=651+swing;gy=337;break;
+    case MC_SAPLING: iw=38;ih=70;ix=621+swing;iy=273;gx=645+swing;gy=338;break;
+    case MC_WHEAT_SEEDS: iw=36;ih=30;ix=624+swing;iy=305;gx=646+swing;gy=334;break;
+    case MC_WHEAT: iw=36;ih=78;ix=624+swing;iy=263;gx=646+swing;gy=337;break;
+    case MC_STICK: iw=24;ih=76;ix=635+swing;iy=267;gx=648+swing;gy=338;break;
+    case MC_APPLE: iw=46;ih=46;ix=627+swing;iy=292;gx=648+swing;gy=337;break;
+    case MC_RAW_MEAT: iw=46;ih=42;ix=627+swing;iy=296;gx=648+swing;gy=337;break;
+    case MC_SWORD: iw=46;ih=101;ix=620+swing;iy=246;gx=648+swing;gy=343;break;
+    case MC_BOW: iw=78;ih=84;ix=588+swing;iy=268;gx=639+swing;gy=342;break;
+    case MC_ARROW: iw=22;ih=78;ix=640+swing;iy=268;gx=650+swing;gy=340;break;
     case MC_AXE:
-    case MC_SHOVEL: iw=76;ih=80;ix=596+swing;iy=276;break;
+    case MC_SHOVEL: iw=70;ih=82;ix=599+swing;iy=274;gx=648+swing;gy=342;break;
     case MC_WOOD_PICK:
     case MC_STONE_PICK:
-    case MC_IRON_PICK: iw=82;ih=78;ix=592+swing;iy=278;break;
-    case MC_CHEST: iw=78;ih=62;ix=592+swing;iy=286;break;
-    case MC_BED: iw=82;ih=54;ix=588+swing;iy=294;break;
-    case MC_FENCE: iw=60;ih=76;ix=608+swing;iy=274;break;
-    case MC_STAIR: iw=76;ih=68;ix=600+swing;iy=282;break;
+    case MC_IRON_PICK: iw=78;ih=80;ix=594+swing;iy=276;gx=647+swing;gy=342;break;
+    case MC_CHEST: iw=72;ih=58;ix=596+swing;iy=288;gx=650+swing;gy=342;break;
+    case MC_BED: iw=78;ih=52;ix=591+swing;iy=295;gx=649+swing;gy=343;break;
+    case MC_FENCE: iw=54;ih=74;ix=611+swing;iy=275;gx=648+swing;gy=342;break;
+    case MC_STAIR: iw=70;ih=66;ix=603+swing;iy=283;gx=649+swing;gy=342;break;
     case MC_DOOR:
-    case MC_DOOR_OPEN: iw=54;ih=82;ix=614+swing;iy=274;break;
-    case MC_DUST: iw=34;ih=18;ix=632+swing;iy=318;break;
-    case MC_LAMP: iw=58;ih=58;ix=606+swing;iy=292;break;
-    case MC_LEVER: iw=34;ih=48;ix=630+swing;iy=296;break;
-    case MC_BUTTON: iw=30;ih=30;ix=632+swing;iy=306;break;
+    case MC_DOOR_OPEN: iw=50;ih=82;ix=616+swing;iy=272;gx=648+swing;gy=341;break;
+    case MC_DUST: iw=32;ih=18;ix=633+swing;iy=318;gx=649+swing;gy=340;break;
+    case MC_LAMP: iw=54;ih=54;ix=609+swing;iy=294;gx=649+swing;gy=342;break;
+    case MC_LEVER: iw=32;ih=46;ix=631+swing;iy=297;gx=649+swing;gy=340;break;
+    case MC_BUTTON: iw=28;ih=28;ix=633+swing;iy=307;gx=649+swing;gy=339;break;
     default: break;
   }
-  /* Dark outline and a warm skin-tone cuff give the icon a readable grip. */
-  rect(fb,642+swing,360,42,58,0x4208);
-  rect(fb,646+swing,357,34,61,0xd4a6);
-  rect(fb,650+swing,352,27,20,0xe6bd);
-  rect(fb,ix-3,iy-3,iw+6,ih+6,0x2104);
+  /* The forearm points at the actual grip instead of forming a detached
+     vertical block.  Keep it behind the icon so slender items remain clear. */
+  stroke(fb,716+swing,466,gx,gy+12,28,0x4208);
+  stroke(fb,713+swing,462,gx,gy+10,21,0xd4a6);
+  rect(fb,gx-13,gy-9,27,22,0xd4a6);
+  rect(fb,gx-9,gy-12,18,8,0xe6bd);
+  icon_shadow(fb,ix,iy,iw,ih,id);
   icon_rect(fb,ix,iy,iw,ih,id);
 }
 static const char *world_phase(const MC_World *w)
