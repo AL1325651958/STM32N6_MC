@@ -96,7 +96,7 @@ static void save_world(void)
   generation=next;active_slot=target;dirty=0;snprintf(saved_status,sizeof(saved_status),"SAVED TO SD  %lu MS",(unsigned long)(HAL_GetTick()-start));status=saved_status;
 }
 
-typedef struct {uint8_t active,id,role;uint16_t x,y;uint32_t action;MC_Hold hold;} Contact;
+typedef struct {uint8_t active,id,role,action_done;uint16_t x,y;uint32_t action;MC_Hold hold;} Contact;
 static Contact contacts[GT911_MAX_TOUCHES];
 
 /* Assign a role when a finger first lands; GT911 track IDs keep the two hands independent. */
@@ -129,12 +129,22 @@ static void update_contacts(const GT911_StateTypeDef *touch,uint32_t now,unsigne
         world.slot=(p->x-240)/50;*selected=world.hotbar[world.slot];
         if(MC_ToolIndex(*selected)>=0)MC_SelectItem(&world,*selected);
       }
-      /* A scene tap feeds a pointed animal, fires a bow, or attacks with a
-         held tool. Mining still begins only after a long press. */
+      /* A short scene tap is the contextual action: it feeds, attacks, fires,
+         places or uses the held item at the touched ray. Mining still begins
+         only after a long press, and a successful non-combat action locks out
+         that same finger until it is released. */
       if(c->role==MC_TOUCH_LOOK) {
-        if(MC_MobFeed(&world,p->x,p->y))dirty=1;
-        else if(world.hotbar[world.slot]==MC_BOW ? MC_Shoot(&world,p->x,p->y) :
-                (MC_ToolIndex(world.hotbar[world.slot])>=0 && MC_Attack(&world,p->x,p->y)))dirty=1;
+        unsigned held=world.hotbar[world.slot];
+        if(MC_MobFeed(&world,p->x,p->y)) { dirty=1;c->action_done=1; }
+        else if(held==MC_BOW) { if(MC_Shoot(&world,p->x,p->y))dirty=1; }
+        else if(MC_ToolIndex(held)>=0) { if(MC_Attack(&world,p->x,p->y))dirty=1; }
+        else {
+          if(MC_UseAt(&world,p->x,p->y))dirty=1;
+          /* A non-combat item owns the short tap even when its contextual
+             action is unavailable (for example, full hunger or no blocks).
+             This prevents an accidental long press from mining instead. */
+          if(held)c->action_done=1;
+        }
       }
     }
     if(c->role==MC_TOUCH_LOOK && !world.bag) {
@@ -166,13 +176,8 @@ void VoxelGame_Run(void)
       if(c->role==MC_TOUCH_MOVE) { f=(350.0f-c->y)/65;s=(c->x-110.0f)/65; }
       else if(c->role==MC_TOUCH_JUMP) jump=1;
       else if(c->role==MC_TOUCH_SNEAK) sneak=1;
-      else if(c->role==MC_TOUCH_LOOK && MC_HoldReady(&c->hold,now)) {
+      else if(c->role==MC_TOUCH_LOOK && !c->action_done && MC_HoldReady(&c->hold,now)) {
         holding=1;mine_x=c->x;mine_y=c->y;
-      }
-      else if(c->role==MC_TOUCH_PLACE && now-c->action>=250) {
-        if(MC_Use(&world)) dirty=1;
-        c->action=now;
-        if(world.bag){for(unsigned k=0;k<GT911_MAX_TOUCHES;k++)contacts[k].role=MC_TOUCH_NONE;f=s=0;holding=jump=0;break;}
       }
     }
     if(f || s || jump) dirty=1;

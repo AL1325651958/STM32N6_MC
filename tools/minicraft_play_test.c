@@ -174,7 +174,7 @@ int main(void) {
  /* The former attack button area is now scene input; weapon taps are handled
     by voxel_game.c so the right side only keeps the essential controls. */
  assert(MC_RecipeIngredient(0,1)==0&&MC_UIRole(720,170)==MC_TOUCH_LOOK&&
-        MC_UIRole(720,240)==MC_TOUCH_SNEAK&&MC_UIRole(720,300)==MC_TOUCH_PLACE);
+        MC_UIRole(720,240)==MC_TOUCH_SNEAK&&MC_UIRole(720,300)==MC_TOUCH_LOOK);
  MC_UIBagTap(&w,40,420);assert(w.creative);MC_UIBagTap(&w,750,415);assert(w.slot==7);
  MC_UIBagTap(&w,24+3*48+5,108+3*68+5);assert(w.hotbar[7]==MC_SAPLING);
  MC_UIBagTap(&w,40,420);assert(!w.creative&&w.items[MC_WOOD]==10);MC_UIBagTap(&w,320,420);assert(w.change_world);

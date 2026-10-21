@@ -353,8 +353,55 @@ static void automation_tick(MC_World *w,float dt)
     }
   }
 }
-int MC_Use(MC_World *w) {
-  if(MC_OpenTarget(w))return 1;
+static int open_target_at(MC_World *w,float sx,float sy) {
+  MC_Hit hit;
+  if(!MC_Pick(w,sx,sy,&hit))return 0;
+  int x=hit.x,y=hit.y,z=hit.z;
+  uint8_t b=hit.block;
+  w->moving_slot=255;
+  if(b==MC_LEVER || b==MC_LEVER_ON) {
+    MC_Set(w,x,y,z,b==MC_LEVER?MC_LEVER_ON:MC_LEVER);MC_RedstoneRefresh(w);
+    w->notice=b==MC_LEVER?"LEVER ON":"LEVER OFF";w->target_valid=0;w->mining=0;return 1;
+  }
+  if(b==MC_BUTTON || b==MC_BUTTON_ON) {
+    redstone_button_press(w,x,y,z);MC_RedstoneRefresh(w);
+    w->notice="BUTTON PULSE";w->target_valid=0;w->mining=0;return 1;
+  }
+  if(b==MC_DOOR || b==MC_DOOR_OPEN) {
+    if(b==MC_DOOR_OPEN) {
+      MC_Set(w,x,y,z,MC_DOOR);
+      if(!MC_BodyClear(w,w->x,w->y,w->z)) {
+        MC_Set(w,x,y,z,MC_DOOR_OPEN);w->notice="MOVE CLEAR TO CLOSE";return 1;
+      }
+    } else MC_Set(w,x,y,z,MC_DOOR_OPEN);
+    w->notice=b==MC_DOOR?"DOOR OPEN":"DOOR CLOSED";
+    w->target_valid=0;w->mining=0;return 1;
+  }
+  if(b==MC_TABLE){w->bag=1;w->recipe_requires=b;w->open_chest=w->open_furnace=255;return 1;}
+  if(b==MC_FURNACE) {
+    int fi=furnace_at(w,x,y,z);
+    if(fi<0)for(unsigned i=0;i<MC_FURNACES;i++)if(!w->furnaces[i].x){fi=(int)i;w->furnaces[i].x=x+1;w->furnaces[i].y=y+1;w->furnaces[i].z=z+1;break;}
+    if(fi<0){w->notice="MAX 6 ACTIVE FURNACES";return 1;}
+    w->open_furnace=(uint8_t)fi;w->open_chest=255;w->bag=1;w->notice="SELECT ITEM THEN INPUT OR FUEL";return 1;
+  }
+  if(b==MC_CHEST) {
+    int ci=chest_at(w,x,y,z);if(ci<0)return 0;
+    w->open_chest=(uint8_t)ci;w->open_furnace=255;w->bag=1;w->notice="SELECT INVENTORY THEN CHEST SLOT";return 1;
+  }
+  if(b==MC_BED) {
+    for(unsigned i=0;i<MC_MOBS;i++)if(w->mobs[i].health) {
+      float dx=w->mobs[i].x-w->x,dz=w->mobs[i].z-w->z;
+      if(dx*dx+dz*dz<64){w->notice="ENEMIES NEARBY  CANNOT SLEEP";return 1;}
+    }
+    w->spawn[0]=x+1;w->spawn[1]=y+1;w->spawn[2]=z+1;
+    if(w->time>=300 || w->time<25){w->time=90;w->notice="SLEPT  SPAWN POINT SET";}
+    else w->notice="SPAWN SET  SLEEP AT NIGHT";
+    return 1;
+  }
+  return 0;
+}
+int MC_UseAt(MC_World *w,float sx,float sy) {
+  if(open_target_at(w,sx,sy))return 1;
   unsigned b=w->hotbar[w->slot];
   if((b==MC_APPLE || b==MC_RAW_MEAT) && (w->health<20 || w->hunger<20) && (w->creative || w->items[b])) {
     if(!w->creative){MC_Stack *s=&w->slots[w->slot];if(!--s->count)memset(s,0,sizeof(*s));}
@@ -362,7 +409,7 @@ int MC_Use(MC_World *w) {
     w->hunger=(uint8_t)fminf(20,w->hunger+(b==MC_APPLE?6:5));w->notice=b==MC_APPLE?"ATE APPLE":"ATE RAW MEAT";return 1;
   }
   if(b==MC_SHOVEL) {
-    MC_Hit h;if(MC_Pick(w,400,240,&h) && (h.block==MC_GRASS||h.block==MC_DIRT) && MC_Get(w,h.x,h.y+1,h.z)==MC_AIR) {
+    MC_Hit h;if(MC_Pick(w,sx,sy,&h) && (h.block==MC_GRASS||h.block==MC_DIRT) && MC_Get(w,h.x,h.y+1,h.z)==MC_AIR) {
       MC_Set(w,h.x,h.y,h.z,MC_FARMLAND);
       if(!w->creative) { MC_Stack *s=&w->slots[w->slot]; if(s->wear && !--s->wear){memset(s,0,sizeof(*s));w->equipped=0;w->notice="SHOVEL BROKE";} MC_SyncInventory(w); }
       w->notice="TILLED SOIL";return 1;
@@ -370,7 +417,7 @@ int MC_Use(MC_World *w) {
     w->notice="TILL GRASS OR DIRT";return 0;
   }
   if(b==MC_WHEAT_SEEDS) {
-    MC_Hit h;if(MC_Pick(w,400,240,&h) && h.block==MC_FARMLAND && MC_Get(w,h.x,h.y+1,h.z)==MC_AIR) {
+    MC_Hit h;if(MC_Pick(w,sx,sy,&h) && h.block==MC_FARMLAND && MC_Get(w,h.x,h.y+1,h.z)==MC_AIR) {
       int gi=-1;for(unsigned i=0;i<MC_GROWERS;i++)if(!w->growers[i].x){gi=(int)i;break;}
       if(gi<0){w->notice="MAX 16 CROPS";return 0;}
       MC_Set(w,h.x,h.y+1,h.z,MC_WHEAT_CROP);w->growers[gi]=(MC_Grower){h.x+1,h.y+2,h.z+1,0};
@@ -379,15 +426,17 @@ int MC_Use(MC_World *w) {
     w->notice="PLANT ON TILLED SOIL";return 0;
   }
   if(MC_ToolIndex(b)>=0){MC_SelectItem(w,b);return 0;}
-  return MC_Place(w);
+  return MC_PlaceAt(w,sx,sy);
 }
-int MC_Place(MC_World *w) {
+int MC_Use(MC_World *w) { return MC_UseAt(w,400,240); }
+int MC_Place(MC_World *w) { return MC_PlaceAt(w,400,240); }
+int MC_PlaceAt(MC_World *w,float sx,float sy) {
   unsigned b=w->hotbar[w->slot];
   if(!MC_IsBlock(b) || map_only(b) || b==MC_BEDROCK || b==MC_WATER || b==MC_DOOR_OPEN || b==MC_SLAB_TOP)return 0;
   if(!w->creative && !w->items[b]){w->notice="NO BLOCKS";return 0;}
   int x,y,z,nx,ny,nz,ci=-1,fi=-1,gi=-1;
   MC_Hit hit;
-  if(!MC_Pick(w,400,240,&hit))return 0;
+  if(!MC_Pick(w,sx,sy,&hit))return 0;
   x=hit.x;y=hit.y;z=hit.z;nx=hit.nx;ny=hit.ny;nz=hit.nz;
   x+=nx;y+=ny;z+=nz;
   if((b==MC_DUST||b==MC_LEVER||b==MC_BUTTON) &&
@@ -687,51 +736,7 @@ void MC_SystemsTick(MC_World *w,float dt) {
     memset(g,0,sizeof(*g));
   }
 }
-int MC_OpenTarget(MC_World *w) {
-  int x,y,z,nx,ny,nz;if(!MC_Raycast(w,&x,&y,&z,&nx,&ny,&nz,4))return 0;
-  uint8_t b=MC_Get(w,x,y,z);w->moving_slot=255;
-  if(b==MC_LEVER || b==MC_LEVER_ON) {
-    MC_Set(w,x,y,z,b==MC_LEVER?MC_LEVER_ON:MC_LEVER);MC_RedstoneRefresh(w);
-    w->notice=b==MC_LEVER?"LEVER ON":"LEVER OFF";w->target_valid=0;w->mining=0;return 1;
-  }
-  if(b==MC_BUTTON || b==MC_BUTTON_ON) {
-    redstone_button_press(w,x,y,z);MC_RedstoneRefresh(w);
-    w->notice="BUTTON PULSE";w->target_valid=0;w->mining=0;return 1;
-  }
-  if(b==MC_DOOR || b==MC_DOOR_OPEN) {
-    if(b==MC_DOOR_OPEN) {
-      MC_Set(w,x,y,z,MC_DOOR);
-      if(!MC_BodyClear(w,w->x,w->y,w->z)) {
-        MC_Set(w,x,y,z,MC_DOOR_OPEN);w->notice="MOVE CLEAR TO CLOSE";return 1;
-      }
-    } else MC_Set(w,x,y,z,MC_DOOR_OPEN);
-    w->notice=b==MC_DOOR?"DOOR OPEN":"DOOR CLOSED";
-    w->target_valid=0;w->mining=0;
-    return 1;
-  }
-  if(b==MC_TABLE){w->bag=1;w->recipe_requires=b;w->open_chest=w->open_furnace=255;return 1;}
-  if(b==MC_FURNACE) {
-    int fi=furnace_at(w,x,y,z);
-    if(fi<0)for(unsigned i=0;i<MC_FURNACES;i++)if(!w->furnaces[i].x){fi=(int)i;w->furnaces[i].x=x+1;w->furnaces[i].y=y+1;w->furnaces[i].z=z+1;break;}
-    if(fi<0){w->notice="MAX 6 ACTIVE FURNACES";return 1;}
-    w->open_furnace=(uint8_t)fi;w->open_chest=255;w->bag=1;w->notice="SELECT ITEM THEN INPUT OR FUEL";return 1;
-  }
-  if(b==MC_CHEST) {
-    int ci=chest_at(w,x,y,z);if(ci<0)return 0;
-    w->open_chest=(uint8_t)ci;w->open_furnace=255;w->bag=1;w->notice="SELECT INVENTORY THEN CHEST SLOT";return 1;
-  }
-  if(b==MC_BED) {
-    for(unsigned i=0;i<MC_MOBS;i++)if(w->mobs[i].health) {
-      float dx=w->mobs[i].x-w->x,dz=w->mobs[i].z-w->z;
-      if(dx*dx+dz*dz<64){w->notice="ENEMIES NEARBY  CANNOT SLEEP";return 1;}
-    }
-    w->spawn[0]=x+1;w->spawn[1]=y+1;w->spawn[2]=z+1;
-    if(w->time>=300 || w->time<25){w->time=90;w->notice="SLEPT  SPAWN POINT SET";}
-    else w->notice="SPAWN SET  SLEEP AT NIGHT";
-    return 1;
-  }
-  return 0;
-}
+int MC_OpenTarget(MC_World *w) { return open_target_at(w,400,240); }
 int MC_ContainerTap(MC_World *w,unsigned slot) {
   MC_Stack *src=&w->slots[w->selected_slot];
   if(w->open_chest<MC_CHESTS && slot<MC_CHEST_SLOTS) {

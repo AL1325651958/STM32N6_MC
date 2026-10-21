@@ -131,8 +131,12 @@ void MC_Hurt(MC_World *w,unsigned damage);
 void MC_NewPlayer(MC_World *w, int legacy);
 void MC_PlayTick(MC_World *w, float dt, int holding, float x, float y);
 int MC_Place(MC_World *w);
+/* Touch-friendly variants use the screen ray that was tapped.  The legacy
+   wrappers below keep the centered crosshair behavior for existing callers. */
+int MC_PlaceAt(MC_World *w,float x,float y);
 int MC_Craft(MC_World *w, unsigned recipe);
 int MC_Use(MC_World *w);
+int MC_UseAt(MC_World *w,float x,float y);
 int MC_Give(MC_World *w,unsigned item,unsigned count);
 int MC_DropSpawn(MC_World *w,unsigned item,unsigned count,float x,float y,float z);
 void MC_SyncInventory(MC_World *w);

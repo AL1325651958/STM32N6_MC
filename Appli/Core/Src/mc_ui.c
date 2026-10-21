@@ -39,7 +39,6 @@ int MC_UIRole(unsigned x,unsigned y)
 {
   if(x>=700 && y<66)return MC_TOUCH_SAVE;
   if(x>=600 && x<690 && y<66)return MC_TOUCH_BAG;
-  if(x>=690 && y>=288 && y<350)return MC_TOUCH_PLACE;
   if(x>=690 && y>=216 && y<278)return MC_TOUCH_SNEAK;
   if(x>=690 && y>=360 && y<422)return MC_TOUCH_JUMP;
   if(x>=240 && x<640 && y>=424)return MC_TOUCH_SELECT;
@@ -161,13 +160,6 @@ static void held_item(uint16_t *fb,const MC_World *w)
   rect(fb,650+swing,352,27,20,0xe6bd);
   rect(fb,ix-3,iy-3,iw+6,ih+6,0x2104);
   icon_rect(fb,ix,iy,iw,ih,id);
-}
-/* This is the one explicit scene action control.  Combat is deliberately
-   absent: a tap on the scene attacks with a held weapon. */
-static const char *scene_action(const MC_World *w)
-{
-  unsigned id=w->hotbar[w->slot];
-  return MC_IsBlock(id)?"PLACE":"USE";
 }
 static const char *world_phase(const MC_World *w)
 { return sinf(w->time*(6.2831853f/600))<=-.38f?"NIGHT":"DAY"; }
@@ -329,7 +321,9 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     for(int yy=-78;yy<=78;yy++)for(int xx=-78;xx<=78;xx++){int d=xx*xx+yy*yy;if(d<78*78&&d>74*74)fb[(350+yy)*800+110+xx]=0xc638;}
     int jx=110+(int)(fmaxf(-1,fminf(1,strafe))*45),jy=350-(int)(fmaxf(-1,fminf(1,move))*45);
     rect(fb,jx-10,jy-10,20,20,0xffe0);text(fb,86,444,"MOVE",0xffff);
-    panel(fb,690,288,100,62);text(fb,710,312,scene_action(w),0xffff);
+    /* Scene taps are the contextual action.  The held item is visible at
+       lower right, so no second PLACE/USE button is needed. */
+    small(fb,690,288,MC_IsBlock(w->hotbar[w->slot])?"TAP PLACE":"TAP ACTION",0xffe0);
     panel(fb,690,216,100,62);text(fb,710,228,"SNEAK",w->sneak?0x07e0:0xffff);small(fb,700,258,w->sneak?"EDGE GUARD":"HOLD TO SNEAK",0xffe0);
     panel(fb,690,360,100,62);text(fb,716,384,"JUMP",0xffff);
     for(unsigned i=0;i<MC_HOTBAR;i++){MC_Stack s=w->creative?(MC_Stack){w->hotbar[i],1,0}:w->slots[i];stack(fb,240+i*50,424,50,56,&s,i==w->slot,w->creative);}
