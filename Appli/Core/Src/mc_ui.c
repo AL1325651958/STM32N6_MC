@@ -383,8 +383,20 @@ static void crop_hint(uint16_t *fb,const MC_World *w)
   }
   panel(fb,280,300,240,26);small(fb,290,309,hint,color);
 }
-static const char *scene_action_hint(unsigned item)
+static const char *block_action_hint(const MC_World *w)
 {
+  if(w->sneak || !w->target_valid)return NULL;
+  unsigned b=w->target.block;
+  if(b==MC_CHEST || b==MC_FURNACE || b==MC_TABLE)return "TAP OPEN";
+  if(b==MC_DOOR || b==MC_DOOR_OPEN)return "TAP TOGGLE";
+  if(b==MC_LEVER || b==MC_LEVER_ON || b==MC_BUTTON || b==MC_BUTTON_ON)return "TAP ACTIVATE";
+  if(b==MC_BED)return "TAP REST";
+  return NULL;
+}
+static const char *scene_action_hint(const MC_World *w)
+{
+  const char *context=block_action_hint(w);if(context)return context;
+  unsigned item=w->hotbar[w->slot];
   if(item==MC_BOW)return "TAP SHOOT";
   if(item==MC_SHOVEL)return "TAP TILL";
   if(item==MC_WHEAT)return "TAP FEED";
@@ -489,7 +501,8 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     unsigned held=w->hotbar[w->slot];
     uint16_t action_color=held==MC_BOW?0xfca0:held==MC_WHEAT?0x07e0:
       (held==MC_SWORD||held==MC_AXE||held==MC_WOOD_PICK||held==MC_STONE_PICK||held==MC_IRON_PICK)?0xf9a4:0xffe0;
-    small(fb,690,288,scene_action_hint(held),action_color);
+    if(block_action_hint(w))action_color=0xffff;
+    small(fb,690,288,scene_action_hint(w),action_color);
     panel(fb,690,216,100,62);text(fb,724,228,"SNEAK",w->sneak?0x07e0:0xffff);small(fb,700,258,w->sneak?"EDGE GUARD":"HOLD TO SNEAK",0xffe0);
     panel(fb,690,360,100,62);text(fb,724,384,"JUMP",0xffff);
     for(unsigned i=0;i<MC_HOTBAR;i++){MC_Stack s=w->creative?(MC_Stack){w->hotbar[i],1,0}:w->slots[i];stack(fb,240+i*50,424,50,56,&s,i==w->slot,w->creative);}

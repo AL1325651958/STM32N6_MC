@@ -79,6 +79,17 @@ int main(void)
   w.experience=0;w.level=0;
   MC_Set(&w,10,3,12,MC_STONE);w.attack_cooldown=0;assert(MC_PickMob(&w,400,240,4,&d)<0);
   assert(!MC_Attack(&w,400,240));MC_Set(&w,10,3,12,MC_AIR);
+  /* Scene dispatch hits a foreground mob before a usable block, but cannot
+     hit through that block. Empty-hand taps also deal their defined damage. */
+  arena(&w);MC_Set(&w,10,3,14,MC_TABLE);
+  w.mobs[0]=(MC_Mob){10.5f,2.01f,12.5f,0,0,0,12,1,0,0};
+  assert(!MC_SceneTap(&w,400,240)&&w.mobs[0].health==11&&!w.bag);
+  MC_Set(&w,10,3,11,MC_TABLE);w.attack_cooldown=0;
+  assert(MC_SceneTap(&w,400,240)&&w.bag&&w.mobs[0].health==11);
+  MC_CloseBag(&w);MC_Set(&w,10,3,11,MC_AIR);
+  w.bag=1;assert(!MC_SceneTap(&w,400,240)&&w.mobs[0].health==11);w.bag=0;
+  /* Restore the weapon/inventory used by the following feeding tests. */
+  arena(&w);assert(MC_Give(&w,MC_SWORD,1));
   /* Wheat attracts passive animals and two fed animals produce one child.
      This uses the scene tap path and keeps the fixed four-animal budget. */
   memset(w.mobs,0,sizeof(w.mobs));w.yaw=0;w.pitch=0;w.time=90;

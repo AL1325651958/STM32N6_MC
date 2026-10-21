@@ -440,9 +440,9 @@ static int open_target_at(MC_World *w,float sx,float sy) {
     w->open_chest=(uint8_t)ci;w->open_furnace=255;w->bag=1;w->notice="SELECT INVENTORY THEN CHEST SLOT";return 1;
   }
   if(b==MC_BED) {
-    for(unsigned i=0;i<MC_MOBS;i++)if(w->mobs[i].health) {
-      float dx=w->mobs[i].x-w->x,dz=w->mobs[i].z-w->z;
-      if(dx*dx+dz*dz<64){w->notice="ENEMIES NEARBY  CANNOT SLEEP";return 1;}
+    for(unsigned i=0;i<MC_MOBS;i++)if(w->mobs[i].health&&!w->mobs[i].type) {
+      float dx=w->mobs[i].x-w->x,dy=w->mobs[i].y-w->y,dz=w->mobs[i].z-w->z;
+      if(dx*dx+dy*dy+dz*dz<64){w->notice="ENEMIES NEARBY  CANNOT SLEEP";return 1;}
     }
     w->spawn[0]=x+1;w->spawn[1]=y+1;w->spawn[2]=z+1;
     if(w->time>=300 || w->time<25){w->time=90;w->notice="SLEPT  SPAWN POINT SET";}
@@ -458,7 +458,7 @@ unsigned MC_FoodHunger(unsigned item) {
   return item==MC_APPLE?6:item==MC_RAW_MEAT?5:item==MC_BREAD?8:item==MC_COOKED_MEAT?10:0;
 }
 int MC_UseAt(MC_World *w,float sx,float sy) {
-  if(open_target_at(w,sx,sy))return 1;
+  if(!w->sneak && open_target_at(w,sx,sy))return 1;
   unsigned b=w->hotbar[w->slot];
   if(MC_FoodHunger(b) && (w->health<20 || w->hunger<20) && (w->creative || w->items[b])) {
     if(!w->creative){MC_Stack *s=&w->slots[w->slot];if(!--s->count)memset(s,0,sizeof(*s));}
@@ -486,11 +486,19 @@ int MC_UseAt(MC_World *w,float sx,float sy) {
   return MC_PlaceAt(w,sx,sy);
 }
 int MC_SceneTap(MC_World *w,float x,float y) {
+  if(w->bag)return 0;
   unsigned held=w->hotbar[w->slot];
   if(MC_MobFeed(w,x,y))return 1;
+  /* A visible entity takes priority over a block behind it. Otherwise tools
+     can operate doors/containers without selecting an empty hand first.
+     Sneaking deliberately bypasses block use for building against it. */
+  if(MC_PickMob(w,x,y,3.5f,0)>=0) {
+    if(held==MC_BOW)MC_Shoot(w,x,y);else MC_Attack(w,x,y);
+    return 0;
+  }
+  if(!w->sneak && open_target_at(w,x,y))return 1;
   if(held==MC_BOW){MC_Shoot(w,x,y);return 0;}
   if(held==MC_SHOVEL) {
-    if(MC_PickMob(w,x,y,3.5f,0)>=0){MC_Attack(w,x,y);return 0;}
     return MC_UseAt(w,x,y);
   }
   if(MC_ToolIndex(held)>=0){MC_Attack(w,x,y);return 0;}

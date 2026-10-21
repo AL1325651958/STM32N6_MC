@@ -19,7 +19,8 @@ int main(int argc,char **argv)
   const char *variants[]={"preview","night","inventory","mining","chest","furnace","creative","geometry","farming","combat","ruins",
     "action_attack","action_shoot","action_feed","action_place","action_use",
     "crop_dry","crop_dark","crop_growing","crop_ready","action_eat","main_menu","create_world","slab_merge","cave_threat","cave_lit",
-    "save_busy","save_ok","save_no_sd","save_locked","save_write_failed","save_verify_failed","creative_page1","creative_page2"};
+    "save_busy","save_ok","save_no_sd","save_locked","save_write_failed","save_verify_failed","creative_page1","creative_page2",
+    "tool_interact","sneak_build","tool_chest_open"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -110,6 +111,16 @@ int main(int argc,char **argv)
       MC_Generate(&w,0x20261020);MC_SetMode(&w,1);w.bag=1;w.slot=7;
       if(k==33)MC_UIBagTap(&w,100,90);
       w.notice="SELECT HOTBAR SLOT THEN CATALOG ITEM";
+    }
+    if(k>=34) {
+      memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+      for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++)MC_Set(&w,x,1,z,MC_GRASS);
+      MC_Set(&w,12,2,12,MC_CHEST);w.chest_map[0][0]=13;w.chest_map[0][1]=3;w.chest_map[0][2]=13;
+      w.chest_blocks[0][0]=(MC_Stack){MC_WOOD,32,0};w.chest_blocks[0][1]=(MC_Stack){MC_COAL,8,0};
+      w.x=12.5f;w.y=2.01f;w.z=8.5f;w.yaw=0;w.pitch=-.28f;w.sneak=k==35;
+      MC_Give(&w,k==35?MC_DIRT:MC_SWORD,k==35?16:1);w.notice=NULL;
+      w.target_valid=MC_Pick(&w,400,240,&w.target);assert(w.target_valid&&w.target.block==MC_CHEST);
+      if(k==36)assert(MC_SceneTap(&w,400,240)&&w.bag&&w.open_chest==0);
     }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];

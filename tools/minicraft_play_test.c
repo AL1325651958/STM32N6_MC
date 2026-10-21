@@ -217,6 +217,41 @@ int main(void) {
  assert(MC_Get(&w,10,4,13)==MC_WHEAT_CROP&&w.growers[0].y==5);
  tick(&w,760);assert(MC_Get(&w,10,4,13)==MC_WHEAT_MATURE);
  /* Bed night skip, safe respawn and survival food/oxygen/death. */
+ /* Scene taps use interactive blocks with any tool in hand. These are the
+    firmware's real tap dispatcher, not direct calls to the use helper. */
+ const unsigned interaction_tools[]={0,MC_WOOD_PICK,MC_STONE_PICK,MC_IRON_PICK,MC_AXE,MC_SHOVEL,MC_SWORD,MC_BOW};
+ const unsigned interaction_blocks[]={MC_TABLE,MC_CHEST,MC_FURNACE,MC_DOOR,MC_LEVER,MC_BUTTON,MC_BED};
+ for(unsigned t=0;t<sizeof(interaction_tools)/sizeof(interaction_tools[0]);t++)
+ for(unsigned b=0;b<sizeof(interaction_blocks)/sizeof(interaction_blocks[0]);b++) {
+   scene(&w);if(interaction_tools[t])assert(MC_Give(&w,interaction_tools[t],1));
+   MC_Set(&w,10,3,13,(uint8_t)interaction_blocks[b]);w.pitch=-.15f;w.time=435;
+   if(interaction_blocks[b]==MC_CHEST){w.chest_map[0][0]=11;w.chest_map[0][1]=4;w.chest_map[0][2]=14;}
+   MC_Stack before[MC_SLOTS];memcpy(before,w.slots,sizeof(before));
+   assert(MC_Pick(&w,400,240,&hit)&&hit.block==interaction_blocks[b]);
+   assert(MC_SceneTap(&w,400,240));assert(!memcmp(before,w.slots,sizeof(before)));
+   assert(!w.projectiles[0].active&&!w.attack_cooldown);
+   if(interaction_blocks[b]==MC_TABLE)assert(w.bag&&w.recipe_requires==MC_TABLE);
+   if(interaction_blocks[b]==MC_CHEST)assert(w.bag&&w.open_chest==0);
+   if(interaction_blocks[b]==MC_FURNACE)assert(w.bag&&w.open_furnace<MC_FURNACES);
+   if(interaction_blocks[b]==MC_DOOR)assert(MC_Get(&w,10,3,13)==MC_DOOR_OPEN);
+   if(interaction_blocks[b]==MC_LEVER)assert(MC_Get(&w,10,3,13)==MC_LEVER_ON);
+   if(interaction_blocks[b]==MC_BUTTON)assert(MC_Get(&w,10,3,13)==MC_BUTTON_ON);
+   if(interaction_blocks[b]==MC_BED)assert(w.time==90&&w.spawn[2]==14);
+ }
+ /* Sneaking builds against a container, ordinary taps open it. */
+ scene(&w);assert(MC_Give(&w,MC_DIRT,2));MC_Set(&w,10,3,13,MC_CHEST);
+ w.chest_map[0][0]=11;w.chest_map[0][1]=4;w.chest_map[0][2]=14;
+ assert(MC_SceneTap(&w,400,240)&&w.bag&&w.items[MC_DIRT]==2);MC_CloseBag(&w);
+ w.sneak=1;assert(MC_SceneTap(&w,400,240)&&!w.bag&&w.items[MC_DIRT]==1&&MC_Get(&w,10,3,12)==MC_DIRT);
+ scene(&w);assert(MC_Give(&w,MC_BOW,1)&&MC_Give(&w,MC_ARROW,2));
+ MC_Set(&w,11,3,13,MC_CHEST);w.chest_map[0][0]=12;w.chest_map[0][1]=4;w.chest_map[0][2]=14;
+ assert(MC_SceneTap(&w,600,280)&&w.bag&&w.items[MC_ARROW]==2);MC_CloseBag(&w);
+ w.sneak=1;assert(!MC_SceneTap(&w,600,280)&&w.projectiles[0].active&&w.items[MC_ARROW]==1&&!w.bag);
+ /* Animals do not block rest; only hostiles within the 3D safety radius do. */
+ scene(&w);MC_Set(&w,10,3,13,MC_BED);w.pitch=-.15f;w.time=435;
+ w.mobs[0]=(MC_Mob){13,2,10,0,0,0,8,1,1,0};assert(MC_SceneTap(&w,400,240)&&w.time==90);
+ w.mobs[0].type=0;w.time=435;assert(MC_SceneTap(&w,400,240)&&w.time==435);
+ w.mobs[0].y=12;assert(MC_SceneTap(&w,400,240)&&w.time==90);
  scene(&w);MC_Set(&w,10,3,13,MC_BED);w.pitch=-.15f;w.time=435;assert(MC_Use(&w)&&w.time==90&&w.spawn[2]==14);w.time=150;assert(MC_Use(&w)&&w.time==150);
  MC_Respawn(&w);assert(w.x>9&&w.x<15&&w.z>10&&w.z<16);
  scene(&w);assert(MC_Give(&w,MC_APPLE,3));w.health=12;w.hunger=8;
@@ -335,6 +370,16 @@ int main(void) {
    for(int yy=0;yy<8;yy++)memcpy(&action_pixels[a][yy*100],&fb[(288+yy)*800+690],100*sizeof(*fb));
  }
  for(unsigned a=1;a<7;a++)assert(memcmp(action_pixels[0],action_pixels[a],sizeof(action_pixels[0]))!=0);
+ /* Context hints agree with tap dispatch: tools show OPEN at a workbench;
+    holding sneak restores the selected item's action. */
+ scene(&w);assert(MC_Give(&w,MC_SWORD,1));MC_Set(&w,10,3,13,MC_TABLE);
+ w.target_valid=MC_Pick(&w,400,240,&w.target);assert(w.target_valid);
+ memset(fb,0,800*480*sizeof(*fb));MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);
+ uint16_t open_hint[100*12];
+ for(int y=0;y<12;y++)memcpy(open_hint+y*100,&fb[(288+y)*800+690],100*2);
+ w.sneak=1;memset(fb,0,800*480*sizeof(*fb));MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);
+ int context_changed=0;for(int y=0;y<12;y++)if(memcmp(open_hint+y*100,&fb[(288+y)*800+690],100*2))context_changed=1;
+ assert(context_changed);
  /* The crop hint responds to irrigation without another action button. */
  scene(&w);MC_Set(&w,10,3,13,MC_FARMLAND);MC_Set(&w,10,4,13,MC_WHEAT_CROP);w.pitch=.25f;
  w.growers[0]=(MC_Grower){11,5,14,30};w.target_valid=MC_Pick(&w,400,240,&w.target);

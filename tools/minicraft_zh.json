@@ -275,5 +275,9 @@
   "READ ONLY": "只读",
   "WRITE FAILED": "写入失败",
   "VERIFY FAILED": "校验失败",
-  "CATALOG %u-%u  NEXT": "物品 %u-%u 点击翻页"
+  "CATALOG %u-%u  NEXT": "物品 %u-%u 点击翻页",
+  "TAP OPEN": "点按打开",
+  "TAP TOGGLE": "点按开关",
+  "TAP ACTIVATE": "点按启动",
+  "TAP REST": "点按休息"
 }
