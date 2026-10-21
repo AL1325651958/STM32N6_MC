@@ -396,3 +396,7 @@ Appli/Core/Inc/mc_zh.h
 tools/make_minicraft_zh.py
 tools/minicraft_zh.json
 assets/minicraft/NotoSansSC-OFL.txt
+assets/minicraft/ArkPixel-OFL.txt
+tools/minicraft_font_sources.json
+tools/minicraft_font_test.c
+docs/MINICRAFT_FONT_AUDIT.md

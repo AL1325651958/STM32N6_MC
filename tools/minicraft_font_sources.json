@@ -1,0 +1,13 @@
+{
+  "noto": {
+    "file": "NotoSansSC.ttf",
+    "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf",
+    "sha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da"
+  },
+  "ark12": {
+    "file": "ark-pixel-12px-monospaced-zh_hans.ttf",
+    "url": "https://github.com/TakWolf/ark-pixel-font/releases/download/2026.10.16/ark-pixel-font-12px-monospaced-ttf-v2026.10.16.zip",
+    "zip_member": "ark-pixel-12px-monospaced-zh_hans.ttf",
+    "sha256": "56e82b4fa83e9e7bc586da288a7eb0481f8bc1f1fa8ecc6ad952781c8c0e366a"
+  }
+}

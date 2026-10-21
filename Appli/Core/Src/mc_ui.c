@@ -57,7 +57,7 @@ static const MC_Hanzi *hanzi(unsigned cp)
   while(lo<hi){unsigned mid=(lo+hi)/2;if(mc_hanzi[mid].codepoint==cp)return &mc_hanzi[mid];if(mc_hanzi[mid].codepoint>cp)hi=mid;else lo=mid+1;}
   return NULL;
 }
-static void draw_text(uint16_t *fb,int x,int y,const char *s,uint16_t color,int compact)
+void MC_UIText(uint16_t *fb,int x,int y,const char *s,uint16_t color,int compact)
 {
   const unsigned char *p=(const unsigned char *)MC_Localize(s);
   while(*p) {
@@ -81,7 +81,7 @@ static void draw_text(uint16_t *fb,int x,int y,const char *s,uint16_t color,int 
   }
 }
 static void text(uint16_t *fb,int x,int y,const char *s,uint16_t color)
-{draw_text(fb,x,y,s,color,0);}
+{MC_UIText(fb,x,y,s,color,0);}
 static void panel(uint16_t *fb,int x,int y,int w,int h)
 {
   for(int yy=y;yy<y+h;yy++) for(int xx=x;xx<x+w;xx++) fb[yy*800+xx]=(fb[yy*800+xx]>>1)&0x7bef;
@@ -101,7 +101,7 @@ int MC_UIRole(unsigned x,unsigned y)
 
 /* Small text is used only in the inventory; controls retain the 2x font. */
 static void small(uint16_t *fb,int x,int y,const char *s,uint16_t color)
-{draw_text(fb,x,y,s,color,1);}
+{MC_UIText(fb,x,y,s,color,1);}
 int MC_MenuTap(unsigned x,unsigned y,int creating)
 {
   if(x<200 || x>=600)return MC_MENU_NONE;
