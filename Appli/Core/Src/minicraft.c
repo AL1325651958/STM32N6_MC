@@ -490,6 +490,41 @@ static int trace(const MC_World *w,float dx,float dy,float dz,float reach,Hit *h
   }
   return 0;
 }
+int MC_BlockSegment(const MC_World *w,float px,float py,float pz,float ex,float ey,float ez,float *fraction)
+{
+  float d[3]={ex-px,ey-py,ez-pz};
+  if(!isfinite(px)||!isfinite(py)||!isfinite(pz)||!isfinite(ex)||!isfinite(ey)||!isfinite(ez))return 0;
+  /* Arrows outside the playable volume hit its boundary, including launches
+     inside a wall. Limit casts to map-sized coordinates before conversion. */
+  if(px<0||px>=MC_MAP_X||pz<0||pz>=MC_MAP_Z||py<0) {if(fraction)*fraction=0;return 1;}
+  if(py>MC_MAP_Y+128 || fabsf(ex-px)>MC_MAP_X || fabsf(ey-py)>MC_MAP_Y || fabsf(ez-pz)>MC_MAP_Z)return 0;
+  int x=(int)floorf(px),y=(int)floorf(py),z=(int)floorf(pz);
+  int sx=d[0]<0?-1:1,sy=d[1]<0?-1:1,sz=d[2]<0?-1:1;
+  float ix=fabsf(d[0])>1e-7f?1/fabsf(d[0]):1e30f,iy=fabsf(d[1])>1e-7f?1/fabsf(d[1]):1e30f,iz=fabsf(d[2])>1e-7f?1/fabsf(d[2]):1e30f;
+  float tx=(d[0]<0?px-x:x+1-px)*ix,ty=(d[1]<0?py-y:y+1-py)*iy,tz=(d[2]<0?pz-z:z+1-pz)*iz;
+  for(float t=0;t<=1;) {
+    float end=fminf(1,fminf(tx,fminf(ty,tz))),best=2;
+    /* Fence posts extend into the cell above their base. */
+    for(int below=0;below<2;below++) {
+      uint8_t b=MC_Get(w,x,y-below,z);
+      if(!MC_IsSolid(b)||(below&&b!=MC_FENCE))continue;
+      float p[3]={px-x,py-y+below,pz-z},lo[3],hi[3];
+      const MC_Part *parts;unsigned count=parts_for(b,&parts);
+      if(!count){bounds(b,lo,hi);count=1;}
+      for(unsigned part=0;part<count;part++) {
+        const float *a=parts?parts[part].lo:lo,*v=parts?parts[part].hi:hi;
+        float q[3]={p[0]+d[0]*t,p[1]+d[1]*t,p[2]+d[2]*t},hit;int hx,hy,hz;
+        if(q[0]>=a[0]&&q[0]<=v[0]&&q[1]>=a[1]&&q[1]<=v[1]&&q[2]>=a[2]&&q[2]<=v[2])best=t;
+        else if(box_hit(a,v,p,d,t,end,&hit,&hx,&hy,&hz)&&hit<best)best=hit;
+      }
+    }
+    if(best<=1){if(fraction)*fraction=fmaxf(0,best);return 1;}
+    if(tx<=ty&&tx<=tz){x+=sx;t=tx;tx+=ix;}
+    else if(ty<=tz){y+=sy;t=ty;ty+=iy;}
+    else{z+=sz;t=tz;tz+=iz;}
+  }
+  return 0;
+}
 int MC_Raycast(const MC_World *w,int *x,int *y,int *z,int *nx,int *ny,int *nz,float reach)
 {
   Hit h;

@@ -275,7 +275,8 @@ int main(void) {
  for(int i=0;i<8;i++)MC_ProjectilesTick(&w,.1f);
  for(unsigned i=0;i<MC_PROJECTILES;i++)assert(!w.projectiles[i].active);
  scene(&w);assert(MC_Give(&w,MC_BOW,1)&&MC_Give(&w,MC_ARROW,2));select_item(&w,MC_BOW);
- w.mobs[0]=(MC_Mob){10.5f,2.01f,14.0f,0,0,0,MC_MOB_HEALTH,1,0,0};w.shoot_cooldown=0;assert(MC_Shoot(&w,400,384));
+ /* Aim at the torso; the lower former aim passes through the visible leg gap. */
+ w.mobs[0]=(MC_Mob){10.5f,2.01f,14.0f,0,0,0,MC_MOB_HEALTH,1,0,0};w.shoot_cooldown=0;assert(MC_Shoot(&w,400,360));
  for(int i=0;i<20 && w.mobs[0].health==MC_MOB_HEALTH;i++)MC_ProjectilesTick(&w,.1f);
  assert(w.mobs[0].health<MC_MOB_HEALTH);
  scene(&w);assert(MC_Give(&w,MC_BOW,1)&&MC_Give(&w,MC_ARROW,3));select_item(&w,MC_BOW);

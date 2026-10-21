@@ -146,6 +146,8 @@ int MC_Raycast(const MC_World *world, int *x, int *y, int *z,
                int *nx, int *ny, int *nz, float reach);
 uint32_t MC_Crc32(const void *data, unsigned length);
 int MC_Pick(const MC_World *w, float x, float y, MC_Hit *hit);
+/* Earliest solid-part hit along a segment; fraction is in [0,1]. */
+int MC_BlockSegment(const MC_World *w,float x,float y,float z,float ex,float ey,float ez,float *fraction);
 int MC_BodyClear(const MC_World *w,float x,float y,float z);
 int MC_PickMob(const MC_World *w,float x,float y,float reach,float *distance);
 int MC_MobRay(const MC_World *w,float dx,float dy,float dz,float reach,unsigned mask,int *index,float *distance,int *axis,int *sign);

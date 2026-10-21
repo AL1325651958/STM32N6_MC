@@ -401,3 +401,4 @@ tools/minicraft_font_sources.json
 tools/minicraft_font_test.c
 docs/MINICRAFT_FONT_AUDIT.md
 tools/minicraft_storage_test.c
+tools/minicraft_projectile_test.c

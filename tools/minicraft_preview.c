@@ -20,7 +20,8 @@ int main(int argc,char **argv)
     "action_attack","action_shoot","action_feed","action_place","action_use",
     "crop_dry","crop_dark","crop_growing","crop_ready","action_eat","main_menu","create_world","slab_merge","cave_threat","cave_lit",
     "save_busy","save_ok","save_no_sd","save_locked","save_write_failed","save_verify_failed","creative_page1","creative_page2",
-    "tool_interact","sneak_build","tool_chest_open","door_closed","door_open","lever_off","lever_on","slab_steps","delete_world","worlds_delete"};
+    "tool_interact","sneak_build","tool_chest_open","door_closed","door_open","lever_off","lever_on","slab_steps","delete_world","worlds_delete",
+    "arrow_door_closed","arrow_door_open","arrow_slab_gap"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -141,6 +142,20 @@ int main(int argc,char **argv)
         w.notice="LOWER HALF  UPPER HALF  TWO SLABS MERGED";
       }
       w.target_valid=MC_Pick(&w,400,240,&w.target);
+    }
+    if(k>=44 && k<=46) {
+      memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+      for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++)MC_Set(&w,x,1,z,MC_GRASS);
+      w.x=14.2f;w.y=2.01f;w.z=9.5f;w.yaw=-.36f;w.pitch=-.12f;w.time=90;
+      if(k<46) {
+        for(int y=2;y<=4;y++){MC_Set(&w,11,y,13,MC_PLANKS);MC_Set(&w,13,y,13,MC_PLANKS);}
+        MC_Set(&w,12,4,13,MC_PLANKS);
+        MC_Set(&w,12,2,13,k==44?MC_DOOR:MC_DOOR_OPEN);
+        MC_Set(&w,12,3,13,k==44?MC_DOOR_TOP:MC_DOOR_TOP_OPEN);
+      } else MC_Set(&w,12,2,13,MC_SLAB);
+      w.projectiles[0]=(MC_Projectile){12.5f,k==46?2.9f:3.5f,11.5f,0,0,18,0,1};
+      MC_ProjectilesTick(&w,.1f);assert(w.projectiles[0].active==(k!=44));
+      MC_Give(&w,MC_BOW,1);w.notice=NULL;
     }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];

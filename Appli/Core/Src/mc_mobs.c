@@ -83,16 +83,17 @@ static int ray_box(const float p[3],const float d[3],const float lo[3],const flo
   *distance=t;*axis=inside?fa:na;*sign=inside?fs:ns;return 1;
 }
 
-int MC_MobRay(const MC_World *w,float dx,float dy,float dz,float reach,unsigned mask,int *index,float *distance,int *axis,int *sign)
-{
-  static const float hostile[6][6]={
+static const float hostile[6][6]={
     {-.25f,1.30f,-.25f,.25f,1.80f,.25f},{-.20f,.62f,-.13f,.20f,1.30f,.13f},
     {-.20f,0,-.13f,-.035f,.62f,.13f},{.035f,0,-.13f,.20f,.62f,.13f},
     {-.28f,.70f,-.12f,-.20f,1.30f,.12f},{.20f,.70f,-.12f,.28f,1.30f,.12f}};
-  static const float passive[6][6]={
+static const float passive[6][6]={
     {-.32f,.40f,-.25f,.32f,1.05f,.25f},{.20f,.72f,-.22f,.47f,1.22f,.22f},
     {-.26f,0,-.20f,-.10f,.46f,.20f},{.10f,0,-.20f,.26f,.46f,.20f},
     {-.30f,0,.05f,-.14f,.48f,.24f},{.14f,0,.05f,.30f,.48f,.24f}};
+
+int MC_MobRay(const MC_World *w,float dx,float dy,float dz,float reach,unsigned mask,int *index,float *distance,int *axis,int *sign)
+{
   float d[3]={dx,dy,dz},best=reach;int found=-1,fa=0,fs=0;
   for(unsigned i=0;i<MC_MOBS;i++)if((mask&(1u<<i))&&w->mobs[i].health) {
     const MC_Mob *m=&w->mobs[i];const float (*parts)[6]=m->type?passive:hostile;
@@ -170,7 +171,7 @@ int MC_Shoot(MC_World *w,float x,float y)
   if(slot<0){w->notice="TOO MANY ARROWS";return 0;}
   float dx,dy,dz;camera_ray(w,x,y,&dx,&dy,&dz);
   MC_Projectile *p=&w->projectiles[slot];
-  p->x=w->x+dx*.55f;p->y=w->y+1.62f+dy*.55f;p->z=w->z+dz*.55f;
+  p->x=w->x;p->y=w->y+1.62f;p->z=w->z;
   p->vx=dx*18;p->vy=dy*18;p->vz=dz*18;p->age=0;p->active=1;
   if(!w->creative) {
     consume_arrow(w);MC_Stack *bow=&w->slots[w->slot];
@@ -180,12 +181,25 @@ int MC_Shoot(MC_World *w,float x,float y)
   w->shoot_cooldown=.42f;w->attack_flash=.18f;w->notice="ARROW FIRED";return 1;
 }
 
-static float segment_distance2(float ax,float ay,float az,float bx,float by,float bz,float px,float py,float pz)
+/* Share the visible head/body/limbs with picking; reject distant entities
+   before testing parts. The block wins an equal-distance tie. */
+static int segment_mob(const MC_World *w,const float origin[3],const float d[3],float limit)
 {
-  float vx=bx-ax,vy=by-ay,vz=bz-az,wx=px-ax,wy=py-ay,wz=pz-az;
-  float vv=vx*vx+vy*vy+vz*vz,t=vv>1e-8f?(wx*vx+wy*vy+wz*vz)/vv:0;
-  if(t<0)t=0;else if(t>1)t=1;
-  float dx=ax+vx*t-px,dy=ay+vy*t-py,dz=az+vz*t-pz;return dx*dx+dy*dy+dz*dz;
+  float best=limit;int found=-1;
+  for(unsigned i=0;i<MC_MOBS;i++)if(w->mobs[i].health) {
+    const MC_Mob *m=&w->mobs[i];const float (*parts)[6]=m->type?passive:hostile;
+    float p[3]={origin[0]-m->x,origin[1]-m->y,origin[2]-m->z};
+    if(fminf(p[0],p[0]+d[0])>.47f||fmaxf(p[0],p[0]+d[0])<-.32f||
+       fminf(p[1],p[1]+d[1])>1.8f||fmaxf(p[1],p[1]+d[1])<0||
+       fminf(p[2],p[2]+d[2])>.25f||fmaxf(p[2],p[2]+d[2])<-.25f)continue;
+    for(unsigned part=0;part<6;part++) {
+      const float *lo=parts[part],*hi=parts[part]+3;float t;int a,s;
+      if(p[0]>=lo[0]&&p[0]<=hi[0]&&p[1]>=lo[1]&&p[1]<=hi[1]&&p[2]>=lo[2]&&p[2]<=hi[2])t=0;
+      else if(!ray_box(p,d,lo,hi,fminf(best,1),&t,&a,&s))continue;
+      if(t<best){best=t;found=(int)i;}
+    }
+  }
+  return found;
 }
 
 static void arrow_kill_mob(MC_World *w,MC_Mob *m)
@@ -207,20 +221,15 @@ void MC_ProjectilesTick(MC_World *w,float dt)
     for(unsigned step=0;step<steps && !gone;step++) {
       float ox=p->x,oy=p->y,oz=p->z;p->vy-=8*h;
       float nx=ox+p->vx*h,ny=oy+p->vy*h,nz=oz+p->vz*h;
-      /* Sample the segment so an arrow cannot tunnel through a one-cell wall. */
-      unsigned samples=(unsigned)ceilf(sqrtf((nx-ox)*(nx-ox)+(ny-oy)*(ny-oy)+(nz-oz)*(nz-oz))/.12f);if(samples<1)samples=1;
-      for(unsigned s=1;s<=samples;s++) {
-        float t=(float)s/samples,qx=ox+(nx-ox)*t,qy=oy+(ny-oy)*t,qz=oz+(nz-oz)*t;
-        if(MC_IsSolid(MC_Get(w,(int)floorf(qx),(int)floorf(qy),(int)floorf(qz)))){gone=1;w->notice="ARROW HIT BLOCK";break;}
-        for(unsigned m=0;m<MC_MOBS;m++)if(w->mobs[m].health) {
-          const MC_Mob *mob=&w->mobs[m];float radius=mob->type?.55f:.45f;
-          if(segment_distance2(ox,oy,oz,qx,qy,qz,mob->x,mob->y+.72f,mob->z)<=radius*radius) {
-            MC_Mob *hit=&w->mobs[m];hit->health=hit->health>5?(uint8_t)(hit->health-5):0;hit->hurt=.35f;
-            if(!hit->health)arrow_kill_mob(w,hit);else w->notice=hit->type?"ANIMAL HIT":"NIGHT STALKER HIT";
-            gone=1;break;
-          }
-        }
-      }
+      float fraction=1;
+      int blocked=MC_BlockSegment(w,ox,oy,oz,nx,ny,nz,&fraction);
+      float origin[3]={ox,oy,oz},delta[3]={nx-ox,ny-oy,nz-oz};
+      int m=segment_mob(w,origin,delta,blocked?fraction:2);
+      if(m>=0) {
+        MC_Mob *hit=&w->mobs[m];hit->health=hit->health>5?(uint8_t)(hit->health-5):0;hit->hurt=.35f;
+        if(!hit->health)arrow_kill_mob(w,hit);else w->notice=hit->type?"ANIMAL HIT":"NIGHT STALKER HIT";
+        gone=1;
+      } else if(blocked){gone=1;w->notice="ARROW HIT BLOCK";}
       if(!gone){p->x=nx;p->y=ny;p->z=nz;}
     }
     if(gone)memset(p,0,sizeof(*p));

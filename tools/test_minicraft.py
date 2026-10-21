@@ -21,6 +21,7 @@ def main():
         'minicraft_mobs_test':core+['Appli/Core/Src/mc_save.c','Appli/Core/Src/mc_ui.c'],
         'minicraft_font_test':core+['Appli/Core/Src/mc_ui.c'],
         'minicraft_storage_test':core+['Appli/Core/Src/mc_save.c'],
+        'minicraft_projectile_test':core,
     }
     for name,sources in cases.items():
         exe=out/(name+'.exe')
