@@ -109,6 +109,10 @@ typedef struct {
   /* Runtime-only redstone scheduler; map bytes keep lever state, while
      button timers and the propagation clock are discarded on save/load. */
   float redstone_clock;
+  /* Derived cache only; reset on generation/load and excluded from saves. */
+  uint32_t map_revision,redstone_revision;
+  int16_t redstone_center[3];
+  uint8_t redstone_valid;
   uint16_t redstone_button_pos[MC_REDSTONE_BUTTONS][3];
   float redstone_button_timer[MC_REDSTONE_BUTTONS];
   uint8_t mob_target;

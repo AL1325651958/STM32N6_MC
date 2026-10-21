@@ -99,7 +99,15 @@ uint8_t MC_Get(const MC_World *w, int x, int y, int z)
   return y >= MC_MAP_Y ? MC_AIR : w->blocks[index_of(x,y,z)];
 }
 void MC_Set(MC_World *w, int x, int y, int z, uint8_t b)
-{ if (inside(x,y,z) && y > 0 && (b==MC_AIR || MC_IsBlock(b))) w->blocks[index_of(x,y,z)] = b; }
+{
+  if(inside(x,y,z) && y>0 && (b==MC_AIR || MC_IsBlock(b))) {
+    unsigned index=index_of(x,y,z);
+    if(w->blocks[index]!=b) {
+      w->blocks[index]=b;
+      if(!++w->map_revision)w->redstone_valid=0;
+    }
+  }
+}
 int MC_IsSolid(uint8_t block) { return block != MC_AIR && block != MC_WATER && block != MC_TORCH && block != MC_SAPLING && block != MC_DOOR_OPEN && block != MC_WHEAT_CROP && block != MC_WHEAT_MATURE && block != MC_DUST && block != MC_DUST_ON && block != MC_LEVER && block != MC_LEVER_ON && block != MC_BUTTON && block != MC_BUTTON_ON; }
 
 typedef struct { float lo[3], hi[3]; } MC_Part;

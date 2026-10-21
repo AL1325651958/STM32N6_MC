@@ -219,6 +219,24 @@ int main(void) {
  MC_Set(&w,11,3,11,MC_DUST);MC_Set(&w,12,3,11,MC_LAMP);MC_RedstoneRefresh(&w);assert(MC_Get(&w,11,3,11)==MC_DUST_ON&&MC_Get(&w,12,3,11)==MC_LAMP_ON);
  for(int i=0;i<6;i++) { MC_SystemsTick(&w,.1f); }
  assert(MC_Get(&w,10,3,11)==MC_BUTTON);
+ /* Cached circuits must refresh on edits, crossing the scan window, and
+    button expiry, while an unchanged powered circuit remains powered. */
+ scene(&w);MC_Set(&w,10,3,11,MC_LEVER_ON);MC_Set(&w,11,3,11,MC_DUST);MC_Set(&w,12,3,11,MC_LAMP);
+ MC_RedstoneRefresh(&w);assert(MC_Get(&w,12,3,11)==MC_LAMP_ON);
+ tick(&w,20);assert(MC_Get(&w,12,3,11)==MC_LAMP_ON);
+ MC_Set(&w,10,3,11,MC_LEVER);tick(&w,3);assert(MC_Get(&w,12,3,11)==MC_LAMP);
+ /* A loaded button has no runtime pulse: it must not act as a source
+    during the first refresh, otherwise the cache would retain ghost power. */
+ MC_Set(&w,10,3,11,MC_BUTTON_ON);MC_Set(&w,11,3,11,MC_DUST_ON);MC_Set(&w,12,3,11,MC_LAMP_ON);
+ MC_RedstoneRefresh(&w);assert(MC_Get(&w,10,3,11)==MC_BUTTON);
+ assert(MC_Get(&w,11,3,11)==MC_DUST&&MC_Get(&w,12,3,11)==MC_LAMP);
+ /* A powered map state outside the old scan window is cleared on arrival. */
+ MC_Set(&w,50,3,50,MC_LAMP_ON);MC_RedstoneRefresh(&w);
+ assert(MC_Get(&w,50,3,50)==MC_LAMP_ON);w.x=w.z=50.5f;
+ tick(&w,3);assert(MC_Get(&w,50,3,50)==MC_LAMP);
+ /* Revision wrap must not accidentally match a cached world. */
+ w.map_revision=0xffffffffu;MC_Set(&w,50,3,50,MC_LAMP_ON);
+ tick(&w,3);assert(MC_Get(&w,50,3,50)==MC_LAMP);
  /* Iron armor is non-stackable, equips from the bag, reduces damage, and
     returns to an empty bag slot when removed. */
  scene(&w);assert(MC_Give(&w,MC_IRON_HELMET,2));assert(w.slots[0].count==1&&w.slots[1].count==1);

@@ -48,5 +48,30 @@ int main(void) {
     for(unsigned frame=0;frame<32;frame++)printf(" %08lx",(unsigned long)frame_crc[frame]);
     putchar('\n');
   }
+  const char *systems[]={"systems_idle","systems_edit","systems_move"};
+  for(unsigned scenario=0;scenario<3;scenario++) {
+    memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+    for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++) {
+      w.blocks[z*MC_MAP_X+x]=MC_BEDROCK;MC_Set(&w,x,1,z,MC_DIRT);
+    }
+    w.x=w.z=64.5f;w.y=2;
+    MC_Set(&w,64,2,65,MC_LEVER_ON);MC_Set(&w,65,2,65,MC_DUST);MC_Set(&w,66,2,65,MC_LAMP);
+    double seconds=0;uint32_t hash=0,frame_crc[32];
+    for(unsigned group=0;group<32;group++) {
+      clock_t start=clock();
+      for(unsigned tick=0;tick<64;tick++) {
+        if(scenario==1 && tick%16==0)MC_Set(&w,64,2,65,tick%32?MC_LEVER_ON:MC_LEVER);
+        if(scenario==2)w.x=64.5f+((group*64+tick)/4%2);
+        MC_SystemsTick(&w,.1f);
+      }
+      seconds+=(double)(clock()-start)/CLOCKS_PER_SEC;
+      frame_crc[group]=MC_Crc32(w.blocks,MC_MAP_BYTES);
+      hash=(hash<<1)|(hash>>31);hash^=frame_crc[group];
+    }
+    /* Per simulated tick, rather than per 64-tick sample. */
+    printf("%s %.6f %08lx",systems[scenario],seconds*1000/(32*64),(unsigned long)hash);
+    for(unsigned group=0;group<32;group++)printf(" %08lx",(unsigned long)frame_crc[group]);
+    putchar('\n');
+  }
   free(fb);free(view);free(w.blocks);return 0;
 }

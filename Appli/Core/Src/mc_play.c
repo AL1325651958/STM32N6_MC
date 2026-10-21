@@ -59,6 +59,10 @@ static void redstone_button_press(MC_World *w,int x,int y,int z)
 void MC_RedstoneRefresh(MC_World *w)
 {
   int cx=(int)w->x,cy=(int)w->y,cz=(int)w->z;
+  /* Same blocks and same scan window imply the same circuit. Button expiry
+     edits its map state before refresh, and all gameplay edits use MC_Set. */
+  if(w->redstone_valid && w->redstone_revision==w->map_revision &&
+     w->redstone_center[0]==cx && w->redstone_center[1]==cy && w->redstone_center[2]==cz)return;
   int x0=cx-16,x1=cx+16,y0=cy-8,y1=cy+8,z0=cz-16,z1=cz+16;
   if(x0<1)x0=1;
   if(z0<1)z0=1;
@@ -68,9 +72,9 @@ void MC_RedstoneRefresh(MC_World *w)
   if(y1>=MC_MAP_Y)y1=MC_MAP_Y-1;
   int qx[128],qy[128],qz[128],head=0,tail=0;
   for(int y=y0;y<=y1;y++)for(int z=z0;z<=z1;z++)for(int x=x0;x<=x1;x++){
-    uint8_t b=MC_Get(w,x,y,z);
+    uint8_t b=w->blocks[((unsigned)y*MC_MAP_Z+(unsigned)z)*MC_MAP_X+(unsigned)x];
     if(b==MC_DUST_ON||b==MC_LAMP_ON)MC_Set(w,x,y,z,redstone_off(b));
-    else if(b==MC_BUTTON_ON && redstone_button_find(w,x,y,z)<0)MC_Set(w,x,y,z,MC_BUTTON);
+    else if(b==MC_BUTTON_ON && redstone_button_find(w,x,y,z)<0){b=MC_BUTTON;MC_Set(w,x,y,z,b);}
     if((b==MC_LEVER_ON || b==MC_BUTTON_ON) && tail<128){qx[tail]=x;qy[tail]=y;qz[tail++]=z;}
   }
   while(head<tail){
@@ -83,6 +87,9 @@ void MC_RedstoneRefresh(MC_World *w)
       else if(b==MC_BUTTON_ON || b==MC_LEVER_ON){/* a source can feed dust on its other side */}
     }
   }
+  w->redstone_revision=w->map_revision;
+  w->redstone_center[0]=(int16_t)cx;w->redstone_center[1]=(int16_t)cy;w->redstone_center[2]=(int16_t)cz;
+  w->redstone_valid=1;
 }
 int MC_ToolIndex(unsigned i) {
   if(i>=MC_WOOD_PICK && i<=MC_IRON_PICK)return (int)i-MC_WOOD_PICK;
@@ -257,6 +264,8 @@ void MC_NewPlayer(MC_World *w,int legacy) {
   w->gravity_clock=0;w->gravity_cursor=0;
   w->fluid_clock=0;w->fluid_cursor=0;
   w->automation_clock=0;w->crop_clock=0;
+  w->map_revision=w->redstone_revision=0;w->redstone_valid=0;
+  memset(w->redstone_center,0,sizeof(w->redstone_center));
   w->redstone_clock=0;memset(w->redstone_button_pos,0,sizeof(w->redstone_button_pos));memset(w->redstone_button_timer,0,sizeof(w->redstone_button_timer));
   memset(w->mob_fed,0,sizeof(w->mob_fed));memset(w->mob_fed_age,0,sizeof(w->mob_fed_age));w->breed_cooldown=0;
   MC_SyncInventory(w);
