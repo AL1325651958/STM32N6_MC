@@ -22,7 +22,7 @@ int main(int argc,char **argv)
     "save_busy","save_ok","save_no_sd","save_locked","save_write_failed","save_verify_failed","creative_page1","creative_page2",
     "tool_interact","sneak_build","tool_chest_open","door_closed","door_open","lever_off","lever_on","slab_steps","delete_world","worlds_delete",
     "arrow_door_closed","arrow_door_open","arrow_slab_gap","cave_cache","cave_cache_loot",
-    "hud_meters","empty_hand","armor_storage","armor_equip"};
+    "hud_meters","empty_hand","armor_storage","armor_equip","new_world_view","bed_safe_respawn"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -193,6 +193,19 @@ int main(int argc,char **argv)
         }
       }
       w.notice=NULL;
+    }
+    if(k==53){MC_Generate(&w,0x20261020);w.notice=NULL;}
+    if(k==54) {
+      memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+      for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++)MC_Set(&w,x,1,z,MC_GRASS);
+      MC_Set(&w,12,2,12,MC_BED);
+      for(int z=10;z<=14;z++)for(int x=10;x<=14;x++) {
+        MC_Set(&w,x,4,z,MC_PLANKS);
+        if(x==10||x==14||z==14)for(int y=2;y<4;y++)MC_Set(&w,x,y,z,MC_PLANKS);
+      }
+      w.spawn[0]=13;w.spawn[1]=3;w.spawn[2]=13;MC_Respawn(&w);
+      assert(w.y<2.02f&&MC_BodyClear(&w,w.x,w.y,w.z));
+      w.yaw=.78539816f;w.pitch=-.55f;w.notice=NULL;
     }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];

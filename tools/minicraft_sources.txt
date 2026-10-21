@@ -405,3 +405,4 @@ tools/minicraft_projectile_test.c
 tools/minicraft_exploration_test.c
 tools/minicraft_hud_test.c
 tools/minicraft_ui_primitives_test.c
+tools/minicraft_spawn_test.c

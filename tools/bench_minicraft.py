@@ -35,7 +35,7 @@ def main():
     for scene,variants in timings.items():
         assert hashes[scene]['baseline']==hashes[scene]['optimized'] and len(hashes[scene]['baseline'])==1, (scene,hashes[scene])
         old=statistics.median(variants['baseline']);new=statistics.median(variants['optimized'])
-        report['scenes'][scene]={'baseline_ms':old,'optimized_ms':new,'speedup':round(old/new,3),'checksum':next(iter(hashes[scene]['baseline']))[0],'frame_checksums':list(next(iter(hashes[scene]['baseline']))[1]),'samples_ms':variants,'timing_unit':'ms per systems tick (64 ticks per sample)' if scene.startswith('systems_') else 'ms per render frame'}
+        report['scenes'][scene]={'baseline_ms':old,'optimized_ms':new,'speedup':round(old/new,3),'checksum':next(iter(hashes[scene]['baseline']))[0],'frame_checksums':list(next(iter(hashes[scene]['baseline']))[1]),'samples_ms':variants,'timing_unit':'ms per simulation tick (64 ticks per sample)' if scene.startswith(('systems_','physics_')) else 'ms per render frame'}
     (out/'comparison.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(report,indent=2))
 if __name__=='__main__':main()

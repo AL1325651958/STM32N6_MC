@@ -25,7 +25,10 @@ int main(void) {
   if(!w.blocks||!view||!fb)return 1;
   const char *names[]={"terrain","water","cave_lights","entities"};
   for(unsigned scene=0;scene<4;scene++) {
-    MC_Generate(&w,0x20261020u);
+    /* Stable terrain and camera make this a rendering benchmark even when
+       new-world spawn selection or optional structures change. */
+    MC_GenerateTerrain(&w,0x20261020u);
+    w.x=w.z=128.5f;w.y=40.01f;w.yaw=.7f;w.pitch=-.12f;
     float yaw=w.yaw;
     if(scene==1) {
       for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++)
@@ -83,6 +86,27 @@ int main(void) {
     /* Per simulated tick, rather than per 64-tick sample. */
     printf("%s %.6f %08lx",systems[scenario],seconds*1000/(32*64),(unsigned long)hash);
     for(unsigned group=0;group<32;group++)printf(" %08lx",(unsigned long)frame_crc[group]);
+    putchar('\n');
+  }
+  const char *physics[]={"physics_ground","physics_water"};
+  for(unsigned scene=0;scene<2;scene++) {
+    memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+    for(int z=4;z<20;z++)for(int x=4;x<20;x++) {
+      MC_Set(&w,x,1,z,MC_STONE);
+      if(scene){MC_Set(&w,x,2,z,MC_WATER);MC_Set(&w,x,3,z,MC_WATER);}
+    }
+    w.x=w.z=10.5f;w.y=2.01f;w.yaw=0;double seconds=0;uint32_t hash=0,checks[32];
+    for(unsigned group=0;group<32;group++) {
+      double start=seconds_now();
+      for(unsigned tick=0;tick<64;tick++) {
+        w.x=10.5f+(tick%16)*.005f;w.y=2.01f;w.z=10.5f;w.vy=0;w.on_ground=1;
+        MC_Step(&w,1,.5f,.1f,0);
+      }
+      seconds+=seconds_now()-start;
+      float pose[]={w.x,w.y,w.z,w.vy,(float)w.on_ground};checks[group]=MC_Crc32(pose,sizeof(pose));hash=(hash<<1)|(hash>>31);hash^=checks[group];
+    }
+    printf("%s %.6f %08lx",physics[scene],seconds*1000/(32*64),(unsigned long)hash);
+    for(unsigned group=0;group<32;group++)printf(" %08lx",(unsigned long)checks[group]);
     putchar('\n');
   }
   free(fb);free(view);free(w.blocks);return 0;

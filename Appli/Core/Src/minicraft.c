@@ -264,43 +264,94 @@ static int overlaps(const MC_World *w, float x, float y, float z)
       uint8_t b=MC_Get(w,xx,yy,zz);
       if(MC_IsSolid(b) && body_intersects(b,xx,yy,zz,x,y,z))return 1;
     }
+  /* A fence's upper half protrudes from the cell below the player's feet.
+     Check it after ordinary hits, preserving the cheap ground-contact path. */
+  if(y-y0<.5f)for(int zz=z0;zz<=z1;zz++)for(int xx=x0;xx<=x1;xx++)
+    if(MC_Get(w,xx,y0-1,zz)==MC_FENCE && body_intersects(MC_FENCE,xx,y0-1,zz,x,y,z))return 1;
   return 0;
 }
 int MC_BodyClear(const MC_World *w,float x,float y,float z)
 {return !overlaps(w,x,y,z);}
-static int has_floor(const MC_World *w,float x,float z)
+static int floor_at(const MC_World *w,float x,float feet,float z)
 {
-  const float inset=.24f,y=w->y-.08f;
-  for(int iz=-1;iz<=1;iz+=2)for(int ix=-1;ix<=1;ix+=2)
-    {
-      float px=x+ix*inset,pz=z+iz*inset;int bx=(int)floorf(px),by=(int)floorf(y),bz=(int)floorf(pz);
-      uint8_t b=MC_Get(w,bx,by,bz);
-      float lo[3],hi[3];bounds(b,lo,hi);
-      if(!MC_IsSolid(b))continue;
-      if(px>=bx+lo[0] && px<=bx+hi[0] && pz>=bz+lo[2] && pz<=bz+hi[2] && y>=by+lo[1] && y<by+hi[1])return 1;
+  const float y=feet-.08f;
+  for(unsigned sample=0;sample<5;sample++) {
+    float px=x+(sample==4?0:(sample&1)?.24f:-.24f),pz=z+(sample==4?0:(sample&2)?.24f:-.24f);
+    int bx=(int)floorf(px),by=(int)floorf(y),bz=(int)floorf(pz);
+    for(int below=0;below<2;below++) {
+      uint8_t b=MC_Get(w,bx,by-below,bz);
+      if(!MC_IsSolid(b)||(below&&b!=MC_FENCE))continue;
+      const MC_Part *parts;unsigned count=parts_for(b,&parts);float lo[3],hi[3];
+      if(!count){bounds(b,lo,hi);count=1;}
+      float p[3]={px-bx,y-by+below,pz-bz};
+      for(unsigned i=0;i<count;i++) {
+        const float *a=parts?parts[i].lo:lo,*v=parts?parts[i].hi:hi;
+        if(p[0]>=a[0]&&p[0]<=v[0]&&p[1]>=a[1]&&p[1]<v[1]&&p[2]>=a[2]&&p[2]<=v[2])return 1;
+      }
     }
+  }
   return 0;
+}
+static int has_floor(const MC_World *w,float x,float z)
+{return floor_at(w,x,w->y,z);}
+/* Bounded startup/respawn work only: choose an open viewing cone rather
+   than pointing every new player at the same nearby tree or hillside. */
+static float spawn_view(const MC_World *w,float x,float y,float z,float *yaw)
+{
+  float best=-1,sp=sinf(-.12f),cp=cosf(-.12f);
+  unsigned start=hash(w->seed,47,0x5a17u)&15u;
+  for(unsigned direction=0;direction<16;direction++) {
+    float angle=((start+direction)&15u)*(6.2831853f/16),nearest=8,total=0;
+    for(int fan=-2;fan<=2;fan++) {
+      float a=angle+fan*.25f,t=1;
+      if(MC_BlockSegment(w,x,y+1.62f,z,x+sinf(a)*cp*8,y+1.62f+sp*8,z+cosf(a)*cp*8,&t))t=fmaxf(0,t);
+      else t=1;
+      float clear=t*8;nearest=fminf(nearest,clear);total+=clear;
+    }
+    float score=nearest*100+total*2;
+    if(score>best){best=score;*yaw=angle;}
+  }
+  return best;
+}
+static void face_spawn(MC_World *w)
+{spawn_view(w,w->x,w->y,w->z,&w->yaw);w->pitch=-.12f;}
+static int spawn_floor(const MC_World *w,int x,int y,int z,float *feet)
+{
+  uint8_t b=MC_Get(w,x,y,z);if(!MC_IsSolid(b))return 0;
+  float lo[3],hi[3];bounds(b,lo,hi);float fy=y+hi[1]+.01f;
+  if(overlaps(w,x+.5f,fy,z+.5f) || !floor_at(w,x+.5f,fy,z+.5f) ||
+     MC_Get(w,x,(int)floorf(fy+.5f),z)==MC_WATER || MC_Get(w,x,(int)floorf(fy+1.62f),z)==MC_WATER)return 0;
+  *feet=fy;return 1;
 }
 void MC_Respawn(MC_World *w)
 {
   w->vy=0;w->on_ground=0;w->fall_speed=0;
   memset(w->mobs,0,sizeof(w->mobs));w->mob_target=255;w->spawn_clock=0;
+  memset(w->projectiles,0,sizeof(w->projectiles));w->target_valid=0;w->mining=0;
   if(w->spawn[0] && MC_Get(w,w->spawn[0]-1,w->spawn[1]-1,w->spawn[2]-1)==MC_BED) {
     int bx=w->spawn[0]-1,by=w->spawn[1]-1,bz=w->spawn[2]-1;
     for(int dz=-1;dz<=1;dz++)for(int dx=-1;dx<=1;dx++) {
-      float lo[3],hi[3];bounds(MC_Get(w,bx+dx,by,bz+dz),lo,hi);
-      float x=bx+dx+.5f,z=bz+dz+.5f,y=by+hi[1]+.01f;
-      if(MC_IsSolid(MC_Get(w,bx+dx,by,bz+dz)) && !overlaps(w,x,y,z)) {
-        w->x=x;w->y=y;w->z=z;return;
+      if(!dx&&!dz)continue;
+      for(int floor=by;floor>=by-1;floor--) {
+        float y;
+        if(spawn_floor(w,bx+dx,floor,bz+dz,&y)) {
+          w->x=bx+dx+.5f;w->y=y;w->z=bz+dz+.5f;face_spawn(w);return;
+        }
       }
     }
+    float y;
+    if(spawn_floor(w,bx,by,bz,&y)){w->x=bx+.5f;w->y=y;w->z=bz+.5f;face_spawn(w);return;}
   }
-  for(int r=0;r<64;r++)for(int dz=-r;dz<=r;dz++)for(int dx=-r;dx<=r;dx++) {
+  for(int pass=0;pass<2;pass++)for(int r=0;r<64;r++)for(int dz=-r;dz<=r;dz++)for(int dx=-r;dx<=r;dx++) {
     if(r && abs(dx)!=r && abs(dz)!=r)continue;
     int x=MC_MAP_X/2+dx,z=MC_MAP_Z/2+dz;if(x<1||x>=MC_MAP_X-1||z<1||z>=MC_MAP_Z-1)continue;
-    for(int y=MC_MAP_Y-3;y>=1;y--) if(MC_IsSolid(MC_Get(w,x,y,z)) && MC_Get(w,x,y+1,z)==MC_AIR && MC_Get(w,x,y+2,z)==MC_AIR) {
-      float lo[3],hi[3];bounds(MC_Get(w,x,y,z),lo,hi);
-      w->x=x+.5f;w->y=y+hi[1]+.01f;w->z=z+.5f;return;
+    for(int y=MC_MAP_Y-1;y>=0;y--) {
+      uint8_t b=MC_Get(w,x,y,z);
+      if(!pass && (b==MC_LEAVES||b==MC_WOOD||b==MC_BIRCH_WOOD||b==MC_DARK_WOOD))continue;
+      float feet;
+      if(spawn_floor(w,x,y,z,&feet)) {
+        w->x=x+.5f;w->y=feet;w->z=z+.5f;face_spawn(w);return;
+      }
     }
   }
   w->x=MC_MAP_X/2+.5f;w->z=MC_MAP_Z/2+.5f;w->y=MC_MAP_Y+1;
@@ -343,13 +394,36 @@ static void generate_world(MC_World *w,uint32_t seed,int structures)
     }
   }
   w->yaw=.7f; w->pitch=-.12f; MC_Respawn(w);
-  /* Start on open grass, near wood, with an unobstructed horizon. */
-  int best=-100000;
+  /* Shortlist eight flat grass candidates before doing viewing-cone tests.
+     Height is a minor preference, not a reason to choose a tree-lined peak. */
+  struct {int x,y,z,score;} candidates[8];unsigned count=0;
   for(int z=MC_MAP_Z/2-40;z<MC_MAP_Z/2+40;z+=2)for(int x=MC_MAP_X/2-40;x<MC_MAP_X/2+40;x+=2) {
     int y=height(x,z,seed);
     if(MC_Get(w,x,y,z)!=MC_GRASS || MC_Get(w,x,y+1,z)!=MC_AIR || MC_Get(w,x,y+2,z)!=MC_AIR)continue;
-    int score=y*8-abs(x-MC_MAP_X/2)-abs(z-MC_MAP_Z/2);
-    if(score>best){best=score;w->x=x+.5f;w->y=y+1.01f;w->z=z+.5f;}
+    float feet;if(!spawn_floor(w,x,y,z,&feet))continue;
+    int score=y/4-abs(x-MC_MAP_X/2)-abs(z-MC_MAP_Z/2);
+    const int offsets[4][2]={{-1,0},{1,0},{0,-1},{0,1}};
+    for(unsigned i=0;i<4;i++) {
+      int nx=x+offsets[i][0],nz=z+offsets[i][1];float nf;
+      if(spawn_floor(w,nx,y,nz,&nf))score+=20;
+    }
+    unsigned at=0;while(at<count && candidates[at].score>=score)at++;
+    if(at<8) {
+      if(count<8)count++;
+      for(unsigned i=count-1;i>at;i--)candidates[i]=candidates[i-1];
+      candidates[at].x=x;candidates[at].y=y;candidates[at].z=z;candidates[at].score=score;
+    }
+  }
+  float best=-1e30f;
+  for(unsigned i=0;i<count;i++) {
+    int x=candidates[i].x,y=candidates[i].y,z=candidates[i].z,wood=400;float yaw;
+    for(int tz=4+((z-22)/6)*6;tz<=z+18;tz+=6)for(int tx=4+((x-22)/6)*6;tx<=x+18;tx+=6) {
+      int dx=tx-x,dz=tz-z,d=dx*dx+dz*dz;if(d>=wood)continue;
+      uint8_t b=MC_Get(w,tx,height(tx,tz,seed)+1,tz);
+      if(b==MC_WOOD||b==MC_BIRCH_WOOD||b==MC_DARK_WOOD)wood=d;
+    }
+    float score=spawn_view(w,x+.5f,y+1.01f,z+.5f,&yaw)+candidates[i].score+(wood<=324?50-wood/10:-20);
+    if(score>best){best=score;w->x=x+.5f;w->y=y+1.01f;w->z=z+.5f;w->yaw=yaw;w->pitch=-.12f;}
   }
   MC_NewPlayer(w,0);
   if(structures){generate_ruins(w,seed);generate_cave_cache(w,seed);}

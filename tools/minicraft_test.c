@@ -142,7 +142,7 @@ int main(void)
   for(int i=0;i<80;i++)MC_Step(&w,0,0,.016f,0);
   assert(fabsf(w.y-2.875f)<.01f);
   flat(&w);MC_Set(&w,64,2,64,MC_BED);w.spawn[0]=65;w.spawn[1]=3;w.spawn[2]=65;
-  MC_Respawn(&w);assert(fabsf(w.y-2.5725f)<.001f);
+  MC_Respawn(&w);assert(fabsf(w.y-2.01f)<.001f&&fabsf(w.x-64.5f)<=1&&fabsf(w.z-64.5f)<=1);
   memset(w.spawn,0,sizeof(w.spawn));
 
   flat(&w);
