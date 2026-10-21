@@ -50,6 +50,7 @@ static int ruin_site(int cx,int cz,uint32_t seed,int *base)
 static int place_ruin(MC_World *w,int cx,int cz,uint32_t seed,int chest_slot)
 {
   int h;if(!ruin_site(cx,cz,seed,&h))return 0;
+  if(fabsf(cx+.5f-w->x)<20 && fabsf(cz+.5f-w->z)<20)return 0;
   /* Clear a small footprint and level its floor so the structure is walkable. */
   for(int dz=-3;dz<=3;dz++)for(int dx=-3;dx<=3;dx++) {
     int x=cx+dx,z=cz+dz,nh=height(x,z,seed);
@@ -79,18 +80,70 @@ static int place_ruin(MC_World *w,int cx,int cz,uint32_t seed,int chest_slot)
   }
   return 1;
 }
+enum { STRUCT_COLS=(MC_MAP_X-32)/8,STRUCT_ROWS=(MC_MAP_Z-32)/8,STRUCT_SITES=STRUCT_COLS*STRUCT_ROWS };
+/* A seed-dependent permutation visits every site once, across the full map.
+   Coprime stride avoids repeats and the old north-west-only search bias. */
+static unsigned structure_order(uint32_t seed,unsigned *stride)
+{
+  unsigned step=(hash(seed,19,0x51f2u)%STRUCT_SITES)|1u;
+  for(;;step+=2) {
+    unsigned a=step,b=STRUCT_SITES;
+    while(b){unsigned next=a%b;a=b;b=next;}
+    if(a==1)break;
+  }
+  *stride=step;return hash(seed,31,0x9e37u)%STRUCT_SITES;
+}
 static void generate_ruins(MC_World *w,uint32_t seed)
 {
-  int count=0;
-  int placed_x[2]={0,0},placed_z[2]={0,0};
-  /* A hash gate keeps the structures distributed across seeds. */
-  for(int pass=0;pass<2 && count<2;pass++)
-    for(int z=16;z<112 && count<2;z+=8)for(int x=16;x<112 && count<2;x+=8) {
-      if(pass==0 && (hash((uint32_t)x,(uint32_t)z,seed+0x51f2u)&7u)!=0u)continue;
-      int duplicate=0;for(int i=0;i<count;i++)if(placed_x[i]==x&&placed_z[i]==z)duplicate=1;
-      if(duplicate)continue;
-      if(place_ruin(w,x,z,seed,count)) { placed_x[count]=x;placed_z[count]=z;count++; }
+  int count=0,placed_x[2]={0,0},placed_z[2]={0,0};
+  unsigned stride,start=structure_order(seed,&stride);
+  for(unsigned i=0;i<STRUCT_SITES && count<2;i++) {
+    unsigned site=(start+i*stride)%STRUCT_SITES;
+    int x=16+(int)(site%STRUCT_COLS)*8,z=16+(int)(site/STRUCT_COLS)*8,near=0;
+    for(int n=0;n<count;n++) {
+      int dx=x-placed_x[n],dz=z-placed_z[n];if(dx*dx+dz*dz<64*64)near=1;
     }
+    if(!near && place_ruin(w,x,z,seed,count)){placed_x[count]=x;placed_z[count]=z;count++;}
+  }
+}
+/* One underground supply room connects to an existing dry cave, never to
+   an isolated pocket carved only for the chest. Reuse one free container
+   slot, leaving at least three slots for player-built storage. */
+static void generate_cave_cache(MC_World *w,uint32_t seed)
+{
+  unsigned slot=0;while(slot<MC_CHESTS && w->chest_map[slot][0])slot++;
+  if(slot>=3 || slot>=MC_CHESTS)return;
+  unsigned stride,start=structure_order(seed^0xc4a7u,&stride);
+  for(unsigned i=0;i<STRUCT_SITES;i++) {
+    unsigned site=(start+i*stride)%STRUCT_SITES;
+    int cx=16+(int)(site%STRUCT_COLS)*8,cz=16+(int)(site/STRUCT_COLS)*8;
+    for(int floor=7;floor<=15;floor+=4) {
+      if(MC_Get(w,cx,floor+1,cz-3)!=MC_AIR || MC_Get(w,cx,floor+2,cz-3)!=MC_AIR ||
+         !MC_IsSolid(MC_Get(w,cx,floor,cz-3)))continue;
+      int valid=1;
+      for(int dz=-2;dz<=2 && valid;dz++)for(int dx=-2;dx<=2 && valid;dx++) {
+        if(height(cx+dx,cz+dz,seed)<floor+7)valid=0;
+        for(int y=floor;y<=floor+4 && valid;y++) {
+          uint8_t b=MC_Get(w,cx+dx,y,cz+dz);
+          if(b!=MC_AIR && b!=MC_STONE && b!=MC_COAL_ORE && b!=MC_IRON_ORE)valid=0;
+        }
+      }
+      if(!valid)continue;
+      for(int dz=-2;dz<=2;dz++)for(int dx=-2;dx<=2;dx++)for(int y=floor;y<=floor+4;y++) {
+        int shell=y==floor || y==floor+4 || abs(dx)==2 || abs(dz)==2;
+        int entrance=dx==0 && dz==-2 && y>floor && y<floor+3;
+        MC_Set(w,cx+dx,y,cz+dz,shell&&!entrance?MC_BRICK:MC_AIR);
+      }
+      MC_Set(w,cx-1,floor+1,cz+1,MC_TORCH);
+      MC_Set(w,cx+1,floor+1,cz,MC_CHEST);
+      w->chest_map[slot][0]=(uint16_t)(cx+2);w->chest_map[slot][1]=(uint16_t)(floor+2);w->chest_map[slot][2]=(uint16_t)(cz+1);
+      w->chest_blocks[slot][0]=(MC_Stack){MC_IRON,2,0};
+      w->chest_blocks[slot][1]=(MC_Stack){MC_COAL,6,0};
+      w->chest_blocks[slot][2]=(MC_Stack){MC_BREAD,2,0};
+      w->chest_blocks[slot][3]=(MC_Stack){MC_ARROW,8,0};
+      return;
+    }
+  }
 }
 
 uint8_t MC_Get(const MC_World *w, int x, int y, int z)
@@ -299,7 +352,7 @@ static void generate_world(MC_World *w,uint32_t seed,int structures)
     if(score>best){best=score;w->x=x+.5f;w->y=y+1.01f;w->z=z+.5f;}
   }
   MC_NewPlayer(w,0);
-  if(structures)generate_ruins(w,seed);
+  if(structures){generate_ruins(w,seed);generate_cave_cache(w,seed);}
 }
 void MC_Generate(MC_World *w,uint32_t seed){generate_world(w,seed,1);}
 void MC_GenerateTerrain(MC_World *w,uint32_t seed){generate_world(w,seed,0);}

@@ -21,7 +21,7 @@ int main(int argc,char **argv)
     "crop_dry","crop_dark","crop_growing","crop_ready","action_eat","main_menu","create_world","slab_merge","cave_threat","cave_lit",
     "save_busy","save_ok","save_no_sd","save_locked","save_write_failed","save_verify_failed","creative_page1","creative_page2",
     "tool_interact","sneak_build","tool_chest_open","door_closed","door_open","lever_off","lever_on","slab_steps","delete_world","worlds_delete",
-    "arrow_door_closed","arrow_door_open","arrow_slab_gap"};
+    "arrow_door_closed","arrow_door_open","arrow_slab_gap","cave_cache","cave_cache_loot"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -156,6 +156,18 @@ int main(int argc,char **argv)
       w.projectiles[0]=(MC_Projectile){12.5f,k==46?2.9f:3.5f,11.5f,0,0,18,0,1};
       MC_ProjectilesTick(&w,.1f);assert(w.projectiles[0].active==(k!=44));
       MC_Give(&w,MC_BOW,1);w.notice=NULL;
+    }
+    if(k==47 || k==48) {
+      MC_Generate(&w,0x20261020);unsigned slot=0;
+      while(slot<MC_CHESTS && w.chest_blocks[slot][0].item!=MC_IRON)slot++;
+      assert(slot<MC_CHESTS);
+      int cx=w.chest_map[slot][0]-2,floor=w.chest_map[slot][1]-2,cz=w.chest_map[slot][2]-1;
+      w.x=cx+.5f;w.y=floor+1.01f;w.z=cz-2.5f;w.yaw=0;w.pitch=-.06f;w.time=90;
+      if(k==48) {
+        w.z=cz+.5f;w.yaw=1.570796327f;w.pitch=-.8f;
+        assert(MC_SceneTap(&w,400,240)&&w.bag&&w.open_chest==slot);
+      }
+      w.notice=NULL;
     }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];
