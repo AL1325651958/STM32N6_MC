@@ -210,6 +210,10 @@ static uint16_t map_color(uint8_t b)
     case MC_PLANKS:
     case MC_TABLE:
     case MC_FENCE:return 0xa365;
+    case MC_BIRCH_WOOD:
+    case MC_BIRCH_PLANKS:return 0xd6b6;
+    case MC_DARK_WOOD:
+    case MC_DARK_PLANKS:return 0x5a04;
     case MC_LEAVES:return 0x3b85;
     case MC_GLASS:return 0x9f7f;
     case MC_TORCH:return 0xfaa0;

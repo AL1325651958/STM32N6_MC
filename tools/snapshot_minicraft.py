@@ -16,7 +16,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/minicraft"
-ARCHIVE_ROOT = ROOT / "out/verified-v5"
+ARCHIVE_ROOT = ROOT / "out/verified-v6"
 
 
 def digest(data):
@@ -58,7 +58,7 @@ def main():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archive_root = ARCHIVE_ROOT / stamp
     archive_root.mkdir(parents=True, exist_ok=False)
-    source_zip = archive_root / "MiniCraft-v5-source.zip"
+    source_zip = archive_root / "MiniCraft-v6-source.zip"
     source_hashes = {}
     with zipfile.ZipFile(source_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for rel in sources:

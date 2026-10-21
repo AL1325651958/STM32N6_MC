@@ -28,7 +28,12 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
        /* Ranged combat IDs are appended so all existing saves keep their
           original item numbering. */
        MC_BOW, MC_ARROW, MC_IRON_HELMET, MC_IRON_CHESTPLATE,
-       MC_IRON_LEGGINGS, MC_IRON_BOOTS, MC_ITEM_COUNT };
+       MC_IRON_LEGGINGS, MC_IRON_BOOTS,
+       /* P3 wood variants are appended so every v1-v4 item/map ID stays
+          stable.  They are explicit blocks even though they live after the
+          legacy item range. */
+       MC_BIRCH_WOOD, MC_BIRCH_PLANKS, MC_DARK_WOOD, MC_DARK_PLANKS,
+       MC_ITEM_COUNT };
 #define MC_HOTBAR 8
 #define MC_SLOTS 32
 #define MC_CHEST_SLOTS 24

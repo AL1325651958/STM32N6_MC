@@ -247,7 +247,8 @@ void MC_Generate(MC_World *w, uint32_t seed)
     int biome=biome_at(x,z,seed);
     if(biome==1 || (hash(x,z,seed)&15)>(biome==2?8:4) || (abs(x-64)<4 && abs(z-64)<4)) continue;
     int h=height(x,z,seed); if(h<18 || MC_Get(w,x,h,z)!=MC_GRASS) continue;
-    for(int y=h+1; y<=h+4; ++y) MC_Set(w,x,y,z,MC_WOOD);
+    uint8_t trunk=biome==2?MC_DARK_WOOD:((hash(x,z,seed+0x9e37u)&7u)==0u?MC_BIRCH_WOOD:MC_WOOD);
+    for(int y=h+1; y<=h+4; ++y) MC_Set(w,x,y,z,trunk);
     for(int dy=3; dy<=6; ++dy) for(int dz=-2; dz<=2; ++dz) for(int dx=-2; dx<=2; ++dx)
       if(abs(dx)+abs(dz)+(dy==6?2:0)<=4 && MC_Get(w,x+dx,h+dy,z+dz)==MC_AIR)
         MC_Set(w,x+dx,h+dy,z+dz,MC_LEAVES);
@@ -595,11 +596,21 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
           if(h.ny) {int rr=abs((int)tu-8)+abs((int)tv-8);n+=(rr%3==0?-30:14);}
           else n+=((tu+(tv/5))%4==0?-25:0);
           break;
+        case MC_BIRCH_WOOD:r=190;g=176;b=126;
+          if(h.ny){int rr=abs((int)tu-8)+abs((int)tv-8);n+=(rr%3==0?-28:10);}
+          else if((tu+tv*3)%7==0)n=-35;
+          break;
+        case MC_DARK_WOOD:r=82;g=53;b=31;
+          if(h.ny){int rr=abs((int)tu-8)+abs((int)tv-8);n+=(rr%3==0?-24:12);}
+          else if((tu+tv*3)%6==0)n=-28;
+          break;
         case MC_LEAVES:r=56;g=119;b=40;n*=2;break;
         case MC_BEDROCK:r=53;g=56;b=62;break;
         case MC_WATER:r=40;g=113;b=186;n=(int)(sinf(tu*.8f+tv*.6f+w->time*2)*11);break;
         case MC_COBBLE:if((tu+((tv/5)&1)*4)%7==0 || tv%5==0)n=-45;break;
         case MC_PLANKS:r=179;g=137;b=79;if(tv%4==0 || (tu+(tv/4)*7)%16==0)n=-32;break;
+        case MC_BIRCH_PLANKS:r=204;g=181;b=126;if(tv%4==0 || (tu+(tv/4)*7)%16==0)n=-30;break;
+        case MC_DARK_PLANKS:r=105;g=68;b=39;if(tv%4==0 || (tu+(tv/4)*7)%16==0)n=-28;break;
         case MC_TABLE:r=147;g=100;b=51;if(h.ny && (tu%5==0 || tv%5==0))n=-50;else if(!h.ny && tu>4 && tu<11)n=-35;break;
         case MC_FURNACE:r=102;g=107;b=111;if(!h.ny && tu>3 && tu<12 && tv>3 && tv<10){r=44;g=31;b=24;if(tv<6){r=247;g=132;b=24;}}break;
         case MC_COAL_ORE:if((hash(tu/2,tv/2,13)&15)<5){r=35;g=38;b=42;}break;

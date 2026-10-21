@@ -2,12 +2,12 @@
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
-static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT","REDSTONE DUST","REDSTONE DUST ON","REDSTONE LAMP","REDSTONE LAMP ON","LEVER","LEVER ON","BUTTON","BUTTON ON","BOW","ARROW","IRON HELMET","IRON CHESTPLATE","IRON LEGGINGS","IRON BOOTS"};
-static const uint16_t colors[MC_ITEM_COUNT]={0,0x6cc6,0x8b07,0x8410,0xd66f,0x8b45,0x3b85,0x3186,0x3397,0x7390,0xb48a,0x9347,0x630c,0x4208,0xb3ac,0x9f7f,0xb2a8,0xff20,0x9b05,0x2104,0xc638,0xa366,0x94b2,0xdefb,0xe924,0x9b05,0x9b05,0xdefb,0x9347,0x6cc6,0x3b85,0xa365,0x9b05,0x8c71,0x8c71,0x6a64,0x4d8b,0xf6A0,0x7e24,0x8410,0x8410,0x8410,0x8410,0xc9b0,0xf800,0xf800,0x8410,0xffe0,0x9b05,0xffc0,0xb48a,0xffe0,0x8a45,0xe7be,0xa514,0xa514,0xa514,0xa514};
+static const char *names[MC_ITEM_COUNT]={"AIR","GRASS","DIRT","STONE","SAND","LOG","LEAVES","BEDROCK","WATER","COBBLE","PLANKS","WORKBENCH","FURNACE","COAL ORE","IRON ORE","GLASS","BRICKS","TORCH","STICKS","COAL","IRON","WOOD PICK","STONE PICK","IRON PICK","APPLE","AXE","SHOVEL","SWORD","CHEST","BED","SAPLING","DOOR","DOOR OPEN","STONE SLAB","SLAB TOP","FARMLAND","WHEAT CROP","WHEAT MATURE","WHEAT SEEDS","WHEAT","FENCE","STONE STAIRS","STONE STAIRS EAST","STONE STAIRS SOUTH","STONE STAIRS WEST","RAW MEAT","REDSTONE DUST","REDSTONE DUST ON","REDSTONE LAMP","REDSTONE LAMP ON","LEVER","LEVER ON","BUTTON","BUTTON ON","BOW","ARROW","IRON HELMET","IRON CHESTPLATE","IRON LEGGINGS","IRON BOOTS","BIRCH LOG","BIRCH PLANKS","DARK LOG","DARK PLANKS"};
+static const uint16_t colors[MC_ITEM_COUNT]={0,0x6cc6,0x8b07,0x8410,0xd66f,0x8b45,0x3b85,0x3186,0x3397,0x7390,0xb48a,0x9347,0x630c,0x4208,0xb3ac,0x9f7f,0xb2a8,0xff20,0x9b05,0x2104,0xc638,0xa366,0x94b2,0xdefb,0xe924,0x9b05,0x9b05,0xdefb,0x9347,0x6cc6,0x3b85,0xa365,0x9b05,0x8c71,0x8c71,0x6a64,0x4d8b,0xf6A0,0x7e24,0x8410,0x8410,0x8410,0x8410,0xc9b0,0xf800,0xf800,0x8410,0xffe0,0x9b05,0xffc0,0xb48a,0xffe0,0x8a45,0xe7be,0xa514,0xa514,0xa514,0xa514,0xd6b6,0xc5a2,0x5a04,0x7b05};
 const char *MC_ItemName(unsigned i){return i<MC_ITEM_COUNT?names[i]:"EMPTY";}uint16_t MC_ItemColor(unsigned i){return i<MC_ITEM_COUNT?colors[i]:0;}
 void MC_HoldStart(MC_Hold*h,int x,int y,uint32_t n){*h=(MC_Hold){x,y,x,y,n};}void MC_HoldMove(MC_Hold*h,int x,int y,uint32_t n){int dx=x-h->anchor_x,dy=y-h->anchor_y;h->x=x;h->y=y;if(dx*dx+dy*dy>144){h->anchor_x=x;h->anchor_y=y;h->since=n;}}int MC_HoldReady(const MC_Hold*h,uint32_t n){return(uint32_t)(n-h->since)>=450;}
 int MC_IsBlock(unsigned i) {
-  return (i>MC_AIR && i<MC_BLOCK_COUNT) || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP || i==MC_FARMLAND || i==MC_WHEAT_CROP || i==MC_WHEAT_MATURE || (i>=MC_FENCE && i<=MC_STAIR_WEST) || (i>=MC_DUST && i<=MC_BUTTON_ON);
+  return (i>MC_AIR && i<MC_BLOCK_COUNT) || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP || i==MC_FARMLAND || i==MC_WHEAT_CROP || i==MC_WHEAT_MATURE || (i>=MC_FENCE && i<=MC_STAIR_WEST) || (i>=MC_DUST && i<=MC_BUTTON_ON) || (i>=MC_BIRCH_WOOD && i<=MC_DARK_PLANKS);
 }
 static int map_only(unsigned i){return i==MC_FARMLAND||i==MC_WHEAT_CROP||i==MC_WHEAT_MATURE||(i>=MC_STAIR_EAST&&i<=MC_STAIR_WEST)||i==MC_DUST_ON||i==MC_LAMP_ON||i==MC_LEVER_ON||i==MC_BUTTON_ON;}
 static uint8_t redstone_off(uint8_t b)
@@ -249,23 +249,34 @@ void MC_SelectItem(MC_World *w,unsigned item) {
   if(MC_ToolIndex(item)>=0 && (w->creative || w->items[item]))w->equipped=(uint8_t)item;
 }
 typedef struct{uint8_t out,n,a,na,b,nb,station;}R;
-static const R recipes[]={{MC_PLANKS,4,MC_WOOD,1,0,0,0},{MC_STICK,4,MC_PLANKS,2,0,0,0},{MC_TABLE,1,MC_PLANKS,4,0,0,0},{MC_WOOD_PICK,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_STONE_PICK,1,MC_COBBLE,3,MC_STICK,2,MC_TABLE},{MC_FURNACE,1,MC_COBBLE,8,0,0,MC_TABLE},{MC_COAL,1,MC_WOOD,1,MC_PLANKS,1,MC_FURNACE},{MC_TORCH,4,MC_COAL,1,MC_STICK,1,0},{MC_IRON,1,MC_IRON_ORE,1,MC_COAL,1,MC_FURNACE},{MC_IRON_PICK,1,MC_IRON,3,MC_STICK,2,MC_TABLE},{MC_GLASS,4,MC_SAND,4,MC_COAL,1,MC_FURNACE},{MC_BRICK,4,MC_COBBLE,4,MC_COAL,1,MC_FURNACE},{MC_AXE,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_SHOVEL,1,MC_PLANKS,1,MC_STICK,2,MC_TABLE},{MC_SWORD,1,MC_PLANKS,2,MC_STICK,1,MC_TABLE},{MC_CHEST,1,MC_PLANKS,8,0,0,MC_TABLE},{MC_BED,1,MC_PLANKS,3,MC_SAPLING,3,MC_TABLE},{MC_DOOR,1,MC_PLANKS,6,0,0,MC_TABLE},{MC_SLAB,6,MC_COBBLE,3,0,0,MC_TABLE},{MC_FENCE,3,MC_PLANKS,4,MC_STICK,2,MC_TABLE},{MC_STAIR,4,MC_COBBLE,6,0,0,MC_TABLE},{MC_DUST,4,MC_COAL,1,MC_IRON,1,MC_TABLE},{MC_LAMP,1,MC_DUST,4,MC_GLASS,4,MC_TABLE},{MC_LEVER,1,MC_STICK,1,MC_COBBLE,1,MC_TABLE},{MC_BUTTON,1,MC_PLANKS,1,0,0,MC_TABLE},{MC_BOW,1,MC_PLANKS,3,MC_STICK,3,MC_TABLE},{MC_ARROW,4,MC_STICK,1,MC_IRON,1,MC_TABLE},{MC_IRON_HELMET,1,MC_IRON,5,0,0,MC_TABLE},{MC_IRON_CHESTPLATE,1,MC_IRON,8,0,0,MC_TABLE},{MC_IRON_LEGGINGS,1,MC_IRON,7,0,0,MC_TABLE},{MC_IRON_BOOTS,1,MC_IRON,4,0,0,MC_TABLE}};
-static const char*cost[]={"1 LOG - 4 PLANKS","2 PLANKS - 4 STICKS","4 PLANKS","3 PLANKS 2 STICKS","3 COBBLE 2 STICKS","8 COBBLE","1 LOG 1 PLANK","1 COAL 1 STICK","1 ORE 1 COAL","3 IRON 2 STICKS","4 SAND 1 COAL","4 COBBLE 1 COAL","3 PLANKS 2 STICKS","1 PLANK 2 STICKS","2 PLANKS 1 STICK","8 PLANKS","3 PLANKS 3 SAPLINGS","6 PLANKS","3 COBBLE - 6 STONE SLABS","4 PLANKS 2 STICKS - 3 FENCES","6 COBBLE - 4 STONE STAIRS","1 COAL 1 IRON - 4 DUST","4 DUST 4 GLASS","1 STICK 1 COBBLE","1 PLANK","3 PLANKS 3 STICKS","1 STICK 1 IRON - 4 ARROWS","5 IRON","8 IRON","7 IRON","4 IRON"};
+static const R recipes[]={{MC_PLANKS,4,MC_WOOD,1,0,0,0},{MC_STICK,4,MC_PLANKS,2,0,0,0},{MC_TABLE,1,MC_PLANKS,4,0,0,0},{MC_WOOD_PICK,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_STONE_PICK,1,MC_COBBLE,3,MC_STICK,2,MC_TABLE},{MC_FURNACE,1,MC_COBBLE,8,0,0,MC_TABLE},{MC_COAL,1,MC_WOOD,1,MC_PLANKS,1,MC_FURNACE},{MC_TORCH,4,MC_COAL,1,MC_STICK,1,0},{MC_IRON,1,MC_IRON_ORE,1,MC_COAL,1,MC_FURNACE},{MC_IRON_PICK,1,MC_IRON,3,MC_STICK,2,MC_TABLE},{MC_GLASS,4,MC_SAND,4,MC_COAL,1,MC_FURNACE},{MC_BRICK,4,MC_COBBLE,4,MC_COAL,1,MC_FURNACE},{MC_AXE,1,MC_PLANKS,3,MC_STICK,2,MC_TABLE},{MC_SHOVEL,1,MC_PLANKS,1,MC_STICK,2,MC_TABLE},{MC_SWORD,1,MC_PLANKS,2,MC_STICK,1,MC_TABLE},{MC_CHEST,1,MC_PLANKS,8,0,0,MC_TABLE},{MC_BED,1,MC_PLANKS,3,MC_SAPLING,3,MC_TABLE},{MC_DOOR,1,MC_PLANKS,6,0,0,MC_TABLE},{MC_SLAB,6,MC_COBBLE,3,0,0,MC_TABLE},{MC_FENCE,3,MC_PLANKS,4,MC_STICK,2,MC_TABLE},{MC_STAIR,4,MC_COBBLE,6,0,0,MC_TABLE},{MC_DUST,4,MC_COAL,1,MC_IRON,1,MC_TABLE},{MC_LAMP,1,MC_DUST,4,MC_GLASS,4,MC_TABLE},{MC_LEVER,1,MC_STICK,1,MC_COBBLE,1,MC_TABLE},{MC_BUTTON,1,MC_PLANKS,1,0,0,MC_TABLE},{MC_BOW,1,MC_PLANKS,3,MC_STICK,3,MC_TABLE},{MC_ARROW,4,MC_STICK,1,MC_IRON,1,MC_TABLE},{MC_IRON_HELMET,1,MC_IRON,5,0,0,MC_TABLE},{MC_IRON_CHESTPLATE,1,MC_IRON,8,0,0,MC_TABLE},{MC_IRON_LEGGINGS,1,MC_IRON,7,0,0,MC_TABLE},{MC_IRON_BOOTS,1,MC_IRON,4,0,0,MC_TABLE},{MC_BIRCH_PLANKS,4,MC_BIRCH_WOOD,1,0,0,0},{MC_DARK_PLANKS,4,MC_DARK_WOOD,1,0,0,0}};
+static const char*cost[]={"1 LOG - 4 PLANKS","2 PLANKS - 4 STICKS","4 PLANKS","3 PLANKS 2 STICKS","3 COBBLE 2 STICKS","8 COBBLE","1 LOG 1 PLANK","1 COAL 1 STICK","1 ORE 1 COAL","3 IRON 2 STICKS","4 SAND 1 COAL","4 COBBLE 1 COAL","3 PLANKS 2 STICKS","1 PLANK 2 STICKS","2 PLANKS 1 STICK","8 PLANKS","3 PLANKS 3 SAPLINGS","6 PLANKS","3 COBBLE - 6 STONE SLABS","4 PLANKS 2 STICKS - 3 FENCES","6 COBBLE - 4 STONE STAIRS","1 COAL 1 IRON - 4 DUST","4 DUST 4 GLASS","1 STICK 1 COBBLE","1 PLANK","3 PLANKS 3 STICKS","1 STICK 1 IRON - 4 ARROWS","5 IRON","8 IRON","7 IRON","4 IRON","1 BIRCH LOG - 4 BIRCH PLANKS","1 DARK LOG - 4 DARK PLANKS"};
 unsigned MC_RecipeCount(void){return sizeof(recipes)/sizeof(recipes[0]);}const char*MC_RecipeName(unsigned r){return r<MC_RecipeCount()?MC_ItemName(recipes[r].out):"";}const char*MC_RecipeCost(unsigned r){return r<MC_RecipeCount()?cost[r]:"";}
 unsigned MC_RecipeResult(unsigned r){return r<MC_RecipeCount()?recipes[r].out:0;}
 unsigned MC_RecipeIngredient(unsigned r,unsigned p){if(r>=MC_RecipeCount()||p>1)return 0;return p?recipes[r].b:recipes[r].a;}
 unsigned MC_RecipeIngredientCount(unsigned r,unsigned p){if(r>=MC_RecipeCount()||p>1)return 0;return p?recipes[r].nb:recipes[r].na;}
 static int near(const MC_World*w,uint8_t b){for(int y=(int)w->y-2;y<=(int)w->y+2;y++)for(int z=(int)w->z-3;z<=(int)w->z+3;z++)for(int x=(int)w->x-3;x<=(int)w->x+3;x++)if(MC_Get(w,x,y,z)==b)return 1;return 0;}
-const char*MC_RecipeStatus(const MC_World*w,unsigned r){if(r>=MC_RecipeCount())return "";R c=recipes[r];if(c.station==MC_FURNACE)return "USE FURNACE INPUT AND FUEL";if(!w->creative&&c.station&&!near(w,c.station))return "NEEDS WORKBENCH";return w->creative||(w->items[c.a]>=c.na&&w->items[c.b]>=c.nb)?"READY":"NEED MATERIALS";}
+static unsigned material_count(const MC_World *w,unsigned id){
+  if(id==MC_PLANKS)return w->items[MC_PLANKS]+w->items[MC_BIRCH_PLANKS]+w->items[MC_DARK_PLANKS];
+  if(id==MC_WOOD)return w->items[MC_WOOD]+w->items[MC_BIRCH_WOOD]+w->items[MC_DARK_WOOD];
+  return w->items[id];
+}
+static void remove_material(MC_World *w,unsigned id,unsigned n){
+  unsigned ids[3]={id,MC_BIRCH_PLANKS,MC_DARK_PLANKS};
+  if(id==MC_WOOD){ids[1]=MC_BIRCH_WOOD;ids[2]=MC_DARK_WOOD;}
+  else if(id!=MC_PLANKS){remove_item(w,id,n);return;}
+  for(unsigned i=0;i<3&&n;i++){unsigned take=w->items[ids[i]]<n?w->items[ids[i]]:n;if(take){remove_item(w,ids[i],take);n-=take;}}
+}
+const char*MC_RecipeStatus(const MC_World*w,unsigned r){if(r>=MC_RecipeCount())return "";R c=recipes[r];if(c.station==MC_FURNACE)return "USE FURNACE INPUT AND FUEL";if(!w->creative&&c.station&&!near(w,c.station))return "NEEDS WORKBENCH";return w->creative||(material_count(w,c.a)>=c.na&&(!c.nb||material_count(w,c.b)>=c.nb))?"READY":"NEED MATERIALS";}
 int MC_Craft(MC_World *w,unsigned r) {
   if(r>=MC_RecipeCount())return 0;
   R c=recipes[r];
   /* Smelting has its own persistent input/fuel/output and timer. */
   if(c.station==MC_FURNACE){w->notice="OPEN FURNACE  ADD INPUT AND FUEL";return 0;}
   if(!w->creative && c.station && !near(w,c.station)){w->notice="PLACE WORKBENCH NEARBY";return 0;}
-  if(!w->creative && (w->items[c.a]<c.na || w->items[c.b]<c.nb)){w->notice="NEED MORE MATERIALS";return 0;}
+  if(!w->creative && (material_count(w,c.a)<c.na || (c.nb && material_count(w,c.b)<c.nb))){w->notice="NEED MORE MATERIALS";return 0;}
   MC_Stack before[MC_SLOTS];memcpy(before,w->slots,sizeof(before));
-  if(!w->creative){remove_item(w,c.a,c.na);remove_item(w,c.b,c.nb);}
+  if(!w->creative){remove_material(w,c.a,c.na);if(c.nb)remove_material(w,c.b,c.nb);}
   if(!MC_Give(w,c.out,c.n)) {
     memcpy(w->slots,before,sizeof(before));MC_SyncInventory(w);w->notice="BAG FULL  NO MATERIALS USED";return 0;
   }
@@ -296,7 +307,7 @@ int MC_DropSpawn(MC_World *w,unsigned item,unsigned count,float x,float y,float 
   }
   return count==0;
 }
-static int fuel_time(unsigned item){return item==MC_COAL?40:item==MC_WOOD?15:item==MC_PLANKS?10:0;}
+static int fuel_time(unsigned item){return item==MC_COAL?40:(item==MC_WOOD||item==MC_BIRCH_WOOD||item==MC_DARK_WOOD)?15:(item==MC_PLANKS||item==MC_BIRCH_PLANKS||item==MC_DARK_PLANKS)?10:0;}
 static unsigned smelt(unsigned item){return item==MC_IRON_ORE?MC_IRON:item==MC_SAND?MC_GLASS:item==MC_COBBLE?MC_BRICK:item==MC_WOOD?MC_COAL:0;}
 /* A chest touching a furnace becomes a small, deterministic automation link.
    It feeds one input/fuel stack when the corresponding furnace slot has room
@@ -525,9 +536,9 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   if(tool==MC_BOW)return;
   unsigned tier=ti>=0 && ti<3?(unsigned)ti+1:0;
   int hard=h.block==MC_STONE || h.block==MC_COBBLE || h.block==MC_COAL_ORE || h.block==MC_IRON_ORE || h.block==MC_FURNACE || h.block==MC_BRICK || h.block==MC_SLAB || h.block==MC_SLAB_TOP || (h.block>=MC_STAIR && h.block<=MC_STAIR_WEST);
-  int suited=hard?tier>0:(tool==MC_AXE && (h.block==MC_WOOD || h.block==MC_PLANKS || h.block==MC_TABLE || h.block==MC_CHEST || h.block==MC_DOOR || h.block==MC_DOOR_OPEN || h.block==MC_FENCE)) ||
+  int suited=hard?tier>0:(tool==MC_AXE && (h.block==MC_WOOD || h.block==MC_BIRCH_WOOD || h.block==MC_DARK_WOOD || h.block==MC_PLANKS || h.block==MC_BIRCH_PLANKS || h.block==MC_DARK_PLANKS || h.block==MC_TABLE || h.block==MC_CHEST || h.block==MC_DOOR || h.block==MC_DOOR_OPEN || h.block==MC_FENCE)) ||
     (tool==MC_SHOVEL && (h.block==MC_GRASS || h.block==MC_DIRT || h.block==MC_SAND)) || (tool==MC_SWORD && h.block==MC_LEAVES);
-  float sec=hard?(tier?1.3f/(tier*.8f):4):h.block==MC_WOOD?1.4f:h.block==MC_LEAVES?.25f:.55f;
+  float sec=hard?(tier?1.3f/(tier*.8f):4):(h.block==MC_WOOD||h.block==MC_BIRCH_WOOD||h.block==MC_DARK_WOOD)?1.4f:h.block==MC_LEAVES?.25f:.55f;
   if(!hard && suited)sec*=.35f;
   if(w->creative)sec=.15f;
   w->mining+=dt/sec;if(w->mining<1)return;
@@ -554,6 +565,8 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
   if(h.block==MC_BUTTON_ON||h.block==MC_BUTTON)drop=MC_BUTTON;
   if(h.block>=MC_STAIR && h.block<=MC_STAIR_WEST)drop=MC_STAIR;
   if(h.block==MC_DOOR_OPEN)drop=MC_DOOR;
+  if(h.block==MC_BIRCH_WOOD)drop=MC_BIRCH_WOOD;
+  if(h.block==MC_DARK_WOOD)drop=MC_DARK_WOOD;
   if(h.block==MC_SLAB_TOP)drop=MC_SLAB;
   if(h.block==MC_LEAVES){unsigned n=(unsigned)(h.x*7+h.y*3+h.z);drop=n%5==0?MC_APPLE:n%3==0?MC_SAPLING:0;}
   int harvest=(!hard || tier>0) && (h.block!=MC_IRON_ORE || tier>=2);
@@ -564,7 +577,7 @@ void MC_PlayTick(MC_World *w,float dt,int holding,float x,float y) {
     }
     if(h.block==MC_COAL_ORE)MC_AddExperience(w,2);
     else if(h.block==MC_IRON_ORE)MC_AddExperience(w,3);
-    else if(h.block==MC_WOOD || h.block==MC_STONE || h.block==MC_COBBLE)MC_AddExperience(w,1);
+    else if(h.block==MC_WOOD || h.block==MC_BIRCH_WOOD || h.block==MC_DARK_WOOD || h.block==MC_STONE || h.block==MC_COBBLE)MC_AddExperience(w,1);
   }
   if(!w->creative && h.block==MC_GRASS && ((unsigned)(h.x*13+h.z*7)%7u==0u)) {
     if(!MC_Give(w,MC_WHEAT_SEEDS,1))MC_DropSpawn(w,MC_WHEAT_SEEDS,1,h.x+.5f,h.y+.55f,h.z+.5f);
@@ -730,7 +743,9 @@ void MC_SystemsTick(MC_World *w,float dt) {
     if(!space){g->age=110;continue;}
     /* Prevent a growing trunk from enclosing the player. */
     if(fabsf(w->x-(x+.5f))<2.8f && fabsf(w->z-(z+.5f))<2.8f && w->y<y+6 && w->y+1.8f>y){g->age=110;continue;}
-    for(int dy=0;dy<4;dy++)MC_Set(w,x,y+dy,z,MC_WOOD);
+    uint32_t variety=(uint32_t)x*0x9e3779b9u^(uint32_t)z*0x85ebca6bu^w->seed;
+    uint8_t trunk=((variety&7u)==0u)?MC_BIRCH_WOOD:((variety&3u)==0u?MC_DARK_WOOD:MC_WOOD);
+    for(int dy=0;dy<4;dy++)MC_Set(w,x,y+dy,z,trunk);
     for(int dy=2;dy<=5;dy++)for(int dz=-2;dz<=2;dz++)for(int dx=-2;dx<=2;dx++)
       if(abs(dx)+abs(dz)+(dy==5?2:0)<=4 && MC_Get(w,x+dx,y+dy,z+dz)==MC_AIR)MC_Set(w,x+dx,y+dy,z+dz,MC_LEAVES);
     memset(g,0,sizeof(*g));

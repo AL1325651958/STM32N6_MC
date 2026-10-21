@@ -18,11 +18,13 @@ NAMES += ['RAW MEAT']
 NAMES += ['REDSTONE DUST', 'REDSTONE DUST ON', 'REDSTONE LAMP', 'REDSTONE LAMP ON', 'LEVER', 'LEVER ON', 'BUTTON', 'BUTTON ON']
 NAMES += ['BOW', 'ARROW']
 NAMES += ['IRON HELMET', 'IRON CHESTPLATE', 'IRON LEGGINGS', 'IRON BOOTS']
+NAMES += ['BIRCH LOG', 'BIRCH PLANKS', 'DARK LOG', 'DARK PLANKS']
 BASE = {1:(112,165,55), 2:(139,96,61), 3:(141,145,151), 4:(224,208,150),
         5:(144,100,53), 6:(62,135,49), 7:(67,69,77), 8:(55,135,207),
         9:(133,139,146), 10:(191,145,83), 11:(169,116,59), 12:(115,121,128),
         13:(143,148,153), 14:(143,148,153), 15:(145,219,231),
-        16:(183,85,62), 28:(177,122,51)}
+        16:(183,85,62), 28:(177,122,51), 60:(194,181,132),
+        61:(204,181,126), 62:(82,53,31), 63:(105,68,39)}
 
 
 def shade(c, n):
@@ -45,6 +47,16 @@ def tex(item, u, v, face):
                 n -= 38
         elif (u+(v//5)) % 4 == 0:
             n -= 38
+    elif item in (60, 62):
+        if face == 0:
+            c = (224,214,171) if item == 60 else (112,74,44)
+            if max(abs(u-7), abs(v-7)) % 3 == 0:
+                n -= 34
+        elif (u+(v//5)) % 4 == 0:
+            n -= 32
+    elif item in (61, 63):
+        if v % 4 == 0 or (u+v//4*7) % 16 == 0:
+            n -= 34
     elif item == 6:
         n *= 2
     elif item == 7:

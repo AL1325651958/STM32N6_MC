@@ -44,9 +44,11 @@ int main(int argc,char **argv) {
  a.experience=MC_XpForLevel(5)+2;a.level=(uint8_t)MC_XpLevel(&a);
  a.armor[0]=(MC_Stack){MC_IRON_HELMET,1,73};
  a.reserve[MC_WOOD_PICK]=2;a.reserve_wear[0]=17;
+ assert(MC_Give(&a,MC_BIRCH_WOOD,3)&&MC_Give(&a,MC_DARK_PLANKS,5));
  MC_Set(&a,29,40,30,MC_CHEST);a.chest_map[0][0]=30;a.chest_map[0][1]=41;a.chest_map[0][2]=31;
  a.chest_blocks[0][2]=(MC_Stack){MC_AXE,1,17};a.chest_blocks[0][23]=(MC_Stack){MC_PLANKS,64,0};
  MC_Set(&a,31,40,30,MC_FURNACE);a.furnaces[0]=(MC_Furnace){32,41,31,{MC_IRON_ORE,10,0},{MC_COAL,2,0},{MC_IRON,4,0},21.5f,2.5f};
+ MC_Set(&a,33,40,30,MC_FURNACE);a.furnaces[1]=(MC_Furnace){34,41,31,{0},{MC_BIRCH_WOOD,1,0},{0},0,0};
  MC_Set(&a,35,40,30,MC_SAPLING);a.growers[0]=(MC_Grower){36,41,31,78.5f};
  MC_Set(&a,50,40,30,MC_FARMLAND);MC_Set(&a,50,41,30,MC_WHEAT_CROP);a.growers[1]=(MC_Grower){51,42,31,32.5f};
  MC_Set(&a,36,40,30,MC_BED);a.spawn[0]=37;a.spawn[1]=41;a.spawn[2]=31;
@@ -58,8 +60,9 @@ int main(int argc,char **argv) {
  assert(b.experience==a.experience&&b.level==5&&MC_XpProgress(&b)==2);
  assert(!memcmp(a.slots,b.slots,sizeof(a.slots))&&!memcmp(a.chest_blocks,b.chest_blocks,sizeof(a.chest_blocks)));
  assert(!memcmp(a.chest_map,b.chest_map,sizeof(a.chest_map))&&!memcmp(a.spawn,b.spawn,sizeof(a.spawn))&&b.reserve[MC_WOOD]==999);
+ assert(b.items[MC_BIRCH_WOOD]==3&&b.items[MC_DARK_PLANKS]==5);
  assert(b.reserve[MC_WOOD_PICK]==2&&b.reserve_wear[0]==17);
- assert(b.furnaces[0].progress==2.5f&&b.furnaces[0].burn==21.5f&&b.growers[0].age==78.5f);
+ assert(b.furnaces[0].progress==2.5f&&b.furnaces[0].burn==21.5f&&b.furnaces[1].fuel.item==MC_BIRCH_WOOD&&b.growers[0].age==78.5f);
  assert(MC_Get(&b,50,40,30)==MC_FARMLAND&&MC_Get(&b,50,41,30)==MC_WHEAT_CROP&&b.growers[1].age==32.5f);
  /* Old v4 metadata has no hunger marker and therefore loads with full hunger. */
  memcpy(copy,save,MC_SAVE_SIZE);uint8_t *meta=save+MC_SAVE_V1_SIZE;meta[6]=0;meta[7]=0;meta[MC_SAVE_META-95]=0;crc(save,MC_SAVE_META);
