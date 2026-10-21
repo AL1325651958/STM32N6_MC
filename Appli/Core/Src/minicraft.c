@@ -24,6 +24,15 @@ static float noise(int x, int z, unsigned scale, uint32_t seed)
 }
 static int height(int x, int z, uint32_t seed)
 { return 10 + (int)(noise(x,z,24,seed)*18 + noise(x,z,8,seed+1)*7); }
+/* Three broad terrain regions reuse existing block IDs, so the map and v4
+   save layout stay unchanged: sandy desert, ordinary grassland and denser
+   forest.  The centre is kept as grassland for a reliable spawn area. */
+static int biome_at(int x,int z,uint32_t seed)
+{
+  if(abs(x-64)<12 && abs(z-64)<12)return 0;
+  float n=noise(x,z,48,seed+0x4d3bu);
+  return n<.30f?1:n>.68f?2:0;
+}
 
 /* Small deterministic ruins give exploration a readable destination without
    adding another world data structure.  They are generated only for a new
@@ -225,14 +234,19 @@ void MC_Generate(MC_World *w, uint32_t seed)
   MC_NewPlayer(w,0);
   memset(w->blocks,0,MC_MAP_BYTES); w->seed=seed;
   for(int z=0; z<MC_MAP_Z; ++z) for(int x=0; x<MC_MAP_X; ++x) {
-    int h=height(x,z,seed); w->blocks[index_of(x,0,z)]=MC_BEDROCK;
-    for(int y=1; y<=h; ++y) MC_Set(w,x,y,z,y==h?(h<17?MC_SAND:MC_GRASS):y>h-4?MC_DIRT:MC_STONE);
+    int h=height(x,z,seed),biome=biome_at(x,z,seed); w->blocks[index_of(x,0,z)]=MC_BEDROCK;
+    for(int y=1; y<=h; ++y) {
+      uint8_t top=h<17||biome==1?MC_SAND:MC_GRASS;
+      uint8_t fill=biome==1&&y>=h-3?MC_SAND:y>h-4?MC_DIRT:MC_STONE;
+      MC_Set(w,x,y,z,y==h?top:fill);
+    }
     for(int y=h+1; y<=16; ++y) MC_Set(w,x,y,z,MC_WATER);
   }
   /* Trees are a second pass, so neighboring columns cannot erase their crowns. */
   for(int z=4; z<MC_MAP_Z-4; z+=6) for(int x=4; x<MC_MAP_X-4; x+=6) {
-    if((hash(x,z,seed)&15)>4 || (abs(x-64)<4 && abs(z-64)<4)) continue;
-    int h=height(x,z,seed); if(h<18) continue;
+    int biome=biome_at(x,z,seed);
+    if(biome==1 || (hash(x,z,seed)&15)>(biome==2?8:4) || (abs(x-64)<4 && abs(z-64)<4)) continue;
+    int h=height(x,z,seed); if(h<18 || MC_Get(w,x,h,z)!=MC_GRASS) continue;
     for(int y=h+1; y<=h+4; ++y) MC_Set(w,x,y,z,MC_WOOD);
     for(int dy=3; dy<=6; ++dy) for(int dz=-2; dz<=2; ++dz) for(int dx=-2; dx<=2; ++dx)
       if(abs(dx)+abs(dz)+(dy==6?2:0)<=4 && MC_Get(w,x+dx,h+dy,z+dz)==MC_AIR)

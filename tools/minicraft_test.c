@@ -22,6 +22,16 @@ int main(void)
   MC_Generate(&w,0x12345678);
   assert(MC_Get(&w,-1,0,0)==MC_BEDROCK && MC_Get(&w,MC_MAP_X,0,0)==MC_BEDROCK);
   assert(MC_Get(&w,64,0,64)==MC_BEDROCK && MC_Get(&w,64,MC_MAP_Y,64)==MC_AIR);
+  /* Broad terrain regions remain visible using existing block IDs: a desert
+     has several sand layers, while grassland/forest retain grass tops. */
+  unsigned desert=0,grass=0,wood=0;
+  for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++) {
+    int top=MC_MAP_Y-1;while(top>0 && (MC_Get(&w,x,top,z)==MC_AIR||MC_Get(&w,x,top,z)==MC_WATER))top--;
+    if(MC_Get(&w,x,top,z)==MC_SAND && MC_Get(&w,x,top-1,z)==MC_SAND && MC_Get(&w,x,top-2,z)==MC_SAND)desert++;
+    if(MC_Get(&w,x,top,z)==MC_GRASS)grass++;
+    for(int y=1;y<MC_MAP_Y;y++)if(MC_Get(&w,x,y,z)==MC_WOOD){wood++;break;}
+  }
+  assert(desert>100&&grass>100&&wood>0);
   uint32_t crc=MC_Crc32(w.blocks,MC_MAP_BYTES);
   MC_Generate(&w,0x12345678);assert(crc==MC_Crc32(w.blocks,MC_MAP_BYTES));
   MC_Generate(&w,0x12345679);assert(crc!=MC_Crc32(w.blocks,MC_MAP_BYTES));
