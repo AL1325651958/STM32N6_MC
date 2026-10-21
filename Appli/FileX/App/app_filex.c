@@ -164,6 +164,27 @@ UINT SD_File_Write(const CHAR *file_name, const VOID *data, ULONG size)
   return status;
 }
 
+UINT SD_Card_Flush(void)
+{return sd_media_opened ? fx_media_flush(&sd_media) : FX_NOT_OPEN;}
+
+UINT SD_File_Delete(const CHAR *file_name)
+{
+  if(file_name==FX_NULL)return FX_PTR_ERROR;
+  if(!sd_media_opened)return FX_NOT_OPEN;
+  UINT result=fx_file_delete(&sd_media,(CHAR *)file_name);
+  if(result==FX_SUCCESS)result=fx_media_flush(&sd_media);
+  return result;
+}
+
+UINT SD_File_Exists(const CHAR *file_name)
+{
+  if(file_name==FX_NULL)return FX_PTR_ERROR;
+  if(!sd_media_opened)return FX_NOT_OPEN;
+  FX_FILE file;UINT result=fx_file_open(&sd_media,&file,(CHAR *)file_name,FX_OPEN_FOR_READ);
+  if(result==FX_SUCCESS)result=fx_file_close(&file);
+  return result;
+}
+
 UINT SD_File_Read(const CHAR *file_name, VOID *buffer, ULONG capacity,
                   ULONG *actual_size)
 {

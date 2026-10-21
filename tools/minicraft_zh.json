@@ -279,5 +279,13 @@
   "TAP OPEN": "点按打开",
   "TAP TOGGLE": "点按开关",
   "TAP ACTIVATE": "点按启动",
-  "TAP REST": "点按休息"
+  "TAP REST": "点按休息",
+  "DELETE": "删除",
+  "DELETE WORLD": "删除世界",
+  "DELETE BOTH SAVES": "同时删除两个存档",
+  "THIS CANNOT BE UNDONE": "删除后无法恢复",
+  "NO SD  CANNOT DELETE": "无存储卡 无法删除",
+  "WORLD DELETED": "世界已删除",
+  "DELETE FAILED  SAVE MAY REMAIN": "删除未完成 请重试",
+  "CHECK WORLD NUMBER BEFORE DELETING": "请先核对世界编号"
 }

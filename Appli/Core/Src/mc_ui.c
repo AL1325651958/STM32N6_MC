@@ -110,14 +110,17 @@ static void small(uint16_t *fb,int x,int y,const char *s,uint16_t color)
 int MC_MenuTap(unsigned x,unsigned y,int creating)
 {
   if(x<200 || x>=600)return MC_MENU_NONE;
-  if(creating) {
+  if(creating==2) {
+    if(y>=306 && y<362)return MC_MENU_DELETE_CONFIRM;
+    if(y>=378 && y<426)return MC_MENU_BACK;
+  } else if(creating) {
     if(y>=180 && y<228)return MC_MENU_SEED;
     if(y>=240 && y<288)return MC_MENU_MODE;
     if(y>=306 && y<362)return MC_MENU_CREATE;
     if(y>=378 && y<426)return MC_MENU_BACK;
   } else {
-    if(y>=180 && y<252)return MC_MENU_WORLD1;
-    if(y>=276 && y<348)return MC_MENU_WORLD2;
+    if(y>=180 && y<252)return x>=520?MC_MENU_DELETE1:MC_MENU_WORLD1;
+    if(y>=276 && y<348)return x>=520?MC_MENU_DELETE2:MC_MENU_WORLD2;
   }
   return MC_MENU_NONE;
 }
@@ -126,9 +129,15 @@ void MC_MenuDraw(uint16_t *fb,const uint8_t banks[2],int creating,unsigned bank,
   for(int y=0;y<480;y++)rect(fb,0,y,800,1,y<260?0x19ea:0x2225);
   for(int x=0;x<800;x+=40)rect(fb,x,260+(x/40%3)*16,40,220,0x2b46);
   panel(fb,140,38,520,410);text(fb,350,66,"MINICRAFT N6",0xffe0);
-  text(fb,creating?368:376,110,creating?"CREATE WORLD":"MAIN MENU",0xffff);
+  text(fb,creating?368:376,110,creating==2?"DELETE WORLD":creating?"CREATE WORLD":"MAIN MENU",0xffff);
   char label[48];
-  if(creating) {
+  if(creating==2) {
+    snprintf(label,sizeof(label),MC_Localize("WORLD %u"),bank+1);text(fb,370,158,label,0xffc0);
+    text(fb,336,214,"DELETE BOTH SAVES",0xffff);
+    text(fb,344,250,"THIS CANNOT BE UNDONE",0xf9a4);
+    panel(fb,200,306,400,56);text(fb,368,328,"DELETE WORLD",0xf9a4);
+    panel(fb,200,378,400,48);text(fb,384,394,"BACK",0xffff);
+  } else if(creating) {
     snprintf(label,sizeof(label),MC_Localize("WORLD %u"),bank+1);small(fb,370,148,label,0xffc0);
     panel(fb,200,180,400,48);snprintf(label,sizeof(label),MC_Localize("SEED %lu  CHANGE"),(unsigned long)seed);text(fb,214,196,label,0xffff);
     panel(fb,200,240,400,48);text(fb,260,256,creative?"MODE CREATIVE":"MODE SURVIVAL",0xffff);
@@ -139,6 +148,7 @@ void MC_MenuDraw(uint16_t *fb,const uint8_t banks[2],int creating,unsigned bank,
     snprintf(label,sizeof(label),MC_Localize("WORLD %u  %s"),i+1,MC_Localize(banks[i]==1?"CONTINUE":banks[i]==2?"UNAVAILABLE":"CREATE"));
     text(fb,220,y+20,label,banks[i]==2?0xf9a4:0xffff);
     small(fb,220,y+48,banks[i]==1?"LOAD SAVED PROGRESS":banks[i]==2?"SAVE EXISTS  PRESERVED":"EMPTY SLOT  NEW SEED AND MODE",0xffc0);
+    if(banks[i]){panel(fb,520,y+8,70,56);text(fb,539,y+28,"DELETE",0xf9a4);}
   }
   small(fb,160,460,message?message:"SELECT A WORLD",0xffff);
 }

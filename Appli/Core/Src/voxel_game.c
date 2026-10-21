@@ -22,7 +22,6 @@ static MC_World world;
 static uint32_t generation;
 static int active_slot=-1,sd_ready,save_locked,dirty;
 static const char *status="NEW WORLD";
-static const char *files[2][2]={{"MC0.SAV","MC1.SAV"},{"MC2.SAV","MC3.SAV"}};
 static unsigned world_bank,max_frame_ms;
 static char saved_status[48];
 static int main_menu=1,creating,menu_down,menu_release;
@@ -41,7 +40,7 @@ static void scan_worlds(void)
   for(unsigned bank=0;bank<2;bank++) {
     int valid=0,occupied=0;
     for(unsigned slot=0;slot<2;slot++) {
-      ULONG got=0;UINT ret=SD_File_Read(files[bank][slot],save_blob,sizeof(save_blob),&got);
+      ULONG got=0;UINT ret=SD_File_Read(MC_WorldFile(bank,slot),save_blob,sizeof(save_blob),&got);
       if(ret==FX_NOT_FOUND)continue;
       if(ret==FX_SUCCESS && MC_SaveValidate(save_blob,got))valid=1;
       else occupied=1;
@@ -50,6 +49,27 @@ static void scan_worlds(void)
   }
 }
 
+
+static int delete_file(void *context,const char *name)
+{
+  (void)context;UINT result=SD_File_Delete(name);
+  return result==FX_SUCCESS||result==FX_NOT_FOUND?0:-1;
+}
+static int sync_files(void *context){(void)context;return SD_Card_Flush()==FX_SUCCESS?0:-1;}
+static int file_absent(void *context,const char *name){(void)context;return SD_File_Exists(name)==FX_NOT_FOUND;}
+static void delete_world(void)
+{
+  if(HAL_SD_GetState(&hsd2)!=HAL_SD_STATE_READY || SD_Card_Init()!=FX_SUCCESS) {
+    menu_message="NO SD  CANNOT DELETE";return;
+  }
+  const MC_Storage storage={0,delete_file,sync_files,file_absent};
+  int deleted=MC_DeleteWorld(world_bank,&storage);
+  scan_worlds();
+  if(deleted && sd_ready && bank_state[world_bank]==0) {
+    generation=0;active_slot=-1;dirty=0;save_locked=0;creating=0;
+    menu_message="WORLD DELETED";
+  } else menu_message="DELETE FAILED  SAVE MAY REMAIN";
+}
 
 static void clean_buffer(uint16_t *fb)
 {
@@ -96,7 +116,7 @@ static int load_world(void)
   int found_bad=0,found_unknown=0;generation=0;active_slot=-1;save_locked=0;
   sd_ready=HAL_SD_GetState(&hsd2)==HAL_SD_STATE_READY && SD_Card_Init()==FX_SUCCESS;
   if(sd_ready) for(int slot=0;slot<2;slot++) {
-    ULONG got=0;UINT ret=SD_File_Read(files[world_bank][slot],save_blob,sizeof(save_blob),&got);
+    ULONG got=0;UINT ret=SD_File_Read(MC_WorldFile(world_bank,slot),save_blob,sizeof(save_blob),&got);
     if(ret==FX_SUCCESS && got>=8 && !memcmp(save_blob,"N6MC",4) && (save_blob[4]>6 || save_blob[5] || save_blob[6] || save_blob[7]))found_unknown=1;
     uint32_t gen=ret==FX_SUCCESS?MC_SaveValidate(save_blob,got):0;
     if(gen && (active_slot<0 || (int32_t)(gen-generation)>0)) {
@@ -120,9 +140,9 @@ static void save_world(void)
   int target=active_slot==0?1:0;
   uint32_t next=generation+1;if(!next) next=1;
   MC_SaveEncode(&world,next,save_blob);
-  if(SD_File_Write(files[world_bank][target],save_blob,MC_SAVE_SIZE)!=FX_SUCCESS) {status="SD WRITE FAILED";MC_NotifySave(&world,MC_SAVE_WRITE_FAILED);sd_ready=0;return;}
+  if(SD_File_Write(MC_WorldFile(world_bank,target),save_blob,MC_SAVE_SIZE)!=FX_SUCCESS) {status="SD WRITE FAILED";MC_NotifySave(&world,MC_SAVE_WRITE_FAILED);sd_ready=0;return;}
   ULONG got=0;
-  if(SD_File_Read(files[world_bank][target],save_blob,sizeof(save_blob),&got)!=FX_SUCCESS || MC_SaveValidate(save_blob,got)!=next) {
+  if(SD_File_Read(MC_WorldFile(world_bank,target),save_blob,sizeof(save_blob),&got)!=FX_SUCCESS || MC_SaveValidate(save_blob,got)!=next) {
     status="SD VERIFY FAILED";MC_NotifySave(&world,MC_SAVE_VERIFY_FAILED);sd_ready=0;return;
   }
   generation=next;active_slot=target;dirty=0;snprintf(saved_status,sizeof(saved_status),"SAVED TO SD  %lu MS",(unsigned long)(HAL_GetTick()-start));status=saved_status;
@@ -196,7 +216,12 @@ void VoxelGame_Run(void)
           else if(!menu_down && !menu_release) {
             menu_down=1;
             int action=MC_MenuTap(touch.points[0].x,touch.points[0].y,creating);
-            if(action==MC_MENU_WORLD1 || action==MC_MENU_WORLD2) {
+            if(action==MC_MENU_DELETE1 || action==MC_MENU_DELETE2) {
+              unsigned bank=(unsigned)(action-MC_MENU_DELETE1);
+              if(bank_state[bank]) {world_bank=bank;creating=2;menu_message="CHECK WORLD NUMBER BEFORE DELETING";}
+              else {world_bank=bank;creating=1;}
+            } else if(action==MC_MENU_DELETE_CONFIRM && creating==2)delete_world();
+            else if(action==MC_MENU_WORLD1 || action==MC_MENU_WORLD2) {
               world_bank=(unsigned)(action-MC_MENU_WORLD1);
               if(bank_state[world_bank]==1) {
                 if(load_world()){main_menu=0;menu_release=1;}
@@ -204,7 +229,7 @@ void VoxelGame_Run(void)
               else menu_message="EXISTING SAVE UNREADABLE  CHECK SD ON PC";
             } else if(action==MC_MENU_SEED)create_seed=(create_seed+7919u)%1000000u;
             else if(action==MC_MENU_MODE)create_creative=!create_creative;
-            else if(action==MC_MENU_BACK)creating=0;
+            else if(action==MC_MENU_BACK){creating=0;menu_message="SELECT A WORLD";}
             else if(action==MC_MENU_CREATE) {
               scan_worlds(); /* Recheck immediately before choosing a write target. */
               if(bank_state[world_bank]!=0)menu_message="SLOT OCCUPIED  EXISTING WORLD PRESERVED";

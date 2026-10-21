@@ -55,6 +55,9 @@ UINT MX_FileX_Init(void);
 /* USER CODE BEGIN EFP */
 UINT SD_Card_Init(void);
 UINT SD_Card_DeInit(void);
+UINT SD_Card_Flush(void);
+UINT SD_File_Delete(const CHAR *file_name);
+UINT SD_File_Exists(const CHAR *file_name);
 UINT SD_File_Write(const CHAR *file_name, const VOID *data, ULONG size);
 UINT SD_File_Read(const CHAR *file_name, VOID *buffer, ULONG capacity,
                   ULONG *actual_size);

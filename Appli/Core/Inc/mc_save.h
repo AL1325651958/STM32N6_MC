@@ -13,4 +13,14 @@
 void MC_SaveEncode(const MC_World *world, uint32_t generation, uint8_t *buffer);
 uint32_t MC_SaveValidate(const uint8_t *buffer, unsigned length);
 int MC_SaveDecode(MC_World *world, const uint8_t *buffer, unsigned length);
+/* remove: 0 on success/already absent; sync: 0 on success; absent: 1 only
+   when absence is confirmed (errors must return 0). No directory traversal. */
+typedef struct {
+  void *context;
+  int (*remove)(void *context,const char *name);
+  int (*sync)(void *context);
+  int (*absent)(void *context,const char *name);
+} MC_Storage;
+const char *MC_WorldFile(unsigned bank,unsigned slot);
+int MC_DeleteWorld(unsigned bank,const MC_Storage *storage);
 #endif

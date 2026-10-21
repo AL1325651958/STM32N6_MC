@@ -1,4 +1,19 @@
 #include "mc_save.h"
+const char *MC_WorldFile(unsigned bank,unsigned slot)
+{
+  static const char *names[2][2]={{"MC0.SAV","MC1.SAV"},{"MC2.SAV","MC3.SAV"}};
+  return bank<2&&slot<2?names[bank][slot]:0;
+}
+int MC_DeleteWorld(unsigned bank,const MC_Storage *s)
+{
+  if(bank>=2||!s||!s->remove||!s->sync||!s->absent)return 0;
+  for(unsigned slot=0;slot<2;slot++)if(s->remove(s->context,MC_WorldFile(bank,slot))) {
+    s->sync(s->context);return 0;
+  }
+  if(s->sync(s->context))return 0;
+  for(unsigned slot=0;slot<2;slot++)if(s->absent(s->context,MC_WorldFile(bank,slot))!=1)return 0;
+  return 1;
+}
 #include <math.h>
 #include <string.h>
 /* Versioned metadata offsets are fixed, independent of C struct padding. */

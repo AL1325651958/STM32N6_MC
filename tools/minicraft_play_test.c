@@ -42,6 +42,10 @@ int main(void) {
  assert(MC_MenuTap(400,200,1)==MC_MENU_SEED&&MC_MenuTap(400,260,1)==MC_MENU_MODE);
  assert(MC_MenuTap(400,330,1)==MC_MENU_CREATE&&MC_MenuTap(400,400,1)==MC_MENU_BACK);
  assert(MC_MenuTap(199,330,1)==MC_MENU_NONE&&MC_MenuTap(600,330,1)==MC_MENU_NONE);
+ assert(MC_MenuTap(550,200,0)==MC_MENU_DELETE1&&MC_MenuTap(550,300,0)==MC_MENU_DELETE2);
+ assert(MC_MenuTap(400,200,2)==MC_MENU_NONE&&MC_MenuTap(400,260,2)==MC_MENU_NONE);
+ assert(MC_MenuTap(400,330,2)==MC_MENU_DELETE_CONFIRM&&MC_MenuTap(400,400,2)==MC_MENU_BACK);
+ assert(MC_MenuTap(199,330,2)==MC_MENU_NONE&&MC_MenuTap(600,330,2)==MC_MENU_NONE);
 
  /* Nearby sand falls on a bounded scheduler, while supported sand stays put. */
  MC_Set(&w,4,5,4,MC_SAND);tick(&w,2);
@@ -446,6 +450,7 @@ int main(void) {
  const uint8_t banks[2]={1,0};
  MC_MenuDraw(fb,banks,0,0,20261021,0,"TEST");
  MC_MenuDraw(fb,banks,1,1,20261021,1,"TEST");
+ MC_MenuDraw(fb,banks,2,1,20261021,1,"TEST");
  for(int k=0;k<64;k++)assert(fb[800*480+k]==0xa55a);
  free(fb);free(w.blocks);puts("minicraft slots / crafting / containers / furnace / growth / survival / UI: OK");return 0;
 }
