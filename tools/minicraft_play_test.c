@@ -344,6 +344,31 @@ int main(void) {
  for(int y=8;y<38;y++)new_metrics_crc^=MC_Crc32(&fb[y*800+10],578*2);
  assert(metrics_crc!=new_metrics_crc);
 
+ /* Saving feedback changes only the existing button, in the world and bag.
+    The old log area remains transparent for every success/error result. */
+ uint16_t *idle_frame=malloc(800*480*sizeof(*idle_frame));assert(idle_frame);
+ for(unsigned bag=0;bag<2;bag++) {
+   uint32_t button_crc[MC_SAVE_VERIFY_FAILED+1];w.bag=(uint8_t)bag;
+   for(unsigned result=MC_SAVE_IDLE;result<=MC_SAVE_VERIFY_FAILED;result++) {
+     MC_NotifySave(&w,result);for(unsigned i=0;i<800*480;i++)fb[i]=0x4a69;
+     MC_UIDraw(fb,&w,0,15,67,"INVISIBLE LOG",1,0,0);
+     if(result==MC_SAVE_IDLE)memcpy(idle_frame,fb,800*480*sizeof(*fb));
+     uint32_t crc=0;
+     for(int y=0;y<480;y++)for(int x=0;x<800;x++)
+       if(x<700 || x>=790 || y<8 || y>=62)assert(fb[y*800+x]==idle_frame[y*800+x]);
+     for(int y=8;y<62;y++)crc=(crc<<1|crc>>31)^MC_Crc32(&fb[y*800+700],90*2);
+     button_crc[result]=crc;
+     for(unsigned previous=0;previous<result;previous++)assert(crc!=button_crc[previous]);
+   }
+ }
+ free(idle_frame);
+ MC_NotifySave(&w,MC_SAVE_OK);MC_SystemsTick(&w,2.75f);assert(w.save_feedback==MC_SAVE_OK);
+ MC_SystemsTick(&w,.3f);assert(w.save_feedback==MC_SAVE_IDLE);
+ MC_NotifySave(&w,MC_SAVE_WRITE_FAILED);MC_SystemsTick(&w,5.5f);assert(w.save_feedback==MC_SAVE_WRITE_FAILED);
+ MC_SystemsTick(&w,1);assert(w.save_feedback==MC_SAVE_IDLE);
+ MC_NotifySave(&w,MC_SAVE_BUSY);MC_SystemsTick(&w,10);assert(w.save_feedback==MC_SAVE_BUSY);
+ MC_NotifySave(&w,255);assert(w.save_feedback==MC_SAVE_IDLE&&!w.save_feedback_time);
+
  const uint8_t banks[2]={1,0};
  MC_MenuDraw(fb,banks,0,0,20261021,0,"TEST");
  MC_MenuDraw(fb,banks,1,1,20261021,1,"TEST");

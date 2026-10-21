@@ -114,18 +114,19 @@ static int load_world(void)
 }
 static void save_world(void)
 {
-  if(!sd_ready) {status="NO SD  VOLATILE WORLD";return;}
-  if(save_locked) {status="BAD SAVE  CHECK SD ON PC";return;}
+  if(!sd_ready) {status="NO SD  VOLATILE WORLD";MC_NotifySave(&world,MC_SAVE_NO_SD);return;}
+  if(save_locked) {status="BAD SAVE  CHECK SD ON PC";MC_NotifySave(&world,MC_SAVE_LOCKED);return;}
   uint32_t start=HAL_GetTick();
   int target=active_slot==0?1:0;
   uint32_t next=generation+1;if(!next) next=1;
   MC_SaveEncode(&world,next,save_blob);
-  if(SD_File_Write(files[world_bank][target],save_blob,MC_SAVE_SIZE)!=FX_SUCCESS) {status="SD WRITE FAILED";sd_ready=0;return;}
+  if(SD_File_Write(files[world_bank][target],save_blob,MC_SAVE_SIZE)!=FX_SUCCESS) {status="SD WRITE FAILED";MC_NotifySave(&world,MC_SAVE_WRITE_FAILED);sd_ready=0;return;}
   ULONG got=0;
   if(SD_File_Read(files[world_bank][target],save_blob,sizeof(save_blob),&got)!=FX_SUCCESS || MC_SaveValidate(save_blob,got)!=next) {
-    status="SD VERIFY FAILED";sd_ready=0;return;
+    status="SD VERIFY FAILED";MC_NotifySave(&world,MC_SAVE_VERIFY_FAILED);sd_ready=0;return;
   }
   generation=next;active_slot=target;dirty=0;snprintf(saved_status,sizeof(saved_status),"SAVED TO SD  %lu MS",(unsigned long)(HAL_GetTick()-start));status=saved_status;
+  MC_NotifySave(&world,MC_SAVE_OK);
 }
 
 typedef struct {uint8_t active,id,role,action_done;uint16_t x,y;uint32_t action;MC_Hold hold;} Contact;
@@ -210,7 +211,7 @@ void VoxelGame_Run(void)
               else {
                 MC_Generate(&world,create_seed);MC_SetMode(&world,create_creative);
                 generation=0;active_slot=-1;save_locked=0;dirty=1;
-                if(sd_ready)save_world();else status="NO SD  VOLATILE WORLD";
+                save_world();
                 main_menu=0;creating=0;menu_release=1;
               }
             }
@@ -252,7 +253,7 @@ void VoxelGame_Run(void)
     selected=world.hotbar[world.slot];
     /* Save on request, and once per 30s when the player changed the world or position. */
     int do_save=request_save || (dirty && sd_ready && !save_locked && now-last_save>=30000);
-    if(do_save && sd_ready && !save_locked) status="SAVING SD";
+    if(do_save && sd_ready && !save_locked) {status="SAVING SD";MC_NotifySave(&world,MC_SAVE_BUSY);}
     display(back,selected,fps,touch_ready,f,s);back^=1;
     if(world.change_world) {
       world.change_world=0;

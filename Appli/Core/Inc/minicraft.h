@@ -7,6 +7,8 @@
 #define MC_MAP_Y 64
 #define MC_MAP_Z 256
 #define MC_MAP_BYTES (MC_MAP_X * MC_MAP_Y * MC_MAP_Z)
+enum { MC_SAVE_IDLE, MC_SAVE_BUSY, MC_SAVE_OK, MC_SAVE_NO_SD,
+       MC_SAVE_LOCKED, MC_SAVE_WRITE_FAILED, MC_SAVE_VERIFY_FAILED };
 #define MC_VIEW_W 160
 #define MC_VIEW_H 96
 
@@ -117,6 +119,9 @@ typedef struct {
   uint16_t redstone_button_pos[MC_REDSTONE_BUTTONS][3];
   float redstone_button_timer[MC_REDSTONE_BUTTONS];
   uint8_t mob_target;
+  /* Temporary button feedback, never part of the save format. */
+  uint8_t save_feedback;
+  float save_feedback_time;
   const char *notice;
 } MC_World;
 
@@ -124,6 +129,7 @@ uint8_t MC_Get(const MC_World *world, int x, int y, int z);
 void MC_Set(MC_World *world, int x, int y, int z, uint8_t block);
 void MC_Generate(MC_World *world, uint32_t seed);
 void MC_GenerateTerrain(MC_World *world,uint32_t seed);
+void MC_NotifySave(MC_World *world,unsigned result);
 void MC_Respawn(MC_World *world);
 int MC_IsSolid(uint8_t block);
 int MC_Edit(MC_World *world, int place, uint8_t selected);

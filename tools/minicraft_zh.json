@@ -268,5 +268,11 @@
   "V2 MIGRATED  EXTRA ITEMS IN RESERVE": "旧档已迁移 多余物品存入储备",
   "WORLD AND INVENTORY LOADED": "世界与背包已加载",
   "DARK CAVES REMAIN DANGEROUS IN DAYLIGHT": "白天的黑暗洞穴仍有危险",
-  "TORCHES AND POWERED LAMPS PREVENT SPAWNS": "火把和通电红石灯可阻止敌人生成"
+  "TORCHES AND POWERED LAMPS PREVENT SPAWNS": "火把和通电红石灯可阻止敌人生成",
+  "SAVING": "保存中",
+  "SAVED": "已保存",
+  "NO SD": "无存储卡",
+  "READ ONLY": "只读",
+  "WRITE FAILED": "写入失败",
+  "VERIFY FAILED": "校验失败"
 }

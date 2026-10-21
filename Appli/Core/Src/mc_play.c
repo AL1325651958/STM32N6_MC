@@ -244,6 +244,7 @@ void MC_CloseBag(MC_World *w) {
   w->recipe_requires=0;
 }
 void MC_NewPlayer(MC_World *w,int legacy) {
+  w->save_feedback=MC_SAVE_IDLE;w->save_feedback_time=0;
   memset(w->items,0,sizeof(w->items));memset(w->slots,0,sizeof(w->slots));
   memset(w->armor,0,sizeof(w->armor));
   memset(w->chest_blocks,0,sizeof(w->chest_blocks));memset(w->chest_map,0,sizeof(w->chest_map));
@@ -745,8 +746,19 @@ unsigned MC_CropGrowthNeeds(const MC_World *w,int x,int y,int z) {
   if(!light)needs|=MC_CROP_NEEDS_LIGHT;
   return needs;
 }
+void MC_NotifySave(MC_World *w,unsigned result) {
+  if(result>MC_SAVE_VERIFY_FAILED)result=MC_SAVE_IDLE;
+  w->save_feedback=(uint8_t)result;
+  w->save_feedback_time=result==MC_SAVE_IDLE || result==MC_SAVE_BUSY?0:result==MC_SAVE_OK?3:6;
+}
 void MC_SystemsTick(MC_World *w,float dt) {
   if(!(dt>0))return;
+  /* UI feedback keeps wall-clock duration even while the inventory pauses
+     gameplay or a long frame forces physics to clamp its time step. */
+  if(w->save_feedback_time>0) {
+    w->save_feedback_time=fmaxf(0,w->save_feedback_time-dt);
+    if(!w->save_feedback_time)w->save_feedback=MC_SAVE_IDLE;
+  }
   dt=fminf(dt,.1f);
   int redstone_dirty=0;
   for(unsigned i=0;i<MC_REDSTONE_BUTTONS;i++) if(w->redstone_button_timer[i]>0) {

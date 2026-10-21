@@ -19,6 +19,13 @@ int main(int argc,char **argv) {
  MC_World a={.blocks=calloc(1,MC_MAP_BYTES)},b={.blocks=calloc(1,MC_MAP_BYTES)};
  uint8_t *save=calloc(1,MC_SAVE_SIZE),*copy=malloc(MC_SAVE_SIZE);assert(a.blocks&&b.blocks&&save&&copy);
  MC_Generate(&a,77);
+ /* Save-button state is transient, cannot affect encoded bytes, and cannot
+    survive loading an existing world. */
+ MC_SaveEncode(&a,4,copy);MC_NotifySave(&a,MC_SAVE_OK);MC_SaveEncode(&a,4,save);
+ assert(!memcmp(copy,save,MC_SAVE_SIZE));
+ MC_NotifySave(&b,MC_SAVE_VERIFY_FAILED);assert(MC_SaveDecode(&b,save,MC_SAVE_SIZE));
+ assert(b.save_feedback==MC_SAVE_IDLE&&!b.save_feedback_time);
+ MC_Generate(&a,77);assert(a.save_feedback==MC_SAVE_IDLE);
  /* Finished food in a registered furnace survives a real save roundtrip. */
  MC_Set(&a,50,40,30,MC_FURNACE);
  a.furnaces[0]=(MC_Furnace){51,41,31,{MC_RAW_MEAT,2,0},{MC_COAL,1,0},{MC_COOKED_MEAT,1,0},3,1};

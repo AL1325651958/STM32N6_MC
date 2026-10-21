@@ -18,7 +18,8 @@ int main(int argc,char **argv)
   char path[1024];
   const char *variants[]={"preview","night","inventory","mining","chest","furnace","creative","geometry","farming","combat","ruins",
     "action_attack","action_shoot","action_feed","action_place","action_use",
-    "crop_dry","crop_dark","crop_growing","crop_ready","action_eat","main_menu","create_world","slab_merge","cave_threat","cave_lit"};
+    "crop_dry","crop_dark","crop_growing","crop_ready","action_eat","main_menu","create_world","slab_merge","cave_threat","cave_lit",
+    "save_busy","save_ok","save_no_sd","save_locked","save_write_failed","save_verify_failed"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -99,6 +100,11 @@ int main(int argc,char **argv)
       assert(MC_MobSpawn(&w,12,1,16)==(k==24));
       MC_Give(&w,k==24?MC_SWORD:MC_TORCH,k==24?1:8);
       w.notice=k==24?"DARK CAVES REMAIN DANGEROUS IN DAYLIGHT":"TORCHES AND POWERED LAMPS PREVENT SPAWNS";
+    }
+    if(k>=26) {
+      static const unsigned results[]={MC_SAVE_BUSY,MC_SAVE_OK,MC_SAVE_NO_SD,MC_SAVE_LOCKED,MC_SAVE_WRITE_FAILED,MC_SAVE_VERIFY_FAILED};
+      MC_Generate(&w,0x20261020);MC_Give(&w,MC_TORCH,8);
+      MC_NotifySave(&w,results[k-26]);w.notice=NULL;
     }
     MC_Render(&w,view,MC_VIEW_W,MC_VIEW_H);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];

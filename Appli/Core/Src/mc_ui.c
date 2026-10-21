@@ -403,7 +403,15 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
   snprintf(info,sizeof(info),MC_Localize("X %d Y %d Z %d FPS %u MAX %uMS"),(int)w->x,(int)w->y,(int)w->z,fps,max_ms);
   text(fb,20,16,info,0xffff);
   panel(fb,600,8,90,54);text(fb,629,28,w->bag?"CLOSE":"BAG",0xffff);
-  panel(fb,700,8,90,54);text(fb,729,28,"SAVE",0xffff);
+  {
+    static const char *labels[]={"SAVE","SAVING","SAVED","NO SD","READ ONLY","WRITE FAILED","VERIFY FAILED"};
+    unsigned result=w->save_feedback<=MC_SAVE_VERIFY_FAILED?w->save_feedback:MC_SAVE_IDLE;
+    uint16_t color=result==MC_SAVE_OK?0x07e0:result>=MC_SAVE_NO_SD?0xf9a4:result==MC_SAVE_BUSY?0xffe0:0xffff;
+    const unsigned char *p=(const unsigned char *)MC_Localize(labels[result]);int width=0;
+    while(*p)width+=next_codepoint(&p)>=128?16:12;
+    panel(fb,700,8,90,54);text(fb,745-width/2,28,labels[result],color);
+    if(result!=MC_SAVE_IDLE)rect(fb,702,58,86,2,color);
+  }
   if(w->bag) {
     panel(fb,12,76,776,370);
     text(fb,24,84,w->creative?"CREATIVE CATALOG":"BAG  32 SLOTS",0xffe0);
