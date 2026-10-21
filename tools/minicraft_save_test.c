@@ -29,7 +29,7 @@ int main(int argc,char **argv) {
  /* v6 persists linked door halves and rejects orphan upper panels. Legacy
     doors grow only into air, preserving any construction above them. */
  MC_Set(&a,40,40,40,MC_DOOR);MC_Set(&a,40,41,40,MC_DOOR_TOP);
- roundtrip(&a,&b,save);assert(save[4]==6&&MC_Get(&b,40,41,40)==MC_DOOR_TOP);
+ roundtrip(&a,&b,save);assert(save[4]==MC_SAVE_VERSION&&MC_Get(&b,40,41,40)==MC_DOOR_TOP);
  MC_Set(&a,40,40,40,MC_AIR);MC_SaveEncode(&a,4,save);assert(!MC_SaveValidate(save,MC_SAVE_SIZE));
  MC_Set(&a,40,41,40,MC_AIR);MC_Set(&a,40,40,40,MC_DOOR_OPEN);
  MC_Set(&a,42,40,40,MC_DOOR);MC_Set(&a,42,41,40,MC_STONE);MC_SaveEncode(&a,4,save);
@@ -154,7 +154,7 @@ int main(int argc,char **argv) {
  for(unsigned y=0;y<64;y++)for(unsigned z=0;z<128;z++)
    assert(!memcmp(legacy+64+(y*128+z)*128,b.blocks+(y*MC_MAP_Z+z)*MC_MAP_X,128));
  assert(b.x==10.5f&&b.z==10.5f&&b.chest_blocks[0][0].count==7&&MC_Get(&b,200,1,200)!=MC_AIR);
- MC_SaveEncode(&b,12,copy);assert(copy[4]==6&&MC_SaveValidate(copy,MC_SAVE_SIZE)==12);
+ MC_SaveEncode(&b,12,copy);assert(copy[4]==MC_SAVE_VERSION&&MC_SaveValidate(copy,MC_SAVE_SIZE)==12);
  put16(legacy+old_base+792,129);put32(legacy+48,MC_Crc32(legacy+old_base,MC_SAVE_META));
  put32(legacy+60,MC_Crc32(legacy,60));assert(!MC_SaveValidate(legacy,old_length));free(legacy);
  /* Real SD files are opened strictly read-only; migrate in memory only. */
@@ -175,5 +175,5 @@ int main(int argc,char **argv) {
    }
    printf("Legacy save roundtrip, terrain preserved (only free-space door tops may be added): %s\n",argv[i]);
  }
- free(copy);free(save);free(a.blocks);free(b.blocks);puts("minicraft v1/v2/v3/v4/v5/v6 save / corruption / migration / persistent systems: OK");return 0;
+ free(copy);free(save);free(a.blocks);free(b.blocks);puts("minicraft v1/v2/v3/v4/v5/v6/v7 save / corruption / migration / persistent systems: OK");return 0;
 }

@@ -48,7 +48,7 @@ static int coord(const uint8_t*p,unsigned mx,unsigned mz){unsigned x=get16(p),y=
 static int range(float f,float lo,float hi){return isfinite(f)&&f>=lo&&f<=hi;}
 
 void MC_SaveEncode(const MC_World*w,uint32_t generation,uint8_t*p){
-  memset(p,0,MC_SAVE_HEADER);memcpy(p,"N6MC",4);put32(p+4,6);put32(p+8,MC_MAP_X);put32(p+12,MC_MAP_Y);put32(p+16,MC_MAP_Z);put32(p+20,generation);put32(p+24,w->seed);
+  memset(p,0,MC_SAVE_HEADER);memcpy(p,"N6MC",4);put32(p+4,MC_SAVE_VERSION);put32(p+8,MC_MAP_X);put32(p+12,MC_MAP_Y);put32(p+16,MC_MAP_Z);put32(p+20,generation);put32(p+24,w->seed);
   putfloat(p+28,w->x);putfloat(p+32,w->y);putfloat(p+36,w->z);putfloat(p+40,w->yaw);putfloat(p+44,w->pitch);memcpy(p+MC_SAVE_HEADER,w->blocks,MC_MAP_BYTES);
   uint8_t*m=p+MC_SAVE_V1_SIZE;memset(m,0,MC_SAVE_META);m[0]=1;m[1]=w->creative;m[2]=w->slot;m[3]=w->health;m[4]=w->air;m[5]=w->equipped;m[6]=w->hunger;m[7]=1;
   putfloat(m+8,w->time);putfloat(m+12,w->fall_speed);
@@ -78,17 +78,25 @@ static uint8_t saved_block(const uint8_t*p,const uint8_t*q,unsigned mx,unsigned 
 uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
   if(length<MC_SAVE_HEADER)return 0;
   unsigned v=get32(p+4),mx=get32(p+8),my=get32(p+12),mz=get32(p+16);
-  if(memcmp(p,"N6MC",4)||v<1||v>6||my!=MC_MAP_Y||mx!=mz||(mx!=128&&mx!=MC_MAP_X)||!get32(p+20))return 0;
+  if(memcmp(p,"N6MC",4)||v<1||v>MC_SAVE_VERSION||my!=MC_MAP_Y||mx!=mz||(mx!=128&&mx!=MC_MAP_X)||!get32(p+20))return 0;
   unsigned bytes=mx*my*mz,base=MC_SAVE_HEADER+bytes;
   unsigned metadata=v==1?0:v==2?MC_SAVE_V2_META:v==3?MC_SAVE_V3_META:MC_SAVE_META;
   if(length!=base+metadata)return 0;
   if(get32(p+60)!=MC_Crc32(p,60)||get32(p+56)!=MC_Crc32(p+MC_SAVE_HEADER,bytes))return 0;
   if(!range(getfloat(p+28),.28f,mx-.28f)||!range(getfloat(p+32),1,MC_MAP_Y+4)||!range(getfloat(p+36),.28f,mz-.28f)||!range(getfloat(p+40),-100,100)||!range(getfloat(p+44),-1.4f,1.4f))return 0;
-  for(unsigned i=0;i<bytes;i++){unsigned b=p[MC_SAVE_HEADER+i];if(v==1?b>=9:v==2?b>=18:(b!=MC_AIR&&!MC_IsBlock(b)))return 0;}
-  for(unsigned i=0;i<mx*mz;i++)if(p[MC_SAVE_HEADER+i]!=MC_BEDROCK)return 0;
-  for(unsigned i=0;i<bytes;i++)if(MC_DoorUpper(p[MC_SAVE_HEADER+i])) {
-    if(v<6 || i<mx*mz || p[MC_SAVE_HEADER+i-mx*mz]!=MC_DoorBase(p[MC_SAVE_HEADER+i]))return 0;
+  /* Validate door pairs during the existing block pass, avoiding another
+     four-MiB scan. Preserve legacy lone lower doors under existing builds. */
+  for(unsigned i=0;i<bytes;i++) {
+    uint8_t b=p[MC_SAVE_HEADER+i];
+    if(v==1?b>=9:v==2?b>=18:(b!=MC_AIR&&!MC_IsBlock(b)))return 0;
+    if(v<7&&b>=MC_DOOR_ROTATED_FIRST)return 0;
+    if(MC_DoorUpper(b)) {
+      if(v<6 || i<mx*mz || p[MC_SAVE_HEADER+i-mx*mz]!=MC_DoorBase(b))return 0;
+    } else if(b>=MC_DOOR_ROTATED_FIRST&&MC_IsDoor(b)) {
+      if(i+mx*mz>=bytes || p[MC_SAVE_HEADER+i+mx*mz]!=MC_DoorState(MC_DoorFacing(b),MC_DoorOpen(b),1))return 0;
+    }
   }
+  for(unsigned i=0;i<mx*mz;i++)if(p[MC_SAVE_HEADER+i]!=MC_BEDROCK)return 0;
   if(v>=2){
     const uint8_t*m=p+base;unsigned len=v==2?MC_SAVE_V2_META:v==3?MC_SAVE_V3_META:MC_SAVE_META;
     if(get32(p+52)!=len||get32(p+48)!=MC_Crc32(m,len))return 0;

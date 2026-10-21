@@ -14,6 +14,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline',required=True,help='Git revision, or working-tree to compare the current renderer with/without inventory cache')
+    parser.add_argument('--baseline-cache',action='store_true',help='Enable the same view cache in a cache-capable Git baseline for a like-for-like timing comparison')
     args=parser.parse_args()
     out=ROOT/'out/minicraft/perf';out.mkdir(parents=True,exist_ok=True)
     gcc=shutil.which('gcc') or 'C:/Strawberry/c/bin/gcc.exe'
@@ -27,7 +28,7 @@ def main():
         source_hashes[path]=hashlib.sha256(data).hexdigest()
     for variant in ('baseline','optimized'):
         sources=[str(out/('baseline_'+name)) if variant=='baseline' else 'Appli/Core/Src/'+name for name in ('minicraft.c','mc_ui.c','mc_play.c')]
-        defines=['-DMC_BENCH_VIEW_CACHE'] if variant=='optimized' else []
+        defines=['-DMC_BENCH_VIEW_CACHE'] if variant=='optimized' or args.baseline_cache else []
         subprocess.run([gcc,'-std=c11','-O2','-Wall','-Wextra','-Werror',*defines,'-I','Appli/Core/Inc','tools/minicraft_bench.c',*sources,'Appli/Core/Src/mc_mobs.c','Appli/Core/Src/mc_view.c','-lm','-o',str(out/(variant+'.exe'))],cwd=ROOT,check=True)
     timings={};hashes={}
     for trial in range(3):
@@ -38,7 +39,7 @@ def main():
                 assert len(frames)==32
                 timings.setdefault(scene,{}).setdefault(variant,[]).append(float(ms))
                 hashes.setdefault(scene,{}).setdefault(variant,set()).add((crc,tuple(frames)))
-    report={'baseline_commit':revision,'baseline_source':'working tree without inventory cache' if worktree else 'Git revision','baseline_source_hashes':source_hashes,'frames_per_scene':32,'trials':3,'host_only':True,'optimized_inventory_view_cache':True,'scenes':{}}
+    report={'baseline_commit':revision,'baseline_source':'working tree without inventory cache' if worktree else 'Git revision','baseline_inventory_view_cache':args.baseline_cache,'baseline_source_hashes':source_hashes,'frames_per_scene':32,'trials':3,'host_only':True,'optimized_inventory_view_cache':True,'scenes':{}}
     for scene,variants in timings.items():
         assert hashes[scene]['baseline']==hashes[scene]['optimized'] and len(hashes[scene]['baseline'])==1, (scene,hashes[scene])
         old=statistics.median(variants['baseline']);new=statistics.median(variants['optimized'])

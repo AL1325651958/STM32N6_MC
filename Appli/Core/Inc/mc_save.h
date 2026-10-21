@@ -1,6 +1,7 @@
 #ifndef MC_SAVE_H
 #define MC_SAVE_H
 #include "minicraft.h"
+#define MC_SAVE_VERSION 7U
 #define MC_SAVE_HEADER 64U
 #define MC_SAVE_V1_SIZE (MC_SAVE_HEADER + MC_MAP_BYTES)
 #define MC_SAVE_V2_META 128U

@@ -17,7 +17,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/minicraft"
-ARCHIVE_ROOT = ROOT / "out/verified-v32"
+ARCHIVE_ROOT = ROOT / "out/verified-v33"
 
 
 def digest(data):
@@ -36,9 +36,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--skip-build", action="store_true", help="use an already completed firmware build")
     parser.add_argument("--benchmark-baseline", help="Git revision for optional host render comparison")
+    parser.add_argument("--benchmark-baseline-cache", action="store_true", help="enable the view cache in a cache-capable baseline too")
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
-    font_audit = OUT / "font-audit-v32"
+    font_audit = OUT / "font-audit-v33"
     run([sys.executable, "tools/make_minicraft_zh.py", "--font", str(OUT / "fonts/NotoSansSC.ttf"),
          "--pixel-font", str(OUT / "fonts/ark-pixel-12px-monospaced-zh_hans.ttf"),
          "--check", "--audit-dir", str(font_audit)], "snapshot-font.log")
@@ -51,7 +52,9 @@ def main():
             sheet.save(ppm.with_suffix(".png"))
 
     if args.benchmark_baseline:
-        run([sys.executable, "tools/bench_minicraft.py", "--baseline", args.benchmark_baseline], "snapshot-benchmark.log")
+        command=[sys.executable, "tools/bench_minicraft.py", "--baseline", args.benchmark_baseline]
+        if args.benchmark_baseline_cache:command.append("--baseline-cache")
+        run(command, "snapshot-benchmark.log")
 
     gcc = shutil.which("gcc") or "C:/Strawberry/c/bin/gcc.exe"
     preview_exe = OUT / "tests/minicraft_preview.exe"
@@ -64,7 +67,7 @@ def main():
     (OUT / "snapshot-preview-build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
     if result.returncode:
         raise SystemExit(f"preview build failed; see {OUT / 'snapshot-preview-build.log'}\n{result.stdout}{result.stderr}")
-    preview_dir = OUT / "ui-v32"
+    preview_dir = OUT / "ui-v33"
     preview_dir.mkdir(parents=True, exist_ok=True)
     result = subprocess.run([str(preview_exe), str(preview_dir)], cwd=ROOT,
                             text=True, capture_output=True, encoding="utf-8")
@@ -93,7 +96,7 @@ def main():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archive_root = ARCHIVE_ROOT / stamp
     archive_root.mkdir(parents=True, exist_ok=False)
-    source_zip = archive_root / "MiniCraft-v32-source.zip"
+    source_zip = archive_root / "MiniCraft-v33-source.zip"
     source_hashes = {}
     with zipfile.ZipFile(source_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for rel in sources:
@@ -113,7 +116,7 @@ def main():
         "MiniCraft_N6-Trusted.bin": signed,
         "MiniCraft_N6.bin": raw,
         "MiniCraft_N6.elf": elf.read_bytes(),
-        "initial-world-v6.SAV": (preview_dir / "initial-world-v6.SAV").read_bytes(),
+        "initial-world-v7.SAV": (preview_dir / "initial-world-v7.SAV").read_bytes(),
         "tests.log": tests.encode("utf-8"),
         "build.log": (OUT / "snapshot-build.log").read_bytes() if not args.skip_build else (OUT / "compile.log").read_bytes() + (OUT / "link.log").read_bytes(),
         "geometry.png": (preview_dir / "geometry.png").read_bytes(),
@@ -148,7 +151,7 @@ def main():
         (archive_root / name).write_bytes(data)
     validation = {
         "recorded_utc": stamp,
-        "version": 6,
+        "version": 7,
         "world_dimensions": [256, 64, 256],
         "save_bytes": 4195904,
         "firmware_bytes": len(raw),
@@ -167,8 +170,8 @@ def main():
         "source_bytes": sum((ROOT / p).stat().st_size for p in sources),
         "source_hashes_verified": True,
         "geometry": "Torch stem 4/16 wide × 10/16 high; stepped flame widths 4/16, 3/16, 2/16 reaching 14/16 total height; chest 14/16; bed 9/16; sapling crossed planes.",
-        "geometry_revision": 4,
-        "hardware": "Not flashed in this task. Real FileX deletion tested on an isolated RAM disk; actual SD deletion, touch confirmation, LCD furnace feedback and FPS still require board verification.",
+        "geometry_revision": 5,
+        "hardware": "Not flashed in this task. Four-facing two-cell doors, picking, body/projectile collision and v1-v7 saves tested on host; touch, LCD, real SD deletion/persistence and FPS require board verification.",
         "artifacts": {},
     }
     for name in [source_zip.name, *artifacts]:

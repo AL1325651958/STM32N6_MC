@@ -39,6 +39,9 @@ enum { MC_AIR, MC_GRASS, MC_DIRT, MC_STONE, MC_SAND, MC_WOOD, MC_LEAVES,
        MC_DOUBLE_SLAB, /* map-only: two stone slabs, existing IDs unchanged */
        MC_DOOR_TOP, MC_DOOR_TOP_OPEN,
        MC_ITEM_COUNT };
+/* Map-only directional doors: three rotations, each closed/open lower then
+   closed/open upper. All inventory and existing map IDs stay unchanged. */
+enum { MC_DOOR_ROTATED_FIRST=128, MC_DOOR_ROTATED_LAST=139 };
 #define MC_HOTBAR 8
 #define MC_SLOTS 32
 #define MC_CHEST_SLOTS 24
@@ -144,6 +147,9 @@ int MC_FurnaceBurningAt(const MC_World *world,int x,int y,int z);
 uint8_t MC_DoorBase(uint8_t block);
 int MC_IsDoor(uint8_t block);
 int MC_DoorUpper(uint8_t block);
+unsigned MC_DoorFacing(uint8_t block);
+int MC_DoorOpen(uint8_t block);
+uint8_t MC_DoorState(unsigned facing,int open,int upper);
 void MC_RemoveBlock(MC_World *world,int x,int y,int z);
 void MC_Respawn(MC_World *world);
 int MC_IsSolid(uint8_t block);

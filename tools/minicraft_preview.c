@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 /* Uses the same world generator, renderer, HUD and save encoder as the firmware. */
 int main(int argc,char **argv)
@@ -26,7 +27,9 @@ int main(int argc,char **argv)
     "hud_meters","empty_hand","armor_storage","armor_equip","new_world_view","bed_safe_respawn",
     "notice_short","notice_expired","notice_broken_bow","notice_inventory","inventory_cached_selection","furnace_cached_progress",
     "furnace_empty","furnace_invalid","furnace_blocked","furnace_needs_fuel","furnace_ready","furnace_smelting","furnace_done",
-    "furnace_cold","furnace_burning","delete_error"};
+    "furnace_cold","furnace_burning","delete_error",
+    "door_north_closed","door_north_open","door_east_closed","door_east_open",
+    "door_south_closed","door_south_open","door_west_closed","door_west_open"};
   for(unsigned k=0;k<sizeof(variants)/sizeof(variants[0]);k++) {
     MC_CloseBag(&w);w.time=k==1?435:90;w.bag=k==2;w.target_valid=0;
     if(k==2) {for(unsigned i=1;i<MC_ITEM_COUNT;i++)if(i!=MC_BEDROCK&&i!=MC_WATER&&i!=MC_SLAB_TOP)MC_Give(&w,i,MC_ToolIndex(i)>=0?1:2);w.notice="32 SLOTS  CRAFTING  CONTAINERS";}
@@ -254,6 +257,19 @@ int main(int argc,char **argv)
         assert(MC_FurnaceState(f)==state);
       } else if(k==69)f->burn=23;
     }
+    if(k>=71) {
+      memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
+      for(int z=5;z<20;z++)for(int x=5;x<20;x++)MC_Set(&w,x,1,z,MC_PLANKS);
+      unsigned facing=(k-71)/2;int open=(k-71)%2;
+      /* Same world-space door cell, viewed from each construction approach. */
+      for(int y=2;y<=4;y++)for(int x=8;x<=12;x++)for(int z=8;z<=12;z++) {
+        if((facing&1)?x==10&&z!=10:z==10&&x!=10)MC_Set(&w,x,y,z,MC_BRICK);
+      }
+      MC_Set(&w,10,4,10,MC_BRICK);
+      MC_Set(&w,10,2,10,MC_DoorState(facing,open,0));MC_Set(&w,10,3,10,MC_DoorState(facing,open,1));
+      w.yaw=facing*1.570796327f;w.x=10.5f-sinf(w.yaw)*3;w.z=10.5f-cosf(w.yaw)*3;
+      w.y=2.01f;w.pitch=-.1f;w.time=90;w.notice=NULL;
+    }
     MC_ViewUpdate(view,&w);
     for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view->pixels[y/5*MC_VIEW_W+x/5];
     MC_UIDraw(fb,&w,MC_GRASS,0,0,"NEW WORLD  SD READY",1,0,0);
@@ -271,7 +287,7 @@ int main(int argc,char **argv)
     fclose(f);
   }
   MC_Generate(&w,0x20261020);
-  MC_SaveEncode(&w,1,save);snprintf(path,sizeof(path),"%s/initial-world-v6.SAV",argv[1]);
+  MC_SaveEncode(&w,1,save);snprintf(path,sizeof(path),"%s/initial-world-v7.SAV",argv[1]);
   FILE *f=fopen(path,"wb");if(!f)return 1;
   if(fwrite(save,1,MC_SAVE_SIZE,f)!=MC_SAVE_SIZE)return 1;
   fclose(f);

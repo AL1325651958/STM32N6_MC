@@ -411,6 +411,7 @@ Appli/Core/Inc/mc_view.h
 Appli/Core/Src/mc_view.c
 tools/minicraft_view_test.c
 tools/minicraft_furnace_test.c
+tools/minicraft_door_test.c
 tools/minicraft_filex_test.c
 tools/test_minicraft_filex.py
 tools/filex_host/sdmmc.h

@@ -30,6 +30,7 @@ def main():
         'minicraft_notice_test':core+['Appli/Core/Src/mc_save.c','Appli/Core/Src/mc_ui.c'],
         'minicraft_view_test':core+['Appli/Core/Src/mc_view.c','Appli/Core/Src/mc_save.c','Appli/Core/Src/mc_ui.c'],
         'minicraft_furnace_test':core+['Appli/Core/Src/mc_view.c','Appli/Core/Src/mc_save.c'],
+        'minicraft_door_test':core+['Appli/Core/Src/mc_save.c'],
     }
     for name,sources in cases.items():
         exe=out/(name+'.exe')
@@ -39,7 +40,7 @@ def main():
         if args.sd and name=='minicraft_save_test':
             extra=[str(p.resolve()) for p in sorted(args.sd.glob('MC[0-3].SAV'))]
         if name=='minicraft_save_test':
-            for version in (2,3,4,5):
+            for version in (2,3,4,5,6):
                 legacy=ROOT/f'out/minicraft/initial-world-v{version}.SAV'
                 if legacy.exists():extra.append(str(legacy))
         subprocess.run([str(exe),*extra],cwd=ROOT,check=True)

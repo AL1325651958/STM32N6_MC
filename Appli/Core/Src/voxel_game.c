@@ -137,7 +137,7 @@ static int load_world(void)
   sd_ready=HAL_SD_GetState(&hsd2)==HAL_SD_STATE_READY && SD_Card_Init()==FX_SUCCESS;
   if(sd_ready) for(int slot=0;slot<2;slot++) {
     ULONG got=0;UINT ret=SD_File_Read(MC_WorldFile(world_bank,slot),save_blob,sizeof(save_blob),&got);
-    if(ret==FX_SUCCESS && got>=8 && !memcmp(save_blob,"N6MC",4) && (save_blob[4]>6 || save_blob[5] || save_blob[6] || save_blob[7]))found_unknown=1;
+    if(ret==FX_SUCCESS && got>=8 && !memcmp(save_blob,"N6MC",4) && (save_blob[4]>MC_SAVE_VERSION || save_blob[5] || save_blob[6] || save_blob[7]))found_unknown=1;
     uint32_t gen=ret==FX_SUCCESS?MC_SaveValidate(save_blob,got):0;
     if(gen && (active_slot<0 || (int32_t)(gen-generation)>0)) {
       MC_SaveDecode(&world,save_blob,got);generation=gen;active_slot=slot;

@@ -23,13 +23,13 @@ static const uint16_t colors[MC_ITEM_COUNT]={
   [MC_BIRCH_WOOD]=0xd6b6,[MC_BIRCH_PLANKS]=0xc5a2,[MC_DARK_WOOD]=0x5a04,[MC_DARK_PLANKS]=0x7b05,
   [MC_BREAD]=0xdca6,[MC_COOKED_MEAT]=0xa346,[MC_DOUBLE_SLAB]=0x8c71
 };
-const char *MC_ItemName(unsigned i){return i<MC_ITEM_COUNT?names[i]:"EMPTY";}uint16_t MC_ItemColor(unsigned i){return i<MC_ITEM_COUNT?colors[i]:0;}
+const char *MC_ItemName(unsigned i){if(i>=MC_ITEM_COUNT&&i<=255&&MC_IsDoor((uint8_t)i))i=MC_DoorOpen((uint8_t)i)?MC_DOOR_OPEN:MC_DOOR;return i<MC_ITEM_COUNT?names[i]:"EMPTY";}uint16_t MC_ItemColor(unsigned i){if(i>=MC_ITEM_COUNT&&i<=255&&MC_IsDoor((uint8_t)i))i=MC_DoorOpen((uint8_t)i)?MC_DOOR_OPEN:MC_DOOR;return i<MC_ITEM_COUNT?colors[i]:0;}
 void MC_HoldStart(MC_Hold*h,int x,int y,uint32_t n){*h=(MC_Hold){x,y,x,y,n,0};}void MC_HoldMove(MC_Hold*h,int x,int y,uint32_t n){int dx=x-h->anchor_x,dy=y-h->anchor_y;h->x=x;h->y=y;if(dx*dx+dy*dy>144){h->moved=1;h->anchor_x=x;h->anchor_y=y;h->since=n;}}int MC_HoldReady(const MC_Hold*h,uint32_t n){return(uint32_t)(n-h->since)>=450;}
 int MC_HoldTap(const MC_Hold*h,uint32_t n){return !h->moved && !MC_HoldReady(h,n);}
 int MC_IsBlock(unsigned i) {
   return (i>MC_AIR && i<MC_BLOCK_COUNT) || MC_IsDoor((uint8_t)i) || i==MC_DOUBLE_SLAB || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP || i==MC_FARMLAND || i==MC_WHEAT_CROP || i==MC_WHEAT_MATURE || (i>=MC_FENCE && i<=MC_STAIR_WEST) || (i>=MC_DUST && i<=MC_BUTTON_ON) || (i>=MC_BIRCH_WOOD && i<=MC_DARK_PLANKS);
 }
-static int map_only(unsigned i){return MC_DoorUpper((uint8_t)i)||i==MC_DOUBLE_SLAB||i==MC_FARMLAND||i==MC_WHEAT_CROP||i==MC_WHEAT_MATURE||(i>=MC_STAIR_EAST&&i<=MC_STAIR_WEST)||i==MC_DUST_ON||i==MC_LAMP_ON||i==MC_LEVER_ON||i==MC_BUTTON_ON;}
+static int map_only(unsigned i){return (MC_IsDoor((uint8_t)i)&&i!=MC_DOOR)||i==MC_DOUBLE_SLAB||i==MC_FARMLAND||i==MC_WHEAT_CROP||i==MC_WHEAT_MATURE||(i>=MC_STAIR_EAST&&i<=MC_STAIR_WEST)||i==MC_DUST_ON||i==MC_LAMP_ON||i==MC_LEVER_ON||i==MC_BUTTON_ON;}
 static uint8_t redstone_off(uint8_t b)
 {
   if(b==MC_DUST_ON)return MC_DUST;
@@ -440,14 +440,15 @@ static int open_target_at(MC_World *w,float sx,float sy) {
   if(MC_IsDoor(b)) {
     int upper=MC_DoorUpper(b);if(upper)y--;
     b=MC_DoorBase(b);
-    uint8_t old_top=MC_Get(w,x,y+1,z),next=b==MC_DOOR?MC_DOOR_OPEN:MC_DOOR;
+    uint8_t old_top=MC_Get(w,x,y+1,z),next=MC_DoorState(MC_DoorFacing(b),!MC_DoorOpen(b),0);
+    int paired=MC_DoorUpper(old_top)&&MC_DoorBase(old_top)==b;
     MC_Set(w,x,y,z,next);
-    if(MC_DoorUpper(old_top))MC_Set(w,x,y+1,z,next==MC_DOOR?MC_DOOR_TOP:MC_DOOR_TOP_OPEN);
+    if(paired)MC_Set(w,x,y+1,z,MC_DoorState(MC_DoorFacing(b),!MC_DoorOpen(b),1));
     if(!MC_BodyClear(w,w->x,w->y,w->z)) {
-      MC_Set(w,x,y,z,b);if(MC_DoorUpper(old_top))MC_Set(w,x,y+1,z,old_top);
+      MC_Set(w,x,y,z,b);if(paired)MC_Set(w,x,y+1,z,old_top);
       MC_Notify(w,"MOVE CLEAR TO CLOSE");return 1;
     }
-    MC_Notify(w,b==MC_DOOR?"DOOR OPEN":"DOOR CLOSED");
+    MC_Notify(w,MC_DoorOpen(b)?"DOOR CLOSED":"DOOR OPEN");
     w->target_valid=0;w->mining=0;return 1;
   }
   if(b==MC_TABLE){w->bag=1;w->recipe_requires=b;w->open_chest=w->open_furnace=255;return 1;}
