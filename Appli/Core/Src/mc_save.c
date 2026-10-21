@@ -97,7 +97,7 @@ uint32_t MC_SaveValidate(const uint8_t*p,unsigned length){
         const uint8_t*q=m+M_FURNACES+i*26;
         if(!coord(q)||!svalid(q+6)||!svalid(q+10)||!svalid(q+14)||!range(getfloat(q+18),0,40)||!range(getfloat(q+22),0,4.999999f))return 0;
         if(get16(q)){
-          if(saved_block(p,q)!=MC_FURNACE||(q[7]&&!output(q[6]))||(q[11]&&!isfuel(q[10]))||(q[15]&&q[14]!=MC_IRON&&q[14]!=MC_GLASS&&q[14]!=MC_COAL&&q[14]!=MC_BRICK))return 0;
+          if(saved_block(p,q)!=MC_FURNACE||(q[7]&&!output(q[6]))||(q[11]&&!isfuel(q[10]))||(q[15]&&q[14]!=MC_IRON&&q[14]!=MC_GLASS&&q[14]!=MC_COAL&&q[14]!=MC_BRICK&&q[14]!=MC_COOKED_MEAT))return 0;
           for(unsigned j=0;j<i;j++)if(!memcmp(q,m+M_FURNACES+j*26,6))return 0;
         }else if(q[7]||q[11]||q[15]||getfloat(q+18)||getfloat(q+22))return 0;
       }

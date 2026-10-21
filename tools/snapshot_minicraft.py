@@ -17,7 +17,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/minicraft"
-ARCHIVE_ROOT = ROOT / "out/verified-v11"
+ARCHIVE_ROOT = ROOT / "out/verified-v12"
 
 
 def digest(data):
@@ -52,7 +52,7 @@ def main():
     (OUT / "snapshot-preview-build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
     if result.returncode:
         raise SystemExit(f"preview build failed; see {OUT / 'snapshot-preview-build.log'}\n{result.stdout}{result.stderr}")
-    preview_dir = OUT / "ui-v11"
+    preview_dir = OUT / "ui-v12"
     preview_dir.mkdir(parents=True, exist_ok=True)
     result = subprocess.run([str(preview_exe), str(preview_dir)], cwd=ROOT,
                             text=True, capture_output=True, encoding="utf-8")
@@ -81,7 +81,7 @@ def main():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archive_root = ARCHIVE_ROOT / stamp
     archive_root.mkdir(parents=True, exist_ok=False)
-    source_zip = archive_root / "MiniCraft-v11-source.zip"
+    source_zip = archive_root / "MiniCraft-v12-source.zip"
     source_hashes = {}
     with zipfile.ZipFile(source_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for rel in sources:
@@ -113,6 +113,8 @@ def main():
         "action_feed.png": (preview_dir / "action_feed.png").read_bytes(),
         "action_place.png": (preview_dir / "action_place.png").read_bytes(),
         "action_use.png": (preview_dir / "action_use.png").read_bytes(),
+        "main_menu.png": (preview_dir / "main_menu.png").read_bytes(),
+        "create_world.png": (preview_dir / "create_world.png").read_bytes(),
         "action_eat.png": (preview_dir / "action_eat.png").read_bytes(),
     }
     for name, data in artifacts.items():

@@ -19,6 +19,12 @@ int main(int argc,char **argv) {
  MC_World a={.blocks=calloc(1,MC_MAP_BYTES)},b={.blocks=calloc(1,MC_MAP_BYTES)};
  uint8_t *save=calloc(1,MC_SAVE_SIZE),*copy=malloc(MC_SAVE_SIZE);assert(a.blocks&&b.blocks&&save&&copy);
  MC_Generate(&a,77);
+ /* Finished food in a registered furnace survives a real save roundtrip. */
+ MC_Set(&a,50,40,30,MC_FURNACE);
+ a.furnaces[0]=(MC_Furnace){51,41,31,{MC_RAW_MEAT,2,0},{MC_COAL,1,0},{MC_COOKED_MEAT,1,0},3,1};
+ roundtrip(&a,&b,save);assert(b.furnaces[0].output.item==MC_COOKED_MEAT);
+ MC_Generate(&a,77);
+
  uint16_t ruin_coords[2][3];
  for(unsigned c=0;c<2;c++) {
    memcpy(ruin_coords[c],a.chest_map[c],sizeof(ruin_coords[c]));

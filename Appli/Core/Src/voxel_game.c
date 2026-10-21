@@ -25,6 +25,31 @@ static const char *status="NEW WORLD";
 static const char *files[2][2]={{"MC0.SAV","MC1.SAV"},{"MC2.SAV","MC3.SAV"}};
 static unsigned world_bank,max_frame_ms;
 static char saved_status[48];
+static int main_menu=1,creating,menu_down,menu_release;
+static uint8_t bank_state[2]; /* 0 empty, 1 valid save, 2 occupied/unreadable */
+static uint32_t create_seed=20261021;
+static int create_creative;
+static const char *menu_message="SELECT A WORLD";
+
+/* Scan both slots without changing a world or writing to the card. Any
+   unknown/corrupt/read-error slot reserves its bank against creation. */
+static void scan_worlds(void)
+{
+  sd_ready=HAL_SD_GetState(&hsd2)==HAL_SD_STATE_READY && SD_Card_Init()==FX_SUCCESS;
+  memset(bank_state,0,sizeof(bank_state));
+  if(!sd_ready){menu_message="NO SD  NEW WORLDS ARE TEMPORARY";return;}
+  for(unsigned bank=0;bank<2;bank++) {
+    int valid=0,occupied=0;
+    for(unsigned slot=0;slot<2;slot++) {
+      ULONG got=0;UINT ret=SD_File_Read(files[bank][slot],save_blob,sizeof(save_blob),&got);
+      if(ret==FX_NOT_FOUND)continue;
+      if(ret==FX_SUCCESS && MC_SaveValidate(save_blob,got))valid=1;
+      else occupied=1;
+    }
+    bank_state[bank]=valid?1:occupied?2:0;
+  }
+}
+
 
 static void clean_buffer(uint16_t *fb)
 {
@@ -47,13 +72,17 @@ static void lcd_init(void)
 static void display(unsigned back,unsigned selected,unsigned fps,int touch,float f,float s)
 {
   uint16_t *fb=(uint16_t *)(void *)(lcd_bg_buffer+back*FB_BYTES);
-  MC_Render(&world,view,MC_VIEW_W,MC_VIEW_H);
-  for(unsigned y=0;y<MC_VIEW_H;y++) {
-    uint16_t *row=fb+y*5*800;
-    for(unsigned x=0;x<MC_VIEW_W;x++) for(unsigned k=0;k<5;k++) row[x*5+k]=view[y*MC_VIEW_W+x];
-    for(unsigned k=1;k<5;k++) memcpy(row+k*800,row,1600);
+  if(main_menu)MC_MenuDraw(fb,bank_state,creating,world_bank,create_seed,create_creative,menu_message);
+  else {
+    MC_Render(&world,view,MC_VIEW_W,MC_VIEW_H);
+    for(unsigned y=0;y<MC_VIEW_H;y++) {
+      uint16_t *row=fb+y*5*800;
+      for(unsigned x=0;x<MC_VIEW_W;x++) for(unsigned k=0;k<5;k++) row[x*5+k]=view[y*MC_VIEW_W+x];
+      for(unsigned k=1;k<5;k++) memcpy(row+k*800,row,1600);
+    }
+    MC_UIDraw(fb,&world,selected,fps,max_frame_ms,status,touch,f,s);
   }
-  MC_UIDraw(fb,&world,selected,fps,max_frame_ms,status,touch,f,s);clean_buffer(fb);
+  clean_buffer(fb);
   if(HAL_LTDC_SetAddress_NoReload(&hltdc,(uint32_t)fb,0)!=HAL_OK) Error_Handler();
   if(HAL_LTDC_Reload(&hltdc,LTDC_RELOAD_VERTICAL_BLANKING)!=HAL_OK) Error_Handler();
   /* Do not reuse the previous front buffer until hardware completes the swap. */
@@ -62,7 +91,7 @@ static void display(unsigned back,unsigned selected,unsigned fps,int touch,float
     if(HAL_GetTick()-start>100) {HAL_LTDC_Reload(&hltdc,LTDC_RELOAD_IMMEDIATE);break;}
   }
 }
-static void load_world(void)
+static int load_world(void)
 {
   int found_bad=0,found_unknown=0;generation=0;active_slot=-1;save_locked=0;
   sd_ready=HAL_SD_GetState(&hsd2)==HAL_SD_STATE_READY && SD_Card_Init()==FX_SUCCESS;
@@ -75,10 +104,13 @@ static void load_world(void)
     } else if(!gen && ret!=FX_NOT_FOUND) found_bad=1;
   }
   if(active_slot<0) {
-    MC_Generate(&world,0x20261020u+world_bank);dirty=1;
-    save_locked=found_bad;
-    status=!sd_ready?"NO SD  VOLATILE WORLD":save_locked?"BAD SAVE  CHECK SD ON PC":"NEW WORLD  SD READY";
-  } else {dirty=0;save_locked=found_unknown;status=found_unknown?"NEWER SAVE  READ ONLY":world_bank?"WORLD 2 LOADED":"WORLD 1 LOADED";}
+    dirty=0;save_locked=1;
+    menu_message=found_bad?"SAVE READ FAILED  EXISTING FILES PRESERVED":"NO VALID SAVE  RETURN TO MENU";
+    return 0;
+  }
+  dirty=0;save_locked=found_unknown;
+  status=found_unknown?"NEWER SAVE  READ ONLY":world_bank?"WORLD 2 LOADED":"WORLD 1 LOADED";
+  return 1;
 }
 static void save_world(void)
 {
@@ -104,7 +136,13 @@ static void update_contacts(const GT911_StateTypeDef *touch,uint32_t now,unsigne
 {
   for(unsigned i=0;i<GT911_MAX_TOUCHES;i++) if(contacts[i].active) {
     int found=0;for(unsigned j=0;j<touch->touch_count;j++) if(touch->points[j].track_id==contacts[i].id) found=1;
-    if(!found) contacts[i].active=0;
+    if(!found) {
+      Contact *c=&contacts[i];
+      if(c->role==MC_TOUCH_LOOK && !c->action_done && !world.bag && MC_HoldTap(&c->hold,now)) {
+        MC_SceneTap(&world,c->x,c->y);dirty=1;
+      }
+      c->active=0;
+    }
   }
   for(unsigned j=0;j<touch->touch_count;j++) {
     const GT911_PointTypeDef *p=&touch->points[j];Contact *c=NULL;
@@ -129,10 +167,6 @@ static void update_contacts(const GT911_StateTypeDef *touch,uint32_t now,unsigne
         world.slot=(p->x-240)/50;*selected=world.hotbar[world.slot];
         if(MC_ToolIndex(*selected)>=0)MC_SelectItem(&world,*selected);
       }
-      if(c->role==MC_TOUCH_LOOK) {
-        if(MC_SceneTap(&world,p->x,p->y))c->action_done=1;
-        dirty=1;
-      }
     }
     if(c->role==MC_TOUCH_LOOK && !world.bag) {
       MC_HoldMove(&c->hold,p->x,p->y,now);
@@ -144,7 +178,7 @@ static void update_contacts(const GT911_StateTypeDef *touch,uint32_t now,unsigne
 }
 void VoxelGame_Run(void)
 {
-  world.blocks=world_mem;lcd_init();load_world();
+  world.blocks=world_mem;lcd_init();scan_worlds();
   int touch_ready=GT911_Init(&hi2c2)==GT911_OK;
   if(!touch_ready) touch_ready=GT911_Init(&hi2c1)==GT911_OK;
   GT911_StateTypeDef touch={0};
@@ -153,9 +187,50 @@ void VoxelGame_Run(void)
   for(;;) {
     uint32_t now=HAL_GetTick();if(now-previous>max_frame_ms)max_frame_ms=now-previous;float dt=(now-previous)*.001f;previous=now;int request_save=0,jump=0;
     float f=0,s=0;int holding=0,sneak=0;float mine_x=400,mine_y=240;
+    if(main_menu) {
+      if(touch_ready) {
+        GT911_StatusTypeDef ret=GT911_ReadTouches(&touch);
+        if(ret==GT911_OK) {
+          if(!touch.touch_count){menu_down=0;menu_release=0;}
+          else if(!menu_down && !menu_release) {
+            menu_down=1;
+            int action=MC_MenuTap(touch.points[0].x,touch.points[0].y,creating);
+            if(action==MC_MENU_WORLD1 || action==MC_MENU_WORLD2) {
+              world_bank=(unsigned)(action-MC_MENU_WORLD1);
+              if(bank_state[world_bank]==1) {
+                if(load_world()){main_menu=0;menu_release=1;}
+              } else if(bank_state[world_bank]==0)creating=1;
+              else menu_message="EXISTING SAVE UNREADABLE  CHECK SD ON PC";
+            } else if(action==MC_MENU_SEED)create_seed=(create_seed+7919u)%1000000u;
+            else if(action==MC_MENU_MODE)create_creative=!create_creative;
+            else if(action==MC_MENU_BACK)creating=0;
+            else if(action==MC_MENU_CREATE) {
+              scan_worlds(); /* Recheck immediately before choosing a write target. */
+              if(bank_state[world_bank]!=0)menu_message="SLOT OCCUPIED  EXISTING WORLD PRESERVED";
+              else {
+                MC_Generate(&world,create_seed);MC_SetMode(&world,create_creative);
+                generation=0;active_slot=-1;save_locked=0;dirty=1;
+                if(sd_ready)save_world();else status="NO SD  VOLATILE WORLD";
+                main_menu=0;creating=0;menu_release=1;
+              }
+            }
+            if(!main_menu) {
+              memset(contacts,0,sizeof(contacts));selected=world.hotbar[world.slot];
+              previous=last_save=fps_time=HAL_GetTick();frames=0;max_frame_ms=0;
+            }
+          }
+        }
+      }
+      display(back,selected,fps,touch_ready,0,0);back^=1;
+      continue;
+    }
     if(touch_ready) {
       GT911_StatusTypeDef ret=GT911_ReadTouches(&touch);
-      if(ret==GT911_OK) {last_report=now;update_contacts(&touch,now,&selected,&request_save);}
+      if(ret==GT911_OK) {
+        last_report=now;
+        if(menu_release){if(!touch.touch_count)menu_release=0;}
+        else update_contacts(&touch,now,&selected,&request_save);
+      }
       else if(ret!=GT911_NO_DATA || now-last_report>250) memset(contacts,0,sizeof(contacts));
     }
     for(unsigned i=0;i<GT911_MAX_TOUCHES;i++) if(contacts[i].active && !world.bag) {
@@ -163,8 +238,8 @@ void VoxelGame_Run(void)
       if(c->role==MC_TOUCH_MOVE) { f=(350.0f-c->y)/65;s=(c->x-110.0f)/65; }
       else if(c->role==MC_TOUCH_JUMP) jump=1;
       else if(c->role==MC_TOUCH_SNEAK) sneak=1;
-      else if(c->role==MC_TOUCH_LOOK && !c->action_done && MC_HoldReady(&c->hold,now)) {
-        holding=1;mine_x=c->x;mine_y=c->y;
+      else if(c->role==MC_TOUCH_LOOK && MC_HoldReady(&c->hold,now)) {
+        c->action_done=1;holding=1;mine_x=c->x;mine_y=c->y;
       }
     }
     if(f || s || jump) dirty=1;
@@ -181,16 +256,13 @@ void VoxelGame_Run(void)
     display(back,selected,fps,touch_ready,f,s);back^=1;
     if(world.change_world) {
       world.change_world=0;
-      if(!sd_ready || save_locked)world.notice="WORLD SWITCH NEEDS WRITABLE SD";
+      int needs_save=dirty && sd_ready && !save_locked;
+      if(needs_save)save_world();
+      if(needs_save && dirty)world.notice="SAVE FAILED OR LOCKED  STAYING IN WORLD";
       else {
-        /* Save the current bank before loading another; separate filenames preserve builds. */
-        save_world();
-        if(sd_ready) {
-          world_bank^=1;load_world();
-          world.notice=world_bank?"WORLD 2  ORES AND CAVES":"WORLD 1  ORIGINAL WORLD";
-          if(dirty && !save_locked)save_world();
-          memset(contacts,0,sizeof(contacts));
-        }
+        main_menu=1;creating=0;menu_down=0;menu_release=1;
+        menu_message="SELECT A WORLD";scan_worlds();
+        memset(contacts,0,sizeof(contacts));
       }
       last_save=HAL_GetTick();previous=last_save;
     } else if(do_save) {save_world();last_save=HAL_GetTick();previous=last_save;for(unsigned k=0;k<GT911_MAX_TOUCHES;k++)contacts[k].role=MC_TOUCH_NONE;}

@@ -20,6 +20,27 @@ int main(void) {
  MC_HoldMove(&h,105,104,1500);assert(MC_HoldReady(&h,1500));MC_HoldMove(&h,125,104,1510);assert(!MC_HoldReady(&h,1600));assert(MC_HoldReady(&h,1960));
  MC_HoldStart(&h,0,0,0xffffff00u);assert(MC_HoldReady(&h,0x100));assert(MC_UIRole(620,310)==MC_TOUCH_LOOK);
  MC_World w={.blocks=malloc(MC_MAP_BYTES)};assert(w.blocks);scene(&w);
+ /* A release is a tap only before the hold threshold and without a drag.
+    Long holds never place/eat first, regardless of the selected item. */
+ MC_HoldStart(&h,400,240,100);assert(MC_HoldTap(&h,549));assert(!MC_HoldTap(&h,550));
+ MC_HoldMove(&h,430,240,560);assert(!MC_HoldTap(&h,570));
+ MC_HoldStart(&h,400,240,0xfffffff0u);assert(MC_HoldTap(&h,30));
+ const unsigned mining_items[]={MC_DIRT,MC_APPLE,MC_BREAD,MC_COOKED_MEAT,MC_STICK,MC_WHEAT_SEEDS,MC_SWORD};
+ for(unsigned i=0;i<sizeof(mining_items)/sizeof(mining_items[0]);i++) {
+   scene(&w);assert(MC_Give(&w,mining_items[i],2));
+   MC_Set(&w,10,3,13,MC_WOOD);MC_HoldStart(&h,400,240,100);
+   assert(!MC_HoldTap(&h,550));mine(&w,40);
+   assert(MC_Get(&w,10,3,13)==MC_AIR&&w.items[mining_items[i]]==2);
+ }
+ scene(&w);assert(MC_Give(&w,MC_DIRT,2));MC_Set(&w,10,3,13,MC_STONE);
+ MC_HoldStart(&h,400,240,100);assert(MC_HoldTap(&h,200));
+ assert(MC_SceneTap(&w,400,240)&&w.items[MC_DIRT]==1&&MC_Get(&w,10,3,12)==MC_DIRT);
+ scene(&w);
+ assert(MC_MenuTap(400,200,0)==MC_MENU_WORLD1&&MC_MenuTap(400,300,0)==MC_MENU_WORLD2);
+ assert(MC_MenuTap(400,200,1)==MC_MENU_SEED&&MC_MenuTap(400,260,1)==MC_MENU_MODE);
+ assert(MC_MenuTap(400,330,1)==MC_MENU_CREATE&&MC_MenuTap(400,400,1)==MC_MENU_BACK);
+ assert(MC_MenuTap(199,330,1)==MC_MENU_NONE&&MC_MenuTap(600,330,1)==MC_MENU_NONE);
+
  /* Nearby sand falls on a bounded scheduler, while supported sand stays put. */
  MC_Set(&w,4,5,4,MC_SAND);tick(&w,2);
  assert(MC_Get(&w,4,5,4)==MC_AIR&&MC_Get(&w,4,4,4)==MC_SAND);
@@ -255,6 +276,9 @@ int main(void) {
  for(int yy=0;yy<8;yy++)if(memcmp(&dry_hint[yy*220],&fb[(309+yy)*800+290],220*sizeof(*fb)))hint_changed=1;
  assert(hint_changed);
  for(int k=0;k<6;k++){w.bag=k>0;MC_SetMode(&w,k==5);w.open_chest=k==2?0:255;w.open_furnace=k==3?0:255;MC_UIDraw(fb,&w,0,15,67,"TEST",1,0,0);}
+ const uint8_t banks[2]={1,0};
+ MC_MenuDraw(fb,banks,0,0,20261021,0,"TEST");
+ MC_MenuDraw(fb,banks,1,1,20261021,1,"TEST");
  for(int k=0;k<64;k++)assert(fb[800*480+k]==0xa55a);
  free(fb);free(w.blocks);puts("minicraft slots / crafting / containers / furnace / growth / survival / UI: OK");return 0;
 }

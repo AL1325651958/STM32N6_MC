@@ -66,6 +66,42 @@ static void small(uint16_t *fb,int x,int y,const char *s,uint16_t c)
     if(*s=='-')rect(fb,x,y+3,4,1,c);
   }
 }
+int MC_MenuTap(unsigned x,unsigned y,int creating)
+{
+  if(x<200 || x>=600)return MC_MENU_NONE;
+  if(creating) {
+    if(y>=180 && y<228)return MC_MENU_SEED;
+    if(y>=240 && y<288)return MC_MENU_MODE;
+    if(y>=306 && y<362)return MC_MENU_CREATE;
+    if(y>=378 && y<426)return MC_MENU_BACK;
+  } else {
+    if(y>=180 && y<252)return MC_MENU_WORLD1;
+    if(y>=276 && y<348)return MC_MENU_WORLD2;
+  }
+  return MC_MENU_NONE;
+}
+void MC_MenuDraw(uint16_t *fb,const uint8_t banks[2],int creating,unsigned bank,uint32_t seed,int creative,const char *message)
+{
+  for(int y=0;y<480;y++)rect(fb,0,y,800,1,y<260?0x19ea:0x2225);
+  for(int x=0;x<800;x+=40)rect(fb,x,260+(x/40%3)*16,40,220,0x2b46);
+  panel(fb,140,38,520,410);text(fb,292,66,"MINICRAFT N6",0xffe0);
+  text(fb,creating?304:334,110,creating?"CREATE WORLD":"MAIN MENU",0xffff);
+  char label[48];
+  if(creating) {
+    snprintf(label,sizeof(label),"WORLD %u",bank+1);small(fb,370,148,label,0xffc0);
+    panel(fb,200,180,400,48);snprintf(label,sizeof(label),"SEED %lu  CHANGE",(unsigned long)seed);text(fb,214,196,label,0xffff);
+    panel(fb,200,240,400,48);text(fb,260,256,creative?"MODE CREATIVE":"MODE SURVIVAL",0xffff);
+    panel(fb,200,306,400,56);text(fb,316,328,"CREATE WORLD",0xffe0);
+    panel(fb,200,378,400,48);text(fb,376,394,"BACK",0xffff);
+  } else for(unsigned i=0;i<2;i++) {
+    int y=180+(int)i*96;panel(fb,200,y,400,72);
+    snprintf(label,sizeof(label),"WORLD %u  %s",i+1,banks[i]==1?"CONTINUE":banks[i]==2?"UNAVAILABLE":"CREATE");
+    text(fb,220,y+20,label,banks[i]==2?0xf9a4:0xffff);
+    small(fb,220,y+48,banks[i]==1?"LOAD SAVED PROGRESS":banks[i]==2?"SAVE EXISTS  PRESERVED":"EMPTY SLOT  NEW SEED AND MODE",0xffc0);
+  }
+  small(fb,160,460,message?message:"SELECT A WORLD",0xffff);
+}
+
 static unsigned catalog_item(unsigned index);
 void MC_UIBagTap(MC_World *w,unsigned x,unsigned y)
 {
@@ -371,7 +407,7 @@ void MC_UIDraw(uint16_t *fb,const MC_World *w,unsigned selected,unsigned fps,uns
     text(fb,24,386,MC_ItemName(id),0xffff);
     panel(fb,24,410,128,30);text(fb,29,418,w->creative?"CREATIVE":"SURVIVAL",0xffe0);
     panel(fb,160,410,120,30);text(fb,166,418,w->split?"HALF ON":"HALF OFF",0xffff);
-    panel(fb,290,410,114,30);text(fb,310,418,"WORLD",0xffff);
+    panel(fb,290,410,114,30);text(fb,310,418,"MENU",0xffff);
     if(w->creative)for(unsigned i=0;i<8;i++){MC_Stack s={w->hotbar[i],1,0};stack(fb,430+i*44,390,44,50,&s,i==w->slot,1);}
     else if(w->open_chest>=MC_CHESTS&&w->open_furnace>=MC_FURNACES) {
       small(fb,430,386,"ARMOR",0xffe0);

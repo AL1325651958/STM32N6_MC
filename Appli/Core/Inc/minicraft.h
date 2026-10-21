@@ -189,9 +189,10 @@ unsigned MC_RecipeIngredient(unsigned recipe,unsigned part);
 unsigned MC_RecipeIngredientCount(unsigned recipe,unsigned part);
 void MC_SelectItem(MC_World *w, unsigned item);
 /* Long press restarts after drag motion exceeds 12 LCD pixels. */
-typedef struct { int x,y,anchor_x,anchor_y; uint32_t since; } MC_Hold;
+typedef struct { int x,y,anchor_x,anchor_y; uint32_t since; uint8_t moved; } MC_Hold;
 void MC_HoldStart(MC_Hold *h,int x,int y,uint32_t now);
 void MC_HoldMove(MC_Hold *h,int x,int y,uint32_t now);
 int MC_HoldReady(const MC_Hold *h,uint32_t now);
+int MC_HoldTap(const MC_Hold *h,uint32_t now);
 
 #endif

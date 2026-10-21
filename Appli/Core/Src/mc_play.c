@@ -24,7 +24,8 @@ static const uint16_t colors[MC_ITEM_COUNT]={
   [MC_BREAD]=0xdca6,[MC_COOKED_MEAT]=0xa346
 };
 const char *MC_ItemName(unsigned i){return i<MC_ITEM_COUNT?names[i]:"EMPTY";}uint16_t MC_ItemColor(unsigned i){return i<MC_ITEM_COUNT?colors[i]:0;}
-void MC_HoldStart(MC_Hold*h,int x,int y,uint32_t n){*h=(MC_Hold){x,y,x,y,n};}void MC_HoldMove(MC_Hold*h,int x,int y,uint32_t n){int dx=x-h->anchor_x,dy=y-h->anchor_y;h->x=x;h->y=y;if(dx*dx+dy*dy>144){h->anchor_x=x;h->anchor_y=y;h->since=n;}}int MC_HoldReady(const MC_Hold*h,uint32_t n){return(uint32_t)(n-h->since)>=450;}
+void MC_HoldStart(MC_Hold*h,int x,int y,uint32_t n){*h=(MC_Hold){x,y,x,y,n,0};}void MC_HoldMove(MC_Hold*h,int x,int y,uint32_t n){int dx=x-h->anchor_x,dy=y-h->anchor_y;h->x=x;h->y=y;if(dx*dx+dy*dy>144){h->moved=1;h->anchor_x=x;h->anchor_y=y;h->since=n;}}int MC_HoldReady(const MC_Hold*h,uint32_t n){return(uint32_t)(n-h->since)>=450;}
+int MC_HoldTap(const MC_Hold*h,uint32_t n){return !h->moved && !MC_HoldReady(h,n);}
 int MC_IsBlock(unsigned i) {
   return (i>MC_AIR && i<MC_BLOCK_COUNT) || i==MC_CHEST || i==MC_BED || i==MC_SAPLING || i==MC_DOOR || i==MC_DOOR_OPEN || i==MC_SLAB || i==MC_SLAB_TOP || i==MC_FARMLAND || i==MC_WHEAT_CROP || i==MC_WHEAT_MATURE || (i>=MC_FENCE && i<=MC_STAIR_WEST) || (i>=MC_DUST && i<=MC_BUTTON_ON) || (i>=MC_BIRCH_WOOD && i<=MC_DARK_PLANKS);
 }
@@ -479,7 +480,7 @@ int MC_SceneTap(MC_World *w,float x,float y) {
     if(MC_Pick(w,x,y,&hit) && (hit.block==MC_WHEAT_CROP || hit.block==MC_WHEAT_MATURE))return 0;
   }
   if(MC_UseAt(w,x,y))return 1;
-  return held!=0;
+  return 0;
 }
 int MC_Use(MC_World *w) { return MC_UseAt(w,400,240); }
 int MC_Place(MC_World *w) { return MC_PlaceAt(w,400,240); }
