@@ -17,7 +17,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/minicraft"
-GAME_VERSION = "v41"
+GAME_VERSION = "v42"
 ARCHIVE_ROOT = ROOT / f"out/verified-{GAME_VERSION}"
 
 

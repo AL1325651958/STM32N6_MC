@@ -12,9 +12,11 @@ static void crc(uint8_t *p,unsigned len){put32(p+48,MC_Crc32(p+MC_SAVE_V1_SIZE,l
 static void block_crc(uint8_t *p){put32(p+56,MC_Crc32(p+MC_SAVE_HEADER,MC_MAP_BYTES));put32(p+60,MC_Crc32(p,60));}
 static void roundtrip(MC_World *a,MC_World *b,uint8_t *p){MC_SaveEncode(a,4,p);assert(MC_SaveValidate(p,MC_SAVE_SIZE)==4);assert(MC_SaveDecode(b,p,MC_SAVE_SIZE));}
 static void invalid(MC_World *w,uint8_t *p,uint8_t *copy,unsigned offset,unsigned value){
- memcpy(p,copy,MC_SAVE_SIZE);p[MC_SAVE_V1_SIZE+offset]=(uint8_t)value;crc(p,MC_SAVE_META);
- assert(!MC_SaveValidate(p,MC_SAVE_SIZE));uint32_t before=MC_Crc32(w->blocks,MC_MAP_BYTES);float x=w->x;
- assert(!MC_SaveDecode(w,p,MC_SAVE_SIZE));assert(x==w->x&&before==MC_Crc32(w->blocks,MC_MAP_BYTES));
+ assert(MC_SaveValidate(copy,MC_SAVE_SIZE)==4);
+ memcpy(p,copy,MC_SAVE_SIZE);p[MC_SAVE_V1_SIZE+offset]=(uint8_t)value;crc(p,MC_SAVE_META+MC_EXPLORE_BYTES);
+ assert(!MC_SaveValidate(p,MC_SAVE_SIZE));uint32_t before=MC_Crc32(w->blocks,MC_MAP_BYTES);
+ MC_World state;memcpy(&state,w,sizeof(state));
+ assert(!MC_SaveDecode(w,p,MC_SAVE_SIZE));assert(!memcmp(&state,w,sizeof(state))&&before==MC_Crc32(w->blocks,MC_MAP_BYTES));
 }
 int main(int argc,char **argv) {
  MC_World a={.blocks=calloc(1,MC_MAP_BYTES)},b={.blocks=calloc(1,MC_MAP_BYTES)};
@@ -27,8 +29,14 @@ int main(int argc,char **argv) {
  assert(MC_SaveValidate(save,MC_SAVE_V8_SIZE)==5);
  MC_Set(&a,40,30,40,MC_LAVA);MC_SaveEncode(&a,6,save);put32(save+4,7);crc(save,MC_SAVE_META);block_crc(save);
  assert(!MC_SaveValidate(save,MC_SAVE_V8_SIZE));
- MC_SaveEncode(&a,6,save);assert(MC_SaveValidate(save,MC_SAVE_SIZE)==6);
- a.slots[31]=(MC_Stack){MC_LAVA,1,0};MC_SaveEncode(&a,7,save);put32(save+4,7);crc(save,MC_SAVE_META);block_crc(save);
+ MC_SaveEncode(&a,6,save);put32(save+4,8);crc(save,MC_SAVE_META);
+ assert(MC_SaveValidate(save,MC_SAVE_V8_SIZE)==6);
+ uint8_t *v8=malloc(MC_SAVE_V8_SIZE);assert(v8);memcpy(v8,save,MC_SAVE_V8_SIZE);
+ memset(b.explored,0xff,MC_EXPLORE_BYTES);
+ assert(MC_SaveDecode(&b,v8,MC_SAVE_V8_SIZE)&&MC_Get(&b,40,30,40)==MC_LAVA);
+ unsigned revealed=0;for(unsigned z=0;z<MC_MAP_Z;z++)for(unsigned x=0;x<MC_MAP_X;x++)revealed+=MC_IsExplored(&b,(int)x,(int)z);
+ assert(revealed==17*17);free(v8);
+ a.slots[31]=(MC_Stack){MC_LAVA,1,0};MC_SaveEncode(&a,7,save);put32(save+4,8);crc(save,MC_SAVE_META);
  assert(!MC_SaveValidate(save,MC_SAVE_V8_SIZE));memset(&a.slots[31],0,sizeof(a.slots[31]));
  MC_Generate(&a,77);
  /* Save-button state is transient, cannot affect encoded bytes, and cannot
@@ -116,6 +124,12 @@ int main(int argc,char **argv) {
  assert(MC_SaveDecode(&b,save,MC_SAVE_SIZE)&&b.crop_clock==0&&b.growers[1].age==32.5f);
  /* Old v4 metadata has no hunger marker and therefore loads with full hunger. */
  memcpy(copy,save,MC_SAVE_SIZE);
+ put32(save+4,4);uint8_t *meta=save+MC_SAVE_V1_SIZE;
+ meta[6]=0;meta[7]=0;memset(meta+1436,0,6);crc(save,MC_SAVE_META);
+ assert(MC_SaveValidate(save,MC_SAVE_V8_SIZE)==4);
+ assert(MC_SaveDecode(&b,save,MC_SAVE_V8_SIZE)&&b.hunger==20&&b.experience==0&&b.level==0);
+ assert(MC_IsExplored(&b,(int)b.x,(int)b.z));
+ assert(!MC_SaveValidate(save,MC_SAVE_SIZE)); /* Appended v9 tail is not a v4 file. */
  memcpy(save,copy,MC_SAVE_SIZE);
  /* A v3 file has identical legacy metadata but no entities. */
  memcpy(copy,save,MC_SAVE_SIZE);put32(save+4,3);crc(save,MC_SAVE_V3_META);
@@ -134,7 +148,9 @@ int main(int argc,char **argv) {
  invalid(&b,save,copy,1420+1,2);invalid(&b,save,copy,1420+2,0);
  invalid(&b,save,copy,1144+24,MC_MOB_HEALTH+1);
  invalid(&b,save,copy,1144+25,2);
- memcpy(save,copy,MC_SAVE_SIZE);putfloat(save+MC_SAVE_V1_SIZE+8,NAN);crc(save,MC_SAVE_META);assert(!MC_SaveValidate(save,MC_SAVE_SIZE));
+ invalid(&b,save,copy,6,21);invalid(&b,save,copy,7,2);
+ invalid(&b,save,copy,1436+4,MC_MAX_LEVEL+1);invalid(&b,save,copy,1436+5,2);
+ memcpy(save,copy,MC_SAVE_SIZE);putfloat(save+MC_SAVE_V1_SIZE+8,NAN);crc(save,MC_SAVE_META+MC_EXPLORE_BYTES);assert(!MC_SaveValidate(save,MC_SAVE_SIZE));
  /* Synthetic v1 migration preserves every terrain byte. */
  MC_Generate(&a,77);for(unsigned i=0;i<MC_MAP_BYTES;i++)if(a.blocks[i]>=9)a.blocks[i]=MC_STONE;
  MC_SaveEncode(&a,8,save);put32(save+4,1);put32(save+48,0);put32(save+52,0);put32(save+60,MC_Crc32(save,60));
@@ -188,5 +204,5 @@ int main(int argc,char **argv) {
    }
    printf("Legacy save roundtrip, terrain preserved (only free-space door tops may be added): %s\n",argv[i]);
  }
- free(copy);free(save);free(a.blocks);free(b.blocks);puts("minicraft v1/v2/v3/v4/v5/v6/v7/v8 save / corruption / migration / persistent systems: OK");return 0;
+ free(copy);free(save);free(a.blocks);free(b.blocks);puts("minicraft v1-v9 saves / valid-CRC field corruption / atomic rejection / migration / exploration: OK");return 0;
 }
