@@ -33,8 +33,8 @@ int main(void) {
   MC_View *scene_view=calloc(1,sizeof(*scene_view));uint16_t *fb=malloc(800*480*2);
   if(!w.blocks||!scene_view||!fb)return 1;
   uint16_t *view=scene_view->pixels;
-  const char *names[]={"terrain","water","cave_lights","entities","lava","underwater","cutouts","lava_distant"};
-  for(unsigned scene=0;scene<8;scene++) {
+  const char *names[]={"terrain","water","cave_lights","entities","lava","underwater","cutouts","lava_distant","ray_boundaries"};
+  for(unsigned scene=0;scene<9;scene++) {
     /* Stable terrain and camera make this a rendering benchmark even when
        new-world spawn selection or optional structures change. */
     MC_GenerateTerrain(&w,0x20261020u);
@@ -46,7 +46,7 @@ int main(void) {
       w.x=64.5f;w.y=18;w.z=64.5f;w.pitch=-.6f;
       if(scene==5)w.y=14.5f;
     }
-    if(scene==2 || scene==3 || scene==6 || scene==7) {
+    if(scene==2 || scene==3 || scene==6 || scene==7 || scene==8) {
       memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
       for(int z=4;z<25;z++)for(int x=4;x<25;x++) {
         MC_Set(&w,x,1,z,MC_STONE);
@@ -65,10 +65,21 @@ int main(void) {
         MC_Set(&w,x,y,20,MC_BRICK);
       }
       if(scene==7)MC_Set(&w,10,2,23,MC_LAVA);
+      if(scene==8) {
+        MC_Set(&w,10,3,13,MC_GLASS);MC_Set(&w,10,4,13,MC_LEAVES);
+        MC_Set(&w,13,3,10,MC_TORCH);MC_Set(&w,10,3,7,MC_SLAB_TOP);
+        MC_Set(&w,7,3,10,MC_DOOR);MC_Set(&w,7,4,10,MC_DOOR_TOP);
+      }
     }
     double seconds=0;uint32_t hash=0,frame_crc[32];
     for(unsigned frame=0;frame<32;frame++) {
       w.yaw=yaw+frame*.018f;w.time+=.067f;
+      if(scene==8) {
+        /* Exact cell planes, cardinal axes and tiny camera offsets exercise
+           DDA ties and near-zero direction components against shaped blocks. */
+        w.x=10+(frame%3)*.000001f;w.z=10;w.y=2.38f;
+        w.yaw=(frame%4)*1.570796327f;w.pitch=frame%2?0:-.2f;
+      }
       double start=seconds_now();
       render_scene(scene_view,&w);
       for(unsigned y=0;y<480;y++)for(unsigned x=0;x<800;x++)fb[y*800+x]=view[y/5*MC_VIEW_W+x/5];

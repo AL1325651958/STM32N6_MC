@@ -637,16 +637,34 @@ static int shape_hit(uint8_t b,const float p[3],const float d[3],float start,flo
   float lo[3],hi[3];bounds(b,lo,hi);
   return box_hit(lo,hi,p,d,start,end,distance,nx,ny,nz);
 }
-/* DDA advances once per crossed block. The parameter is forward depth for rendering. */
-static int trace(const MC_World *w,float dx,float dy,float dz,float reach,Hit *hit)
+/* All render rays share an eye position; vertical DDA setup also repeats
+   across an entire screen row. Keep touch rays on the same traversal. */
+typedef struct {
+  float px,py,pz,iy,ty;
+  int x,y,z,sy,underwater;
+} TraceStart;
+static TraceStart trace_start(const MC_World *w)
 {
   float px=w->x,py=w->y+1.62f,pz=w->z;
-  int x=(int)floorf(px),y=(int)floorf(py),z=(int)floorf(pz);
-  int sx=dx<0?-1:1,sy=dy<0?-1:1,sz=dz<0?-1:1;
+  return (TraceStart){.px=px,.py=py,.pz=pz,
+    .x=(int)floorf(px),.y=(int)floorf(py),.z=(int)floorf(pz)};
+}
+static void trace_row(TraceStart *start,float dy)
+{
+  start->sy=dy<0?-1:1;
+  start->iy=fabsf(dy)>1e-7f?1/fabsf(dy):1e30f;
+  start->ty=(dy<0?start->py-start->y:start->y+1-start->py)*start->iy;
+}
+/* DDA advances once per crossed block. The parameter is forward depth for rendering. */
+static int trace_from(const MC_World *w,const TraceStart *start,float dx,float dy,float dz,float reach,Hit *hit)
+{
+  float px=start->px,py=start->py,pz=start->pz;
+  int x=start->x,y=start->y,z=start->z;
+  int sx=dx<0?-1:1,sy=start->sy,sz=dz<0?-1:1;
   float ix=fabsf(dx)>1e-7f?1/fabsf(dx):1e30f;
-  float iy=fabsf(dy)>1e-7f?1/fabsf(dy):1e30f;
+  float iy=start->iy;
   float iz=fabsf(dz)>1e-7f?1/fabsf(dz):1e30f;
-  float tx=(dx<0?px-x:x+1-px)*ix,ty=(dy<0?py-y:y+1-py)*iy,tz=(dz<0?pz-z:z+1-pz)*iz;
+  float tx=(dx<0?px-x:x+1-px)*ix,ty=start->ty,tz=(dz<0?pz-z:z+1-pz)*iz;
   int nx=0,ny=0,nz=0;
   for(float t=0;t<=reach;) {
     if(!inside(x,y,z)) return 0;
@@ -667,13 +685,19 @@ static int trace(const MC_World *w,float dx,float dy,float dz,float reach,Hit *h
       if(b==MC_GLASS && u>0 && u<15 && v>0 && v<15 && u!=v && u+1!=v)b=MC_AIR;
       else if(b==MC_LEAVES && (hash(u,v,7)&15)<3)b=MC_AIR;
     }
-    if(reach>6 && b==MC_WATER && MC_Get(w,(int)px,(int)py,(int)pz)==MC_WATER)b=MC_AIR;
+    if(reach>6 && b==MC_WATER && start->underwater)b=MC_AIR;
     if(b!=MC_AIR) { *hit=(Hit){x,y,z,nx,ny,nz,t,b}; return 1; }
     if(tx<=ty && tx<=tz) { x+=sx; t=tx; tx+=ix; nx=-sx; ny=nz=0; }
     else if(ty<=tz) { y+=sy; t=ty; ty+=iy; ny=-sy; nx=nz=0; }
     else { z+=sz; t=tz; tz+=iz; nz=-sz; nx=ny=0; }
   }
   return 0;
+}
+static int trace(const MC_World *w,float dx,float dy,float dz,float reach,Hit *hit)
+{
+  TraceStart start=trace_start(w);trace_row(&start,dy);
+  if(reach>6)start.underwater=MC_Get(w,(int)start.px,(int)start.py,(int)start.pz)==MC_WATER;
+  return trace_from(w,&start,dx,dy,dz,reach,hit);
 }
 int MC_BlockSegment(const MC_World *w,float px,float py,float pz,float ex,float ey,float ez,float *fraction)
 {
@@ -867,7 +891,13 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
      A frame-local direct-mapped cache remains correct after any world edit. */
   uint32_t light_key[256];float light_value[256];
   for(unsigned i=0;i<256;i++)light_key[i]=UINT32_MAX;
+  TraceStart start=trace_start(w);
+  start.underwater=underwater;
   for(unsigned y=0;y<height;++y) {
+    float v=(height*.5f-y-.5f)/focal,dy=sp+v*cp;
+    trace_row(&start,dy);
+    float horizon=clamp(1-fabsf(dy)*1.5f,0,1);
+    int skyR=(int)((73+64*horizon)*daylight),skyG=(int)((151+48*horizon)*daylight),skyB=(int)((218+20*horizon)*(.3f+.7f*daylight));
     unsigned row_drop=0,row_projectile=0,row_mob=0;
     for(unsigned mask=drop_mask;mask;mask&=mask-1) {
       unsigned i=(unsigned)__builtin_ctz(mask);
@@ -882,12 +912,10 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
       if((int)y>=mob_rect[i][1] && (int)y<=mob_rect[i][3])row_mob|=1u<<i;
     }
     for(unsigned x=0;x<width;++x) {
-    float u=(x+.5f-width*.5f)/focal,v=(height*.5f-y-.5f)/focal;
-    float dx=syaw*cp+u*cyaw-v*sp*syaw,dy=sp+v*cp,dz=cyaw*cp-u*syaw-v*sp*cyaw;
-    float horizon=clamp(1-fabsf(dy)*1.5f,0,1);
-    int skyR=(int)((73+64*horizon)*daylight),skyG=(int)((151+48*horizon)*daylight),skyB=(int)((218+20*horizon)*(.3f+.7f*daylight));
+    float u=(x+.5f-width*.5f)/focal;
+    float dx=syaw*cp+u*cyaw-v*sp*syaw,dz=cyaw*cp-u*syaw-v*sp*cyaw;
     unsigned r=skyR,g=skyG,b=skyB;
-    Hit h;int world_hit=trace(w,dx,dy,dz,40,&h);
+    Hit h;int world_hit=trace_from(w,&start,dx,dy,dz,40,&h);
     /* Opaque terrain replaces the sky. Keep the cheap fog sky color, but
        compute celestial discs/clouds/stars only for rays that reach sky. */
     if(!world_hit) {
