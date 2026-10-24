@@ -33,19 +33,20 @@ int main(void) {
   MC_View *scene_view=calloc(1,sizeof(*scene_view));uint16_t *fb=malloc(800*480*2);
   if(!w.blocks||!scene_view||!fb)return 1;
   uint16_t *view=scene_view->pixels;
-  const char *names[]={"terrain","water","cave_lights","entities"};
-  for(unsigned scene=0;scene<4;scene++) {
+  const char *names[]={"terrain","water","cave_lights","entities","lava","underwater","cutouts","lava_distant"};
+  for(unsigned scene=0;scene<8;scene++) {
     /* Stable terrain and camera make this a rendering benchmark even when
        new-world spawn selection or optional structures change. */
     MC_GenerateTerrain(&w,0x20261020u);
     w.x=w.z=128.5f;w.y=40.01f;w.yaw=.7f;w.pitch=-.12f;
     float yaw=w.yaw;
-    if(scene==1) {
+    if(scene==1 || scene==4 || scene==5) {
       for(int z=0;z<MC_MAP_Z;z++)for(int x=0;x<MC_MAP_X;x++)
-        for(int y=1;y<20;y++)MC_Set(&w,x,y,z,y<16?MC_STONE:y==16?MC_WATER:MC_AIR);
+        for(int y=1;y<20;y++)MC_Set(&w,x,y,z,y<16?MC_STONE:y==16?(scene==4?MC_LAVA:MC_WATER):MC_AIR);
       w.x=64.5f;w.y=18;w.z=64.5f;w.pitch=-.6f;
+      if(scene==5)w.y=14.5f;
     }
-    if(scene>=2) {
+    if(scene==2 || scene==3 || scene==6 || scene==7) {
       memset(w.blocks,0,MC_MAP_BYTES);MC_NewPlayer(&w,0);
       for(int z=4;z<25;z++)for(int x=4;x<25;x++) {
         MC_Set(&w,x,1,z,MC_STONE);
@@ -58,6 +59,12 @@ int main(void) {
         w.drops[i]=(MC_Drop){7.5f+i,2.4f,13,0,0,0,MC_APPLE,1};
         w.projectiles[i]=(MC_Projectile){7.5f+i,3,17,0,0,18,0,1};
       }
+      if(scene==6)for(int x=4;x<25;x++)for(int y=2;y<6;y++) {
+        MC_Set(&w,x,y,14,MC_GLASS);
+        MC_Set(&w,x,y,17,MC_LEAVES);
+        MC_Set(&w,x,y,20,MC_BRICK);
+      }
+      if(scene==7)MC_Set(&w,10,2,23,MC_LAVA);
     }
     double seconds=0;uint32_t hash=0,frame_crc[32];
     for(unsigned frame=0;frame<32;frame++) {

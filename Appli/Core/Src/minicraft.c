@@ -660,14 +660,14 @@ static int trace(const MC_World *w,float dx,float dy,float dz,float reach,Hit *h
       b=MC_AIR;
     }
     /* Render cutouts without changing solid collision / touch selection. */
-    if(reach>6 && b!=MC_AIR) {
+    if(reach>6 && (b==MC_GLASS || b==MC_LEAVES)) {
       float hx=px+dx*t,hy=py+dy*t,hz=pz+dz*t;
       unsigned u=(unsigned)(int)floorf((nx?hz:hx)*16)&15;
       unsigned v=(unsigned)(int)floorf((ny?hz:hy)*16)&15;
       if(b==MC_GLASS && u>0 && u<15 && v>0 && v<15 && u!=v && u+1!=v)b=MC_AIR;
       else if(b==MC_LEAVES && (hash(u,v,7)&15)<3)b=MC_AIR;
-      else if(b==MC_WATER && MC_Get(w,(int)px,(int)py,(int)pz)==MC_WATER)b=MC_AIR;
     }
+    if(reach>6 && b==MC_WATER && MC_Get(w,(int)px,(int)py,(int)pz)==MC_WATER)b=MC_AIR;
     if(b!=MC_AIR) { *hit=(Hit){x,y,z,nx,ny,nz,t,b}; return 1; }
     if(tx<=ty && tx<=tz) { x+=sx; t=tx; tx+=ix; nx=-sx; ny=nz=0; }
     else if(ty<=tz) { y+=sy; t=ty; ty+=iy; ny=-sy; nx=nz=0; }
@@ -858,9 +858,10 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
     lc.world=w;lc.blocks=w->blocks;lc.serial=w->scene_serial;lc.revision=w->map_revision;lc.x=lx0;lc.y=ly0;lc.z=lz0;lc.valid=1;
   }
   const int (*lights)[3]=lc.lights;int nl=lc.n;
-  /* Water texture has only 256 possible texels at a fixed world time.
-     Fill lazily so a dry frame performs no water sine evaluations. */
-  int8_t water_noise[256];int water_ready=0;
+  /* Fluid textures have only 256 possible texels at a fixed world time.
+     Lava is filled per texel so a distant pool does not evaluate a full tile. */
+  int8_t water_noise[256],lava_noise[256];int water_ready=0;
+  uint32_t lava_valid[8]={0};
   uint32_t last_furnace=UINT32_MAX;int last_furnace_lit=0;
   /* Lighting depends on block coordinates, not the individual face pixel.
      A frame-local direct-mapped cache remains correct after any world edit. */
@@ -956,7 +957,15 @@ void MC_Render(const MC_World *w,uint16_t *pixels,unsigned width,unsigned height
           n=water_noise[tv*16+tu];break;
         case MC_LAVA:
           r=224;g=60;b=18;
-          n=(int)(sinf((float)tu*.9f+(float)tv*.55f+w->time*3.0f)*18.0f);
+          {
+            unsigned texel=tv*16+tu,word=texel>>5;
+            uint32_t bit=1u<<(texel&31);
+            if(!(lava_valid[word]&bit)) {
+              lava_noise[texel]=(int8_t)(sinf((float)tu*.9f+(float)tv*.55f+w->time*3.0f)*18.0f);
+              lava_valid[word]|=bit;
+            }
+            n=lava_noise[texel];
+          }
           break;
         case MC_COBBLE:if((tu+((tv/5)&1)*4)%7==0 || tv%5==0)n=-45;break;
         case MC_PLANKS:r=179;g=137;b=79;if(tv%4==0 || (tu+(tv/4)*7)%16==0)n=-32;break;
